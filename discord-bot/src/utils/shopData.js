@@ -218,16 +218,33 @@ export const FRAME_PRESETS = [
   { key: 'sombrio',        label: 'Cromo Sombrio',     emoji: '🖤', c1: '#9ca3af', c2: '#111827', image: 'preto.png',    extra: 'studs' },
 ];
 
+// Molduras exclusivas para usuários com um cargo VIP ativo no servidor.
+// O prefixo próprio evita colisões com as molduras comuns no mesmo campo.
+export const VIP_FRAME_PRESETS = [
+  { key: 'angela',   label: 'Angela Dourada',  emoji: '👑', c1: '#ffe27a', c2: '#d88b00', image: 'angela_avatar.webp' },
+  { key: 'prophesy', label: 'Olho da Profecia', emoji: '🔮', c1: '#f0a0ff', c2: '#8c1fc7', image: 'eye_of_prophesy.webp' },
+  { key: 'venom',    label: 'Venom',            emoji: '🕷️', c1: '#a86cff', c2: '#37008c', image: 'marvel_snap_venom.webp' },
+  { key: 'gallica',  label: 'Gallica',          emoji: '🌊', c1: '#b9f7ff', c2: '#167d95', image: 'gallica.webp' },
+];
+
 export function getFrame(value) {
   if (!value || !value.startsWith('frame:')) return null;
   const key = value.slice('frame:'.length);
   return FRAME_PRESETS.find(f => f.key === key) ?? null;
 }
 
+export function getVipFrame(value) {
+  if (!value || !value.startsWith('vipframe:')) return null;
+  const key = value.slice('vipframe:'.length);
+  return VIP_FRAME_PRESETS.find(f => f.key === key) ?? null;
+}
+
 export function getRingColors(activeRing) {
   if (!activeRing) return { c1: '#c084fc', c2: '#7c3aed' };
   const frame = getFrame(activeRing);
   if (frame) return { c1: frame.c1, c2: frame.c2 };
+  const vipFrame = getVipFrame(activeRing);
+  if (vipFrame) return { c1: vipFrame.c1, c2: vipFrame.c2 };
   if (activeRing.startsWith('#')) return { c1: activeRing, c2: activeRing };
   const preset = getRing(activeRing);
   return preset ? { c1: preset.c1, c2: preset.c2 } : { c1: '#c084fc', c2: '#7c3aed' };
@@ -424,9 +441,10 @@ async function getKeyedRingImage(fileName) {
  * ornamento extra desenhado por cima para se diferenciar da cor comum.
  */
 export async function drawAvatarRing(ctx, cx, cy, r, ringValue) {
-  const frame  = getFrame(ringValue);
-  const preset = !frame && ringValue ? getRing(ringValue) : null;
-  const fileName = frame?.image ?? preset?.image ?? 'roxo.png';
+  const frame    = getFrame(ringValue);
+  const vipFrame = !frame ? getVipFrame(ringValue) : null;
+  const preset   = !frame && !vipFrame && ringValue ? getRing(ringValue) : null;
+  const fileName = frame?.image ?? vipFrame?.image ?? preset?.image ?? 'roxo.png';
   const extra    = frame?.extra ?? null;
   const { c1, c2 } = getRingColors(ringValue);
 

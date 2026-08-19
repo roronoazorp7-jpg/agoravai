@@ -16,7 +16,16 @@ import {
 } from 'discord.js';
 import prisma from '../database/client.js';
 import { getEmoji } from './emojiManager.js';
-import { WALLET_BACKGROUNDS, RING_PRESETS, getRing, FRAME_PRESETS, getFrame, buildBannerUrl } from './shopData.js';
+import {
+  WALLET_BACKGROUNDS,
+  RING_PRESETS,
+  getRing,
+  FRAME_PRESETS,
+  getFrame,
+  VIP_FRAME_PRESETS,
+  getVipFrame,
+  buildBannerUrl,
+} from './shopData.js';
 import { renderRingPreview } from './ringPreview.js';
 import { buildPetPanel, petDisplayName } from './petComponents.js';
 
@@ -2068,6 +2077,8 @@ function ringFooter(mode) {
 }
 
 function describeRing(value) {
+  const vipFrame = getVipFrame(value);
+  if (vipFrame) return `${vipFrame.emoji} ${vipFrame.label} (VIP)`;
   const frame = getFrame(value);
   if (frame) return `${frame.emoji} ${frame.label} (moldura)`;
   const preset = getRing(value);
@@ -2094,6 +2105,7 @@ function buildRingRows(current, mode) {
     new ActionRowBuilder().addComponents(FRAME_PRESETS.slice(3).map(makeFrameBtn)),
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`${mode}_ring_custom`).setLabel('🎨 Cor da Argola (Hex)').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`${mode}_ring_vip`).setLabel('👑 Molduras VIP').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId(`${mode}_ring_border_custom`).setLabel('🔲 Cor do Contorno').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId(`${mode}_ring_border_reset`).setLabel('↩️ Resetar Contorno').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId(`${mode}_ring_remove`).setLabel('🚫 Remover Argola').setStyle(ButtonStyle.Danger),
@@ -2101,13 +2113,8 @@ function buildRingRows(current, mode) {
   ];
 }
 
-async function handleRingBtn(interaction, mode) {
-  const fields  = RING_FIELDS[mode];
-  const profile = await prisma.userProfile.findUnique({ where: { userId: interaction.user.id } });
-  const current = profile?.[fields.ring]   ?? 'roxo';
-  const border  = profile?.[fields.border] ?? null;
-
-  return interaction.reply({
+function buildRingPanelPayload(current, border, mode) {
+  return {
     embeds: [
       new EmbedBuilder().setColor(SHOP_COLOR).setTitle(ringTitle(mode))
         .setDescription(
@@ -2118,8 +2125,93 @@ async function handleRingBtn(interaction, mode) {
         .setFooter({ text: ringFooter(mode) }),
     ],
     components: buildRingRows(current, mode),
+  };
+}
+
+async function handleRingBtn(interaction, mode) {
+  const fields  = RING_FIELDS[mode];
+  const profile = await prisma.userProfile.findUnique({ where: { userId: interaction.user.id } });
+  const current = profile?.[fields.ring]   ?? 'roxo';
+  const border  = profile?.[fields.border] ?? null;
+
+  return interaction.reply({ ...buildRingPanelPayload(current, border, mode), ephemeral: true });
+}
+
+async function hasVipFrameAccess(interaction) {
+  const member = interaction.member?.roles?.cache
+    ? interaction.member
+    : await interaction.guild?.members.fetch(interaction.user.id).catch(() => null);
+  if (!member?.roles?.cache || !interaction.guildId) return false;
+
+  const grants = await prisma.vipGrant.findMany({
+    where: {
+      guildId: interaction.guildId,
+      userId: interaction.user.id,
+      expiresAt: { gt: new Date() },
+    },
+    select: { roleId: true },
+  });
+  return grants.some(grant => member.roles.cache.has(grant.roleId));
+}
+
+async function handleVipRingBtn(interaction, mode) {
+  if (!(await hasVipFrameAccess(interaction))) {
+    return interaction.reply({
+      content: '🔒 Esta área é exclusiva para usuários com um cargo VIP ativo.',
+      ephemeral: true,
+    });
+  }
+
+  const fields  = RING_FIELDS[mode];
+  const profile = await prisma.userProfile.findUnique({ where: { userId: interaction.user.id } });
+  const current = profile?.[fields.ring] ?? 'roxo';
+
+  const frameButtons = VIP_FRAME_PRESETS.map(frame =>
+    new ButtonBuilder()
+      .setCustomId(`${mode}_ring_vip_frame:${frame.key}`)
+      .setLabel(`${frame.emoji} ${frame.label}`)
+      .setStyle(current === `vipframe:${frame.key}` ? ButtonStyle.Primary : ButtonStyle.Secondary),
+  );
+
+  return interaction.reply({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(0x8c1fc7)
+        .setTitle('👑 Molduras VIP')
+        .setDescription('Escolha uma moldura exclusiva para visualizar a prévia e equipar no seu avatar.')
+        .setFooter({ text: ringFooter(mode) }),
+    ],
+    components: [
+      new ActionRowBuilder().addComponents(frameButtons),
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`${mode}_ring_vip_back`).setLabel('← Voltar para argolas').setStyle(ButtonStyle.Secondary),
+      ),
+    ],
     ephemeral: true,
   });
+}
+
+async function handleVipRingFrame(interaction, mode) {
+  if (!(await hasVipFrameAccess(interaction))) {
+    return interaction.reply({
+      content: '🔒 Esta área é exclusiva para usuários com um cargo VIP ativo.',
+      ephemeral: true,
+    });
+  }
+
+  const key = interaction.customId.slice(`${mode}_ring_vip_frame:`.length);
+  const frame = getVipFrame(`vipframe:${key}`);
+  if (!frame) return interaction.reply({ content: '❌ Moldura VIP inválida.', ephemeral: true });
+
+  return sendRingPreview(interaction, mode, `vipframe:${key}`, `${frame.emoji} ${frame.label} (VIP)`);
+}
+
+async function handleVipRingBack(interaction, mode) {
+  const fields  = RING_FIELDS[mode];
+  const profile = await prisma.userProfile.findUnique({ where: { userId: interaction.user.id } });
+  const current = profile?.[fields.ring] ?? 'roxo';
+  const border  = profile?.[fields.border] ?? null;
+  return interaction.update(buildRingPanelPayload(current, border, mode));
 }
 
 // ─── 👁️ Prévia (sem persistir) + confirmação de equipar ───────────────────────
