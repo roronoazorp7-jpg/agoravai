@@ -837,6 +837,7 @@ export async function handleShopInteraction(interaction, client) {
 
     if (selectedId === 'profile_banner_btn') return handleProfileBannerBtn(interaction);
     if (selectedId === 'profile_ring_btn') return handleRingBtn(interaction, ringMode(selectedId));
+    if (selectedId === 'profile_ring_vip') return handleVipRingBtn(interaction, ringMode(selectedId));
     if (selectedId === 'profile_bg_btn') return handleProfileBgBtn(interaction);
     if (selectedId === 'profile_panel_btn') return handleProfilePanelBtn(interaction);
     if (selectedId === 'profile_pet_btn') return handleProfilePetBtn(interaction);
@@ -856,6 +857,7 @@ export async function handleShopInteraction(interaction, client) {
     if (selectedId === 'wallet_fundo_preset_btn') return handleWalletFundoPresetBtn(interaction);
     if (selectedId === 'wallet_fundo_btn') return handleWalletFundoBtn(interaction);
     if (selectedId === 'wallet_ring_btn') return handleRingBtn(interaction, ringMode(selectedId));
+    if (selectedId === 'wallet_ring_vip') return handleVipRingBtn(interaction, ringMode(selectedId));
     if (selectedId === 'profile_bg_btn') return handleProfileBgBtn(interaction);
     if (selectedId === 'profile_panel_btn') return handleProfilePanelBtn(interaction);
     if (selectedId === 'wallet_fundo_reset') return handleWalletFundoReset(interaction);
@@ -884,6 +886,9 @@ export async function handleShopInteraction(interaction, client) {
     if (id.startsWith('shop_gok:'))              return handleGiftBuyExecute(interaction, client);
     if (id === 'profile_banner_btn')             return handleProfileBannerBtn(interaction);
     if (id === 'profile_ring_btn' || id === 'wallet_ring_btn')                 return handleRingBtn(interaction, ringMode(id));
+    if (id === 'profile_ring_vip' || id === 'wallet_ring_vip')                 return handleVipRingBtn(interaction, ringMode(id));
+    if (id.startsWith('profile_ring_vip_frame:') || id.startsWith('wallet_ring_vip_frame:')) return handleVipRingFrame(interaction, ringMode(id));
+    if (id === 'profile_ring_vip_back' || id === 'wallet_ring_vip_back')        return handleVipRingBack(interaction, ringMode(id));
     if (id === 'profile_ring_custom' || id === 'wallet_ring_custom')           return handleRingCustom(interaction, ringMode(id));
     if (id === 'profile_ring_border_custom' || id === 'wallet_ring_border_custom') return handleRingBorderCustom(interaction, ringMode(id));
     if (id === 'profile_ring_border_reset' || id === 'wallet_ring_border_reset')   return handleRingBorderReset(interaction, ringMode(id));
