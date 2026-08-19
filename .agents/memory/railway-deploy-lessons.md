@@ -109,3 +109,9 @@ O CDN do FUT.GG (`cdn.futgg.com`) é inacessível da rede do Replit (timeout/000
 - Não usar: sofifa.com, futbin.com, fut.gg (todos Cloudflare)
 - Alternativa: o script `scripts/sync-futgg.js --force` roda no Railway/servidor externo onde o CDN é acessível
 - Jogadores sem futggId mostram avatar com iniciais (comportamento esperado e já implementado)
+
+## Backup do PostgreSQL Railway
+
+- Para acessar o banco a partir do Replit, usar `DATABASE_PUBLIC_URL`; `DATABASE_URL` com host `postgres.railway.internal` só resolve dentro da rede do Railway.
+- **Why:** o host interno falha por DNS fora do Railway; além disso, `pg_dump` precisa ser da mesma versão major ou mais nova que o servidor PostgreSQL.
+- **Como aplicar:** validar a versão do servidor antes do dump e, se o cliente compatível não estiver disponível, exportar os dados por tabela e restaurar a estrutura a partir do schema Prisma.

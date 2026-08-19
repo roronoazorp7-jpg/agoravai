@@ -1,0 +1,454 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Interaction {
+  id      String @id @default(cuid())
+  type    String
+  fromId  String
+  toId    String
+  guildId String?
+  count   Int    @default(1)
+
+  @@unique([type, fromId, toId])
+}
+
+model TellonymProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  link   String
+}
+
+model TicketOption {
+  id          String   @id @default(cuid())
+  guildId     String
+  label       String
+  emoji       String   @default("🎫")
+  description String   @default("")
+  pingRole    String   @default("")
+  pingUser    String   @default("")
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([guildId])
+}
+
+model Ticket {
+  id        String   @id @default(cuid())
+  channelId String   @unique
+  userId    String
+  guildId   String
+  reason    String?
+  answer1   String?
+  answer2   String?
+  answer3   String?
+  claimedBy String?
+  status    String   @default("open")
+  createdAt DateTime @default(now())
+}
+
+model GuildConfig {
+  id             String  @id @default(cuid())
+  guildId        String  @unique
+
+  ticketChannel   String?
+  ticketCategory  String?
+  ticketColor     String?
+  ticketBanner    String?
+  ticketThumb     String?
+  ticketFooter    String?
+  ticketTitle     String?
+  ticketText      String?
+  ticketPingRole  String?
+  ticketPingUser  String?
+  ticketBtnLabel      String?
+  ticketBtnEmoji      String?
+  ticketBtnStyle      String?
+  ticketOpenText      String?
+  ticketUseSeparator  Boolean @default(false)
+  ticketBannerPosition String  @default("top")
+  ticketOnlyBanner     Boolean @default(false)
+  ticketUseMenu        Boolean @default(false)
+  ticketQuestion1 String?
+  ticketQuestion2 String?
+  ticketQuestion3 String?
+  ticketAiEnabled Boolean @default(false)
+
+  instaChannel   String?
+  instaColor     String?
+  instaEmoji     String  @default("💜")
+  instaHandle    String?
+
+  tellonymChannel  String?
+  tellonymColor    String?
+  tellonymBanner   String?
+  tellonymThumb    String?
+  tellonymFooter   String?
+  tellonymTitle    String?
+  tellonymText     String?
+  tellonymBtnLabel String?
+  tellonymBtnEmoji String?
+
+  lojaTitle      String?
+  lojaText       String?
+  lojaBanner     String?
+  lojaBannerPos  String?  @default("top")
+  lojaThumb      String?
+  lojaColor      String?
+  lojaConversao  String?
+  lojaUseDivider Boolean @default(false)
+  shopEmojiComprar   String?
+  shopEmojiVitrine   String?
+  shopEmojiConverter String?
+  shopEmojiSaldo     String?
+  shopEmojiGift      String?
+  shopBtnStyles      String?
+
+  vipTitle            String?
+  vipIntro            String?
+  vipText             String?
+  vipBanner           String?
+  vipThumb            String?
+  vipColor            String?
+  vipPriceLabel       String?
+  vipBtnEscolherLabel String?
+  vipBtnCarrinhoLabel String?
+  vipEmojiCoin        String?
+  vipEmojiTag         String?
+  vipEmojiBtn1        String?
+  vipEmojiBtn2        String?
+  vipPlans            VipPlan[]
+
+  welcomeEnabled      Boolean @default(true)
+  welcomeChannel      String?
+  welcomeColor        String?
+  welcomeBanner       String?
+  welcomeThumb        String?
+  welcomeFooter       String?
+  welcomeTitle        String?
+  welcomeText         String?
+  welcomeRoles          String?
+  welcomeChannels       String?
+  welcomeUseDivider     Boolean @default(false)
+  welcomeBannerPosition String  @default("top")
+  welcomeShowTitle      Boolean @default(true)
+  welcomeShowAvatar     Boolean @default(true)
+  welcomeDeleteAfter    Int?
+
+  partnerEnabled         Boolean @default(false)
+  partnerChannel         String?
+  partnerResponsibleRole String?
+  partnerPingRole        String?
+  partnerRole            String?
+  partnerNotifyDm        Boolean @default(false)
+  partnerMessage         String?
+  partnerImage           String?
+  partnerThumbnail       String?
+  partnerFooter          String?
+  partnerColor           String?
+  partnerRemoveOnLeave   Boolean @default(false)
+
+  botIconUrl   String?
+  botBannerUrl String?
+  botBio       String?
+
+  aiChannelId  String?
+  dropAllowedRoles String?
+}
+
+model VipPlan {
+  id       String      @id @default(cuid())
+  guildId  String
+  name     String
+  price    String
+  emoji    String?
+  roleId   String?
+  position Int         @default(0)
+  config   GuildConfig @relation(fields: [guildId], references: [guildId], onDelete: Cascade)
+}
+
+model Partnership {
+  id               String   @id @default(cuid())
+  guildId          String
+  partnerServerId  String
+  partnerName      String
+  promoterId       String
+  representativeId String?
+  inviteCode       String
+  messageUrl       String?
+  createdAt        DateTime @default(now())
+}
+
+model Economy {
+  id          String    @id @default(cuid())
+  userId      String
+  guildId     String
+  balance      Int       @default(0)
+  bank         Int       @default(0)
+  messageCount Int       @default(0)
+  callMinutes  Int       @default(0)
+  xp           Int       @default(0)
+  level        Int       @default(1)
+  lastDaily    DateTime?
+  lastWork    DateTime?
+  lastRob     DateTime?
+  dailyStreak Int       @default(0)
+  lastPetPlay DateTime?
+  lastPetFeed DateTime?
+  lastPetPet  DateTime?
+
+  @@unique([userId, guildId])
+}
+
+model FishingProfile {
+  id               String   @id @default(cuid())
+  userId           String
+  guildId          String
+  rodKey           String   @default("bambu")
+  activeBaitKey    String?
+  selectedSpotKey  String   @default("lago")
+  lastFishing      DateTime?
+  totalCaught      Int      @default(0)
+  sealBlessing     Boolean  @default(false)
+  sharkBattleHp    Int      @default(0)
+  sharkBattleReward Int     @default(0)
+  legendaryBattleUserId      String?
+  legendaryBattleRound       Int      @default(0)
+  legendaryBattleChoice      String?
+  legendaryBattleExpiresAt   DateTime?
+  dailyMissionDate     String?
+  dailyMissionKey      String?
+  dailyMissionProgress Int      @default(0)
+  dailyMissionClaimed  Boolean  @default(false)
+
+  @@unique([userId, guildId])
+}
+
+model FishingCatch {
+  id       String @id @default(cuid())
+  userId   String
+  guildId  String
+  fishKey  String
+  quantity Int    @default(0)
+
+  @@unique([userId, guildId, fishKey])
+  @@index([userId, guildId])
+}
+
+model FishingItem {
+  id       String @id @default(cuid())
+  userId   String
+  guildId  String
+  itemKey  String
+  quantity Int    @default(0)
+
+  @@unique([userId, guildId, itemKey])
+  @@index([userId, guildId])
+}
+
+model PanelPreset {
+  id        String   @id @default(cuid())
+  guildId   String
+  type      String
+  name      String
+  color     String?
+  banner    String?
+  thumb     String?
+  footer    String?
+  title     String?
+  text      String?
+  createdAt DateTime @default(now())
+
+  @@unique([guildId, type, name])
+}
+
+model ShopRole {
+  id          String   @id @default(cuid())
+  guildId     String
+  roleId      String
+  name        String
+  description String?
+  price       Int
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@unique([guildId, roleId])
+}
+
+model UserPurchase {
+  id          String   @id @default(cuid())
+  userId      String
+  guildId     String?
+  itemType    String
+  itemRef     String
+  purchasedAt DateTime @default(now())
+
+  @@unique([userId, itemType, itemRef])
+}
+
+model UserProfile {
+  id              String  @id @default(cuid())
+  userId          String  @unique
+  guildId         String?
+  activeBanner    String?
+  activeRing      String?
+  ringBorderColor String?
+  activePet       String?
+  bio             String?
+  marriedTo       String?
+  marriedToName   String?
+  marriedAt       DateTime?
+  bestFriendId    String?
+  bestFriendName  String?
+  reps            Int     @default(0)
+  cardBg1          String?
+  cardBg2          String?
+  cardPanelColor   String?
+  walletBg         String?
+  walletRing       String?
+  walletRingBorder String?
+  walletFrame      String?
+}
+
+model Pet {
+  id          String   @id @default(cuid())
+  guildId     String
+  name        String
+  emoji       String
+  imageUrl    String?
+  description String?
+  price       Int
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@unique([guildId, name])
+}
+
+model Badge {
+  id          String @id @default(cuid())
+  key         String @unique
+  name        String
+  emoji       String
+  description String
+  color       String @default("9B4FD6")
+}
+
+model UserBadge {
+  id        String   @id @default(cuid())
+  userId    String
+  badgeKey  String
+  earnedAt  DateTime @default(now())
+
+  @@unique([userId, badgeKey])
+}
+
+model GuildBadgeEmoji {
+  id       String @id @default(cuid())
+  guildId  String
+  badgeKey String
+  emoji    String
+
+  @@unique([guildId, badgeKey])
+}
+
+model CustomBanner {
+  id          String   @id @default(cuid())
+  guildId     String
+  key         String
+  name        String
+  description String   @default("")
+  price       Int      @default(1000)
+  imageUrl    String
+  gradient1   String   @default("#1a0533")
+  gradient2   String   @default("#4a1a8a")
+  emoji       String   @default("🖼️")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@unique([guildId, key])
+}
+
+model PublishedMsgData {
+  messageId String   @id
+  guildId   String
+  data      String
+  createdAt DateTime @default(now())
+}
+
+model CopaConfig {
+  id                    Int      @id @default(1)
+  guildId               String   @default("")
+  announcementChannelId String   @default("")
+  enabled               Boolean  @default(false)
+  emojiHomeWin          String   @default("🏠")
+  emojiDraw             String   @default("🤝")
+  emojiAwayWin          String   @default("✈️")
+  pointsWin             Int      @default(3)
+  pointsDraw            Int      @default(1)
+  pointsExact           Int      @default(5)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model CopaMatch {
+  id         Int      @id @default(autoincrement())
+  teamA      String
+  teamB      String
+  teamAFlag  String   @default("")
+  teamBFlag  String   @default("")
+  matchDate  DateTime
+  phase      String   @default("Fase de Grupos")
+  group      String   @default("")
+  stadium    String   @default("")
+  bannerUrl  String   @default("")
+  channelId  String   @default("")
+  messageId  String   @default("")
+  status     String   @default("pending")
+  scoreA     Int?
+  scoreB     Int?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  predictions CopaPrediction[]
+}
+
+model CopaPrediction {
+  id              Int      @id @default(autoincrement())
+  matchId         Int
+  discordUserId   String
+  discordUsername String   @default("")
+  prediction      String
+  points          Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  match CopaMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, discordUserId])
+}
+
+model VipGrant {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  roleId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([guildId, userId, roleId])
+  @@index([expiresAt])
+}
+
+/// Token do usuário para automação de Discord Quests (/quest)
+model UserQuestToken {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  token     String
+  updatedAt DateTime @updatedAt
+}
+

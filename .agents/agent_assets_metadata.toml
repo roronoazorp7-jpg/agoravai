@@ -65,138 +65,161 @@ id = "4AOTjtd6LAAOcCUcwG7WG"
 uri = "file://artifacts/api-server/public/games/test-grid-preview.png"
 type = "image"
 title = "Mines Grid — Dark + Diamond preview"
+logical_id = "0895f5dc-8b72-45df-9b0d-906da4e7ecd0"
 
 [[outputs]]
 id = "ohrrdIqT66ovjKfNede6R"
 uri = "file://artifacts/api-server/public/games/test-bomb-preview.png"
 type = "image"
 title = "Mines Grid — com bomba nova"
+logical_id = "96610095-aba3-49f4-a8be-0d7723f0cc91"
 
 [[outputs]]
 id = "_7tsuqP2K4pW-XP4Oapt0"
 uri = "file://artifacts/api-server/public/games/initial-preview.png"
 type = "image"
 title = "Grade inicial (todas ocultas)"
+logical_id = "9f8aec31-0b56-4d1e-a936-656b5fdd70e2"
 
 [[outputs]]
 id = "IKVnxj74hTMdQ1zmGAZbk"
 uri = "file://perfil_preview.png"
 type = "image"
 title = "Preview final — Roboto funcionando 100%"
+logical_id = "dc0a7b2d-e284-4c37-86b6-f1d77d297b93"
 
 [[outputs]]
 id = "FkpsFvkcm-VzPVD5GHIss"
 uri = "file://attached_assets/generated/preview_cards.png"
 type = "image"
 title = "Estado atual das fotos dos jogadores"
+logical_id = "091834dd-c3be-4889-ba4d-1cf99148fc79"
 
 [[outputs]]
 id = "hbxYSxF8eU6QqqhYaqh2v"
 uri = "file://test_card.png"
 type = "image"
 title = "Carta FUT — Thiago Silva (foto real do FUT.GG)"
+logical_id = "b4e4a30a-45c2-4705-984a-075ddecee0ba"
 
 [[outputs]]
 id = "eKbV4Y31bA2Eih9FgE8kB"
 uri = "file://tabela_cartas.png"
 type = "image"
 title = "Tabela completa — 124 cartas do bot"
+logical_id = "404cbb26-acf3-4581-bccb-416aa84734e2"
 
 [[outputs]]
 id = "1LrNJ3hu67v-uFLPY5qYn"
 uri = "file://carta_completa.png"
 type = "image"
 title = "Carta completa — Thiago Silva"
+logical_id = "24050023-0c31-4298-918e-f8871e85df4e"
 
 [[outputs]]
 id = "bsM5zHHz-WyG0ggBH9vHB"
 uri = "file://carta_gold_40.png"
 type = "image"
 title = "🥇 Gold — Thiago Silva (com foto real)"
+logical_id = "9f32d743-edd6-47dc-a496-da4447e803f5"
 
 [[outputs]]
 id = "cMei7125YpjCFPNL2SHbr"
 uri = "file://carta_black_1.png"
 type = "image"
 title = "⬛ Black — Courtois (avatar até o sync)"
+logical_id = "9d6773e0-19f4-46e1-9de4-5c780045090d"
 
 [[outputs]]
 id = "0lpOXy0Ydl9vjAINWDc9b"
 uri = "file://carta_silver_3.png"
 type = "image"
 title = "🥈 Silver — Kepa"
+logical_id = "8f7ce441-602a-4e54-a773-96b24ff1a91b"
 
 [[outputs]]
 id = "Vl5AdnR3YvAlmidIrn_XS"
 uri = "file://preview_wallet.png"
 type = "image"
 title = "Preview — Carteira com novos emojis"
+logical_id = "ed2b1cea-2267-4c4f-ac6f-db83fde16bef"
 
 [[outputs]]
 id = "3BTp0xgexoipBIcoecX7g"
 uri = "file://preview_dark.png"
 type = "image"
 title = "Dark mode"
+logical_id = "4d7016c5-1ff0-44df-803d-82daab4c3cd4"
 
 [[outputs]]
 id = "3yg58Haw0vTT2B2mEanec"
 uri = "file://preview_light.png"
 type = "image"
 title = "Light mode"
+logical_id = "857b2b23-04c6-43b5-aded-0b11f5e4c943"
 
 [[outputs]]
 id = "-pKWOnW5Xv0ira7voepZh"
 uri = "file://preview_final.png"
 type = "image"
 title = "Preview com texto corrigido"
+logical_id = "376945dd-c8c4-43cb-b699-9aaf0a2f49d3"
 
 [[outputs]]
 id = "j-6AO-GRXV6veAZMRblG3"
 uri = "file://preview_font_test.png"
 type = "image"
 title = "Preview com fonte corrigida"
+logical_id = "29817d45-a14a-4201-a46d-e69d29504aa9"
 
 [[outputs]]
 id = "jY2wAs41hUKUYYMLYdmeg"
 uri = "file://preview_white_panel.png"
 type = "image"
 title = "Preview painel branco"
+logical_id = "c8dbeb0c-35f6-4a0f-8136-def9f1228ee8"
 
 [[outputs]]
 id = "2HB1_hWQN66dnGBnFP37b"
 uri = "file://preview_fix.png"
 type = "image"
 title = "Preview com contraste corrigido"
+logical_id = "58097752-2b85-4cba-b333-94ab46b180de"
 
 [[outputs]]
 id = "BzH16sXKKTjRawDeRs_2H"
 uri = "file://moldura_fogo_preview.png"
 type = "image"
 title = "Moldura Fogo Tribal"
+logical_id = "5b909d7e-d0ef-4058-b58e-83b67a6cd6f1"
 
 [[outputs]]
 id = "Q8Kf41Tfas9cr688s1GNB"
 uri = "file://resultado_rings.png"
 type = "image"
 title = "Argolas de avatar atualizadas"
+logical_id = "ee007ab2-3fb6-4efd-8acf-9b81ccdd18cd"
 
 [[outputs]]
 id = "npqoJkp1r-fvAI4NxRwsP"
 uri = "file://attached_assets/ring_preview.png"
 type = "image"
 title = "Prévia de todas as molduras e argolas"
+logical_id = "e520688b-b92d-48be-9d4d-f7067ec28986"
 
 [[outputs]]
 id = "-ksGCQjnMv1xIMRl_nZcv"
 uri = "file://attached_assets/ring_preview_correct.png"
 type = "image"
 title = "Molduras 3D — como aparecem no Discord"
+logical_id = "28380bc6-e4a0-4213-ba76-24b4b920ea71"
 
 [[outputs]]
 id = "P-zK4HoaRBZgfKpiPzp_Y"
 uri = "file://attached_assets/thickness_cmp.png"
 type = "image"
 title = "Comparação de espessura — linha do meio (r+30) foi aplicada"
+logical_id = "2cacad2f-cd02-4357-9db6-3de98fcf58fa"
 
 [[outputs]]
 id = "Cah25rCp_1BY2YvvWIdrr"
@@ -204,6 +227,7 @@ uri = "file://attached_assets/pet-shop-preview-after-fix.jpg"
 type = "image"
 title = "Prévia da loja com o emoji do pet"
 description = "Prévia visual da correção aplicada no cartão do pet."
+logical_id = "7b1f5003-ce5e-4b49-9067-3ff2a18c4121"
 
 [[outputs]]
 id = "SHqcy7q5AUhL14vH4uHXo"
@@ -211,6 +235,7 @@ uri = "file://attached_assets/pet-pimentinha-emoji-exato.png"
 type = "image"
 title = "Prévia correta do pet pimentinha"
 description = "Imagem usando exatamente o mesmo emoji de patinhas vermelhas do pet pimentinha."
+logical_id = "dc4d8227-1a58-4c7e-8191-fa9f716c7fc7"
 
 [[outputs]]
 id = "Sf8ImYXqGRvR6U0sTXzGv"
@@ -218,6 +243,7 @@ uri = "file://attached_assets/pimentinha-emoji-correto.png"
 type = "image"
 title = "Emoji correto do pet pimentinha"
 description = "Recorte da captura mostrando exatamente o emoji vermelho usado pelo pet pimentinha."
+logical_id = "25535f35-4ac1-411f-9d09-0918a6d1c761"
 
 [[outputs]]
 id = "W6KzTq9YONRIOt9jXaWsQ"
@@ -225,3 +251,18 @@ uri = "file://attached_assets/pimentinha-interacao-correta.png"
 type = "image"
 title = "Interação correta do pet pimentinha"
 description = "Cartão de carinho do pimentinha com o emoji vermelho correto e os botões do pet."
+logical_id = "048e4970-6a93-4fbc-95bb-20bb0dab1b17"
+
+[[outputs]]
+id = "muC5SlSTI6XSvxsROgJQM"
+uri = "file://.agents/outputs/railway-old-backup.tar.gz"
+type = "unspecified"
+title = "Backup completo do banco antigo"
+description = "Backup privado atualizado do PostgreSQL antigo, incluindo os dados das 25 tabelas, o schema.prisma e instruções de restauração. Guarde em local seguro."
+logical_id = "794c3bee-aed0-48b8-85e6-7cd0a359c2b4"
+content_hash = "sha256:b5e77dd77fce3f03aa57ca9507dcb118cba538ff17a40a1efd9412ec05f69813"
+size = 50677
+mtime_ms = 1787166308913
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:308d5f79-ab08-4f85-85f1-edcf5b343e79/794c3bee-aed0-48b8-85e6-7cd0a359c2b4/85611f68-8cac-4070-857d-34d0694203bd"
+storage_version_token = "1787166312857413"
+content_type = "application/octet-stream"
