@@ -455,7 +455,12 @@ export async function drawAvatarRing(ctx, cx, cy, r, ringValue) {
     // wreaths (verde, outer≈247) are scaled up and spiky rings (azul, outer≈455) are
     // scaled down — all landing at roughly the same band width as the reference.
     const REF_OUTER   = 414;                                         // vermelho reference
-    const clampedOuter = Math.min(Math.max(outerRadius, REF_OUTER * 0.85), REF_OUTER * 1.05);
+    // As molduras VIP recebidas têm dimensões menores e precisam ser ampliadas
+    // pelo raio real; aplicar o clamp das molduras antigas deixaria a arte quase
+    // invisível ao redor do avatar.
+    const clampedOuter = vipFrame
+      ? Math.max(outerRadius, 1)
+      : Math.min(Math.max(outerRadius, REF_OUTER * 0.85), REF_OUTER * 1.05);
     const targetOuter  = r + 30;                                     // outer edge 30px past avatar
     const scale    = targetOuter / clampedOuter;
     const drawSize = size * scale;

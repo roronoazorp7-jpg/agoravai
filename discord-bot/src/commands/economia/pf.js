@@ -68,6 +68,7 @@ function editMenu() {
           { label: 'Fundos', value: 'wallet_fundo_preset_btn', emoji: '🖼️' },
           { label: 'Fundo por link', value: 'wallet_fundo_btn', emoji: '🔗' },
           { label: 'Argola', value: 'wallet_ring_btn', emoji: '💠' },
+          { label: 'Molduras VIP', value: 'wallet_ring_vip', emoji: '👑' },
           { label: 'Cor do fundo', value: 'profile_bg_btn', emoji: '🎨' },
           { label: 'Painel', value: 'profile_panel_btn', emoji: '🟦' },
           { label: 'Limpar fundo', value: 'wallet_fundo_reset', emoji: '↩️' },
