@@ -33,11 +33,15 @@ export async function ensureMarriageSchema() {
       "reason" TEXT,
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT "UserAfk_pkey" PRIMARY KEY ("id")
-    );
+    )
+  `);
+  await prisma.$executeRawUnsafe(`
     CREATE UNIQUE INDEX IF NOT EXISTS "UserAfk_guildId_userId_key"
-      ON "UserAfk" ("guildId", "userId");
+      ON "UserAfk" ("guildId", "userId")
+  `);
+  await prisma.$executeRawUnsafe(`
     CREATE INDEX IF NOT EXISTS "UserAfk_guildId_idx"
-      ON "UserAfk" ("guildId");
+      ON "UserAfk" ("guildId")
   `);
 }
 
