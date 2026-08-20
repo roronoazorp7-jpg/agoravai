@@ -55,6 +55,12 @@ O banco SQLite (`bot.db`) é efêmero no Railway (sem volume). `prisma generate`
 - `nixpacks.toml` → `[phases.build]` → inclui `npx prisma generate`
 - `railway.json` → `startCommand`: `"npx prisma db push --accept-data-loss && node src/index.js"`
 
+## Regra: schema novo deve ter fallback idempotente quando houver drift local
+
+Quando o banco de desenvolvimento contém tabelas antigas fora do schema atual, `prisma db push` pode bloquear por avisos de perda não relacionados à mudança.
+
+**Como aplicar:** Para tabelas simples e novas, manter também um `CREATE TABLE IF NOT EXISTS` idempotente no bootstrap do bot; nunca liberar `--accept-data-loss` só para contornar um banco local divergente.
+
 ## Regra: loader.js deve registrar comandos em apenas UM escopo
 
 Registrar guild + global ao mesmo tempo faz o `/perfil` aparecer duplicado no Discord. Usar `if (GUILD_ID) guild-only, else global-only`, e limpar o escopo oposto com `PUT [...] body:[]` para remover comandos antigos.
