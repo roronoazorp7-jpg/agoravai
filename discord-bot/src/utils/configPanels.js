@@ -180,9 +180,40 @@ export function buildTellonymPanelV2(cfg) {
   const btnLabel = cfg.tellonymBtnLabel?.trim() || 'Enviar Mensagem';
   const btnEmoji = cfg.tellonymBtnEmoji?.trim() || '💌';
   const sendBtn = new ButtonBuilder().setCustomId('tellonym_send').setLabel(btnLabel).setStyle(ButtonStyle.Secondary);
-  try { sendBtn.setEmoji(btnEmoji); } catch { sendBtn.setEmoji('💌'); }
+  try { sendBtn.setEmoji(parseEmoji(btnEmoji) ?? '💌'); } catch { sendBtn.setEmoji('💌'); }
   const row = new ActionRowBuilder().addComponents(sendBtn);
   return { components: [container, row], flags: MessageFlags.IsComponentsV2 };
+}
+
+export function buildTellonymChoicePanelV2() {
+  const container = new ContainerBuilder()
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        '## 💌 Enviar mensagem\n\nEscolha como deseja enviar sua mensagem.',
+      ),
+    )
+    .addSeparatorComponents(new SeparatorBuilder())
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        '-# Você pode enviar de forma anônima ou marcar alguém da comunidade.',
+      ),
+    );
+
+  const anonymousButton = new ButtonBuilder()
+    .setCustomId('tellonym_anon')
+    .setLabel('Anônimo')
+    .setEmoji('🕵️')
+    .setStyle(ButtonStyle.Secondary);
+  const taggedButton = new ButtonBuilder()
+    .setCustomId('tellonym_tag')
+    .setLabel('Marcar alguém')
+    .setEmoji('🎯')
+    .setStyle(ButtonStyle.Primary);
+
+  return {
+    components: [container, new ActionRowBuilder().addComponents(anonymousButton, taggedButton)],
+    flags: MessageFlags.IsComponentsV2,
+  };
 }
 
 // ─── Botões de Config ─────────────────────────────────────────────────────────

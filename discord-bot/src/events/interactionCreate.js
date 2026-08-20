@@ -26,7 +26,7 @@ import { ACTIONS, buildInteractionEmbed } from '../commands/interacoes/interacoe
 import { generateTellonymCard } from '../utils/cardGenerator.js';
 import { buildWeddingCardPayload, getMarriageStats } from '../utils/weddingCard.js';
 import { likesMap, postDataMap } from '../utils/instaState.js';
-import { buildTicketConfigPayload, buildTellonymConfigPayload, buildWelcomeConfigPayload, buildWelcomeV2, buildTicketPanelV2, buildTellonymPanelV2, DEFAULT_TICKET_TEXT, DEFAULT_TICKET_OPEN_TEXT, DEFAULT_TELLONYM_TEXT, formatDeleteTime } from '../utils/configPanels.js';
+import { buildTicketConfigPayload, buildTellonymConfigPayload, buildWelcomeConfigPayload, buildWelcomeV2, buildTicketPanelV2, buildTellonymPanelV2, buildTellonymChoicePanelV2, DEFAULT_TICKET_TEXT, DEFAULT_TICKET_OPEN_TEXT, DEFAULT_TELLONYM_TEXT, formatDeleteTime } from '../utils/configPanels.js';
 import { buildMenuOptsPanel, buildOptionDetailPanel, buildAddOptionModal, buildEditOptionModal, parseIdList } from '../utils/ticketMenuHandlers.js';
 import { buildPartnerConfigPayload } from '../utils/partnershipPanels.js';
 import {
@@ -2542,11 +2542,10 @@ export default {
 
         // ── TELLONYM: Botão principal → escolha ─────────────────────────
         if (customId === 'tellonym_send') {
-          const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('tellonym_anon').setLabel('Anônimo 🕵️').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId('tellonym_tag').setLabel('Marcar Alguém 🎯').setStyle(ButtonStyle.Primary),
-          );
-          return interaction.reply({ content: '**Como deseja enviar sua mensagem?**', components: [row], flags: 64 });
+          return interaction.reply({
+            ...buildTellonymChoicePanelV2(),
+            flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2,
+          });
         }
 
         // ── TELLONYM: Modal anônimo ──────────────────────────────────────
