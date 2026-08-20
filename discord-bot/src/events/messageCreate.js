@@ -24,6 +24,7 @@ import {
   isAIConfigured,
   isGroqConfigured,
 } from '../utils/aiManager.js';
+import { clearAfkOnMessage, handleAfkMessage } from '../commands/general/afk.js';
 
 const PREFIXES = ['savage ', 's '];
 
@@ -314,6 +315,12 @@ export default {
 
   async execute(message, client) {
     if (message.author.bot) return;
+
+    if (message.guildId) {
+      const isAfkCommand = /^(?:savage|s)\s+afk(?:\s|$)/i.test(message.content);
+      if (!isAfkCommand) await clearAfkOnMessage(message);
+      await handleAfkMessage(message);
+    }
 
     // ── ECONOMIA: Contador de mensagens + XP ────────────────────────────────
     if (message.guildId) {

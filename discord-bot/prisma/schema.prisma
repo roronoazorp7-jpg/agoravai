@@ -315,6 +315,17 @@ model UserProfile {
   walletFrame      String?
 }
 
+model UserAfk {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@unique([guildId, userId])
+  @@index([guildId])
+}
+
 model Pet {
   id          String   @id @default(cuid())
   guildId     String

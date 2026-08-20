@@ -46,6 +46,7 @@ const CATEGORIES = [
     title: '🔧 Utilidades',
     commandNames: [
       'ajuda', 'ping', 'call', 'musica', 'radio', 'instagram', 'ia', 'quest',
+      'afk', 'avatar', 'banner', 'server-info',
     ],
   },
   {
