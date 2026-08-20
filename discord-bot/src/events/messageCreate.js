@@ -317,7 +317,7 @@ export default {
     if (message.author.bot) return;
 
     if (message.guildId) {
-      const isAfkCommand = /^(?:savage|s)\s+afk(?:\s|$)/i.test(message.content);
+      const isAfkCommand = /^(?:savage\s+afk|s\s+afk|safk)(?:\s|$)/i.test(message.content);
       if (!isAfkCommand) await clearAfkOnMessage(message);
       await handleAfkMessage(message);
     }
@@ -629,14 +629,19 @@ export default {
     // GF também aceita o formato curto `.gf @usuário`, como os membros usam
     // no canal, sem mudar os prefixos `savage ` e `s ` dos outros comandos.
     const isShortGf = /^\.gf(?:\s|$)/i.test(message.content);
+    const isShortAfk = /^safk(?:\s|$)/i.test(message.content);
     const prefix = PREFIXES.find(candidate => message.content.toLowerCase().startsWith(candidate));
-    if (!prefix && !isShortGf) return;
+    if (!prefix && !isShortGf && !isShortAfk) return;
 
     if (processedMessages.has(message.id)) return;
     processedMessages.add(message.id);
     setTimeout(() => processedMessages.delete(message.id), 10_000);
 
-    const commandText = isShortGf ? message.content.slice(3) : message.content.slice(prefix.length);
+    const commandText = isShortGf
+      ? message.content.slice(3)
+      : isShortAfk
+        ? message.content.slice(1)
+        : message.content.slice(prefix.length);
     const args        = commandText.trim().split(/\s+/);
     const commandName = args.shift().toLowerCase();
     const cmd         = client.prefixCmds.get(commandName);
