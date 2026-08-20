@@ -1,10 +1,12 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { buildUtilityV2 } from '../../utils/utilityV2.js';
 
-function targetFrom(messageOrInteraction) {
-  return messageOrInteraction.mentions?.users?.first()
-    ?? messageOrInteraction.options?.getUser('usuario')
-    ?? messageOrInteraction.user;
+function targetFromInteraction(interaction) {
+  return interaction.options.getUser('usuario') ?? interaction.user;
+}
+
+function targetFromMessage(message) {
+  return message.mentions.users.first() ?? message.author;
 }
 
 function payload(user) {
@@ -34,9 +36,9 @@ export default {
   name: 'banner',
   aliases: ['profile-banner'],
   async execute(interaction) {
-    return interaction.reply(payload(await fetchTarget(targetFrom(interaction))));
+    return interaction.reply(payload(await fetchTarget(targetFromInteraction(interaction))));
   },
   async executePrefix(message) {
-    return message.reply(payload(await fetchTarget(targetFrom(message))));
+    return message.reply(payload(await fetchTarget(targetFromMessage(message))));
   },
 };
