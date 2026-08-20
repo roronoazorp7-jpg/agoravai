@@ -1,9 +1,17 @@
 import 'dotenv/config';
 
 // ─── Bloqueia execução fora do Railway ───────────────────────────────────────
-// Impede o bot de subir no Replit (ou qualquer ambiente que não seja Railway),
+// Impede o bot de subir no Replit quando não houver nenhuma marca do Railway,
 // evitando comandos/interações duplicados com a instância de produção.
-if (!process.env.RAILWAY_ENVIRONMENT_NAME && !process.env.RAILWAY_PROJECT_ID) {
+const railwayMarkers = [
+  process.env.RAILWAY_ENVIRONMENT_NAME,
+  process.env.RAILWAY_PROJECT_ID,
+  process.env.RAILWAY_ENVIRONMENT_ID,
+  process.env.RAILWAY_SERVICE_ID,
+  process.env.RAILWAY_DEPLOYMENT_ID,
+].filter(Boolean);
+
+if (process.env.REPL_ID && !railwayMarkers.length) {
   console.error('[BLOQUEADO] Este bot só pode rodar no Railway. Encerrando.');
   process.exit(0);
 }
@@ -59,15 +67,21 @@ process.on('uncaughtException',  err    => console.error('[UNCAUGHT EXCEPTION]',
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
 (async () => {
-  await ensureMarriageSchema();
-  await loadCommands(client);
+  try {
+    await ensureMarriageSchema();
+    await loadCommands(client);
 
-  const eventsDir = path.join(__dirname, 'events');
-  for (const file of readdirSync(eventsDir).filter(f => f.endsWith('.js'))) {
-    const { default: ev } = await import(pathToFileURL(path.join(eventsDir, file)).href);
-    if (ev.once) client.once(ev.name, (...args) => ev.execute(...args, client));
-    else          client.on(ev.name,   (...args) => ev.execute(...args, client));
+    const eventsDir = path.join(__dirname, 'events');
+    for (const file of readdirSync(eventsDir).filter(f => f.endsWith('.js'))) {
+      const { default: ev } = await import(pathToFileURL(path.join(eventsDir, file)).href);
+      if (ev.once) client.once(ev.name, (...args) => ev.execute(...args, client));
+      else          client.on(ev.name,   (...args) => ev.execute(...args, client));
+    }
+
+    await client.login(process.env.DISCORD_TOKEN);
+  } catch (error) {
+    console.error('[BOOT FATAL] O bot não conseguiu iniciar:', error);
+    try { client.destroy(); } catch {}
+    process.exit(1);
   }
-
-  await client.login(process.env.DISCORD_TOKEN);
 })();
