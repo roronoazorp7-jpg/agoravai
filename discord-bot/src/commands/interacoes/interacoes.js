@@ -109,6 +109,17 @@ export const ACTIONS = {
     retMsg:       (a, b) => `**${a}** empurra **${b}** de volta! 😤`,
     mutualVerb:   (n) => `se empurraram **${n}** ${n === 1 ? 'vez' : 'vezes'}`,
   },
+  kill: {
+    aliases:      ['matar'],
+    emoji:        '🗡️',
+    gif:          'kill',
+    desc:         '🗡️ Mata alguém em uma cena de anime',
+    msg:          (a, b) => `**${a}** mata **${b}** em uma cena dramática de anime 🗡️`,
+    counter:      (to, n) => `*${to} foi derrotado ${n} ${n === 1 ? 'vez' : 'vezes'}.*`,
+    btnLabel:     'Revidar',
+    retMsg:       (a, b) => `**${a}** revida e derrota **${b}**! 🗡️`,
+    mutualVerb:   (n) => `se derrotaram **${n}** ${n === 1 ? 'vez' : 'vezes'}`,
+  },
 };
 
 export async function fetchGif(category) {
@@ -120,6 +131,7 @@ export async function fetchGif(category) {
     poke:  'https://cdn.otakugifs.xyz/gifs/poke/0fac7376e78ccfe4.gif',
     bite:  'https://cdn.otakugifs.xyz/gifs/bite/ba4dffc1a8ba6e4d.gif',
     pat:   'https://cdn.otakugifs.xyz/gifs/pat/XCNHCmIs1w.gif',
+    kill:  'https://cdn.otakugifs.xyz/gifs/punch/lQbYrpwHpz.gif',
   };
 
   try {

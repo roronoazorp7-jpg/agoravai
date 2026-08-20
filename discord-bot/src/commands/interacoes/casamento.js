@@ -103,4 +103,41 @@ export default {
     });
     return interaction.editReply(payload);
   },
+
+  async executePrefix(message) {
+    const profile = await findMarriageProfile(message.author.id);
+    if (!profile?.marriedTo) return message.reply(v2Error('Você não está casado(a) com ninguém.'));
+
+    const partner = await message.client.users.fetch(profile.marriedTo).catch(() => null);
+    if (!partner) return message.reply(v2Error('Não consegui encontrar a outra pessoa do casamento.'));
+
+    const [member, partnerMember] = await Promise.all([
+      message.guild.members.fetch(message.author.id).catch(() => null),
+      message.guild.members.fetch(partner.id).catch(() => null),
+    ]);
+    let stats;
+    try {
+      stats = await getMarriageStats(message.author.id, partner.id, profile.marriedAt);
+    } catch (error) {
+      console.error('[CASAMENTO] Falha ao ler estatísticas:', error);
+      stats = emptyMarriageStats(profile.marriedAt);
+    }
+
+    const payload = await buildWeddingCardPayload({
+      left: {
+        id: message.author.id,
+        displayName: member?.displayName ?? message.author.globalName ?? message.author.username,
+        username: message.author.username,
+        avatarUrl: message.author.displayAvatarURL({ extension: 'png', forceStatic: true, size: 256 }),
+      },
+      right: {
+        id: partner.id,
+        displayName: partnerMember?.displayName ?? partner.globalName ?? partner.username,
+        username: partner.username,
+        avatarUrl: partner.displayAvatarURL({ extension: 'png', forceStatic: true, size: 256 }),
+      },
+      stats,
+    });
+    return message.reply(payload);
+  },
 };
