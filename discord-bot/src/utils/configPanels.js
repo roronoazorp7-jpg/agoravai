@@ -12,6 +12,7 @@ import {
   MediaGalleryItemBuilder,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
+  UserSelectMenuBuilder,
   MessageFlags,
 } from 'discord.js';
 import { buildConfigEmbed, Colors } from './embed.js';
@@ -214,6 +215,66 @@ export function buildTellonymChoicePanelV2() {
     components: [container, new ActionRowBuilder().addComponents(anonymousButton, taggedButton)],
     flags: MessageFlags.IsComponentsV2,
   };
+}
+
+export function buildTellonymComposerPanelV2(session = {}) {
+  const targetIds = session.targetIds ?? [];
+  const targetText = targetIds.length
+    ? targetIds.map(id => `<@${id}>`).join(' ')
+    : 'Nenhuma pessoa selecionada ainda';
+  const container = new ContainerBuilder()
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        '## 💌 Mandar uma tell\n\n' +
+        '⚠️ **Não compartilhe sua senha ou outras informações confidenciais.**\n\n' +
+        `**Para quem**\n${targetText}\n\n` +
+        '-# Escolha uma ou mais pessoas e avance para escrever sua mensagem.',
+      ),
+    );
+  const select = new UserSelectMenuBuilder()
+    .setCustomId('tellonym_target')
+    .setPlaceholder('Faça uma seleção')
+    .setMinValues(1)
+    .setMaxValues(5);
+  const next = new ButtonBuilder()
+    .setCustomId('tellonym_message')
+    .setLabel('Continuar')
+    .setEmoji('✍️')
+    .setStyle(ButtonStyle.Primary)
+    .setDisabled(!targetIds.length);
+  return {
+    components: [
+      container,
+      new ActionRowBuilder().addComponents(select),
+      new ActionRowBuilder().addComponents(next),
+    ],
+    flags: MessageFlags.IsComponentsV2,
+  };
+}
+
+export function buildTellonymIdentityPanelV2(session = {}) {
+  const targets = (session.targetIds ?? []).map(id => `<@${id}>`).join(' ');
+  const preview = String(session.message ?? '').slice(0, 700);
+  const container = new ContainerBuilder()
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `## 💌 Mandar uma tell\n\n**Para quem**\n${targets}\n\n` +
+        `**Mensagem**\n> ${preview.replace(/\n/g, '\n> ')}`,
+      ),
+    );
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('tellonym_identity_anon')
+      .setLabel('Anônimo')
+      .setEmoji('🕵️')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('tellonym_identity_public')
+      .setLabel('Mostrar meu nome')
+      .setEmoji('👤')
+      .setStyle(ButtonStyle.Secondary),
+  );
+  return { components: [container, row], flags: MessageFlags.IsComponentsV2 };
 }
 
 // ─── Botões de Config ─────────────────────────────────────────────────────────

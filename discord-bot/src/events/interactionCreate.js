@@ -5,6 +5,7 @@ import {
   ButtonBuilder,
   ButtonStyle,
   ChannelSelectMenuBuilder,
+  UserSelectMenuBuilder,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
   AttachmentBuilder,
@@ -26,7 +27,7 @@ import { ACTIONS, buildInteractionEmbed } from '../commands/interacoes/interacoe
 import { generateTellonymCard } from '../utils/cardGenerator.js';
 import { buildWeddingCardPayload, getMarriageStats } from '../utils/weddingCard.js';
 import { likesMap, postDataMap } from '../utils/instaState.js';
-import { buildTicketConfigPayload, buildTellonymConfigPayload, buildWelcomeConfigPayload, buildWelcomeV2, buildTicketPanelV2, buildTellonymPanelV2, buildTellonymChoicePanelV2, DEFAULT_TICKET_TEXT, DEFAULT_TICKET_OPEN_TEXT, DEFAULT_TELLONYM_TEXT, formatDeleteTime } from '../utils/configPanels.js';
+import { buildTicketConfigPayload, buildTellonymConfigPayload, buildWelcomeConfigPayload, buildWelcomeV2, buildTicketPanelV2, buildTellonymPanelV2, buildTellonymComposerPanelV2, buildTellonymIdentityPanelV2, DEFAULT_TICKET_TEXT, DEFAULT_TICKET_OPEN_TEXT, DEFAULT_TELLONYM_TEXT, formatDeleteTime } from '../utils/configPanels.js';
 import { buildMenuOptsPanel, buildOptionDetailPanel, buildAddOptionModal, buildEditOptionModal, parseIdList } from '../utils/ticketMenuHandlers.js';
 import { buildPartnerConfigPayload } from '../utils/partnershipPanels.js';
 import {
@@ -84,6 +85,9 @@ import {
   handlePainelModuleBtn,
   handlePainelModuleModal,
 } from '../utils/painelHandlers.js';
+
+const tellonymSessions = new Map();
+const tellonymSessionKey = (interaction) => `${interaction.guildId}:${interaction.user.id}`;
 
 // ─── Emoji resolver ───────────────────────────────────────────────────────────
 
@@ -627,6 +631,18 @@ export default {
         }
 
         return;
+      }
+
+      // ── TELLONYM: destinatários do formulário ─────────────────────────────
+      if (interaction.isUserSelectMenu() && interaction.customId === 'tellonym_target') {
+        const key = tellonymSessionKey(interaction);
+        const session = tellonymSessions.get(key) ?? { targetIds: [], message: null };
+        session.targetIds = interaction.values;
+        tellonymSessions.set(key, session);
+        return interaction.update({
+          ...buildTellonymComposerPanelV2(session),
+          content: null,
+        });
       }
 
       // ── STRING SELECT MENUS ────────────────────────────────────────────────
@@ -2542,10 +2558,63 @@ export default {
 
         // ── TELLONYM: Botão principal → escolha ─────────────────────────
         if (customId === 'tellonym_send') {
+          tellonymSessions.set(tellonymSessionKey(interaction), { targetIds: [], message: null });
           return interaction.reply({
-            ...buildTellonymChoicePanelV2(),
+            ...buildTellonymComposerPanelV2(),
             flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2,
           });
+        }
+
+        if (customId === 'tellonym_reply') {
+          tellonymSessions.set(tellonymSessionKey(interaction), { targetIds: [], message: null });
+          return interaction.reply({
+            ...buildTellonymComposerPanelV2(),
+            flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2,
+          });
+        }
+
+        if (customId === 'tellonym_comment') {
+          return interaction.reply({
+            content: '💬 Os comentários desta tell ainda estão vazios. Envie uma nova mensagem para participar da conversa.',
+            ephemeral: true,
+          });
+        }
+
+        if (customId === 'tellonym_comments') {
+          return interaction.reply({ content: '💬 Esta tell ainda não tem comentários.', ephemeral: true });
+        }
+
+        if (customId === 'tellonym_message') {
+          const session = tellonymSessions.get(tellonymSessionKey(interaction));
+          if (!session?.targetIds?.length) {
+            return interaction.reply({ content: '❌ Selecione pelo menos uma pessoa primeiro.', ephemeral: true });
+          }
+          const modal = new ModalBuilder()
+            .setCustomId('tellonym_modal_compose')
+            .setTitle('Enviar uma tell');
+          modal.addComponents(
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder()
+                .setCustomId('tell_msg')
+                .setLabel('O que você quer dizer?')
+                .setStyle(TextInputStyle.Paragraph)
+                .setPlaceholder('Escreva uma mensagem...')
+                .setRequired(true)
+                .setMaxLength(1000),
+            ),
+          );
+          return interaction.showModal(modal);
+        }
+
+        if (customId === 'tellonym_identity_anon' || customId === 'tellonym_identity_public') {
+          const session = tellonymSessions.get(tellonymSessionKey(interaction));
+          if (!session?.message || !session.targetIds?.length) {
+            return interaction.reply({ content: '❌ O formulário expirou. Clique em Enviar Mensagem novamente.', ephemeral: true });
+          }
+          const targets = session.targetIds.map(id => `<@${id}>`).join(' ');
+          const isAnon = customId.endsWith('_anon');
+          tellonymSessions.delete(tellonymSessionKey(interaction));
+          return sendTellonymMsg(interaction, session.message, targets, isAnon);
         }
 
         // ── TELLONYM: Modal anônimo ──────────────────────────────────────
@@ -3780,9 +3849,23 @@ export default {
         }
 
         // ── TELLONYM: Envio anônimo ──────────────────────────────────────
+        if (interaction.customId === 'tellonym_modal_compose') {
+          const key = tellonymSessionKey(interaction);
+          const session = tellonymSessions.get(key);
+          if (!session?.targetIds?.length) {
+            return interaction.reply({ content: '❌ Selecione pelo menos uma pessoa antes de escrever.', ephemeral: true });
+          }
+          session.message = interaction.fields.getTextInputValue('tell_msg').trim();
+          tellonymSessions.set(key, session);
+          return interaction.reply({
+            ...buildTellonymIdentityPanelV2(session),
+            flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2,
+          });
+        }
+
         if (interaction.customId === 'tellonym_modal_anon') {
           const msg = interaction.fields.getTextInputValue('tell_msg');
-          await sendTellonymMsg(interaction, msg, null);
+          await sendTellonymMsg(interaction, msg, null, true);
           return;
         }
 
@@ -3790,7 +3873,7 @@ export default {
         if (interaction.customId === 'tellonym_modal_tag') {
           const msg = interaction.fields.getTextInputValue('tell_msg');
           const to  = interaction.fields.getTextInputValue('tell_to');
-          await sendTellonymMsg(interaction, msg, to);
+          await sendTellonymMsg(interaction, msg, to, true);
           return;
         }
 
@@ -3956,14 +4039,14 @@ export default {
 
 const TELLONYM_OWNER_IDS = ['1510918703640875028', '1513613689322995804'];
 
-async function sendTellonymMsg(interaction, msg, toText) {
+async function sendTellonymMsg(interaction, msg, toText, identityAnon = true) {
   await interaction.deferReply({ ephemeral: true });
 
   const cfg             = await prisma.guildConfig.findUnique({ where: { guildId: interaction.guildId } });
   const targetChannelId = cfg?.tellonymChannel ?? interaction.channelId;
   const targetChannel   = interaction.guild.channels.cache.get(targetChannelId) ?? interaction.channel;
 
-  const isAnon     = !toText;
+  const isAnon     = identityAnon;
   const authorName = isAnon ? 'Anônimo' : (interaction.member?.displayName ?? interaction.user.username);
   const authorSub  = isAnon ? '🕵️ anônimo' : `@${interaction.user.username}`;
   const avatarUrl  = isAnon
@@ -3973,7 +4056,16 @@ async function sendTellonymMsg(interaction, msg, toText) {
   try {
     const imgBuf     = await generateTellonymCard({ authorName, authorUsername: authorSub, message: msg, taggedTo: toText ?? null, avatarUrl, isAnon });
     const attachment = new AttachmentBuilder(imgBuf, { name: 'tellonym.png' });
-    await targetChannel.send({ files: [attachment] });
+    const cardRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('tellonym_reply').setLabel('Responder').setEmoji('💬').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('tellonym_comment').setLabel('Comentar').setEmoji('💭').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('tellonym_comments').setLabel('Comentários (0)').setEmoji('🗨️').setStyle(ButtonStyle.Secondary),
+    );
+    await targetChannel.send({
+      content: toText ? `**Para:** ${toText}` : '**Para:** comunidade',
+      files: [attachment],
+      components: [cardRow],
+    });
   } catch (e) {
     console.error('[TELLONYM CARD]', e);
     const fallback = new EmbedBuilder()
