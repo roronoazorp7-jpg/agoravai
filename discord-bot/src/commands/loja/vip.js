@@ -56,6 +56,120 @@ async function getCfgWithPlans(guildId) {
   });
 }
 
+const VIP_TIME_UNITS = {
+  minutos: 60 * 1000,
+  horas: 60 * 60 * 1000,
+  dias: 24 * 60 * 60 * 1000,
+  meses: 30 * 24 * 60 * 60 * 1000,
+};
+
+function formatVipDuration(amount, unit) {
+  const labels = {
+    minutos: amount === 1 ? 'minuto' : 'minutos',
+    horas: amount === 1 ? 'hora' : 'horas',
+    dias: amount === 1 ? 'dia' : 'dias',
+    meses: amount === 1 ? 'mês' : 'meses',
+  };
+  return `${amount} ${labels[unit]}`;
+}
+
+async function grantVip(interaction) {
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
+    return interaction.reply({
+      content: '❌ Você precisa da permissão **Gerenciar cargos** para conceder VIP.',
+      ephemeral: true,
+    });
+  }
+
+  const user = interaction.options.getUser('membro');
+  const role = interaction.options.getRole('cargo');
+  const amount = interaction.options.getInteger('tempo');
+  const unit = interaction.options.getString('unidade');
+  const member = await interaction.guild.members.fetch(user.id).catch(() => null);
+
+  if (!member) {
+    return interaction.reply({ content: '❌ Esse membro não está neste servidor.', ephemeral: true });
+  }
+  if (!role || role.managed || role.id === interaction.guild.id) {
+    return interaction.reply({
+      content: '❌ Escolha um cargo normal. Cargos integrados e o @everyone não podem ser usados como VIP.',
+      ephemeral: true,
+    });
+  }
+  if (!amount || amount < 1 || amount > 3650) {
+    return interaction.reply({
+      content: '❌ O tempo deve estar entre 1 e 3650 unidades.',
+      ephemeral: true,
+    });
+  }
+
+  const botMember = interaction.guild.members.me
+    ?? await interaction.guild.members.fetch(interaction.client.user.id).catch(() => null);
+  if (!botMember?.permissions.has(PermissionFlagsBits.ManageRoles)) {
+    return interaction.reply({
+      content: '❌ Eu preciso da permissão **Gerenciar cargos** para conceder e remover VIP.',
+      ephemeral: true,
+    });
+  }
+  if (role.position >= botMember.roles.highest.position) {
+    return interaction.reply({
+      content: '❌ Meu cargo precisa estar acima do cargo VIP escolhido.',
+      ephemeral: true,
+    });
+  }
+  if (role.position >= interaction.member.roles.highest.position && interaction.member.id !== interaction.guild.ownerId) {
+    return interaction.reply({
+      content: '❌ Seu cargo precisa estar acima do cargo VIP escolhido.',
+      ephemeral: true,
+    });
+  }
+
+  const now = new Date();
+  const existing = await prisma.vipGrant.findUnique({
+    where: {
+      guildId_userId_roleId: {
+        guildId: interaction.guildId,
+        userId: user.id,
+        roleId: role.id,
+      },
+    },
+  });
+  const startsAt = existing?.expiresAt > now ? existing.expiresAt : now;
+  const expiresAt = new Date(startsAt.getTime() + amount * VIP_TIME_UNITS[unit]);
+
+  try {
+    await member.roles.add(role, `VIP concedido por ${interaction.user.tag}`);
+    await prisma.vipGrant.upsert({
+      where: {
+        guildId_userId_roleId: {
+          guildId: interaction.guildId,
+          userId: user.id,
+          roleId: role.id,
+        },
+      },
+      create: { guildId: interaction.guildId, userId: user.id, roleId: role.id, expiresAt },
+      update: { expiresAt },
+    });
+  } catch (error) {
+    console.error('[VIP] Erro ao conceder VIP:', error);
+    return interaction.reply({
+      content: '❌ Não consegui conceder esse VIP. Verifique minhas permissões e a hierarquia dos cargos.',
+      ephemeral: true,
+    });
+  }
+
+  const expiration = Math.floor(expiresAt.getTime() / 1000);
+  return interaction.reply({
+    content:
+      `✅ VIP concedido com sucesso!\n` +
+      `**Membro:** ${member}\n` +
+      `**Cargo:** ${role}\n` +
+      `**Duração adicionada:** ${formatVipDuration(amount, unit)}\n` +
+      `**Expira:** <t:${expiration}:F> (<t:${expiration}:R>)`,
+    ephemeral: false,
+  });
+}
+
 function safeEmoji(raw) {
   if (!raw) return null;
   const s = raw.trim();
@@ -419,6 +533,37 @@ export default {
     )
     .addSubcommand(s =>
       s.setName('config').setDescription('⚙️ Abre o painel de configuração do VIP (apenas admins)'),
+    )
+    .addSubcommand(s =>
+      s
+        .setName('dar')
+        .setDescription('👑 Concede um cargo VIP por tempo determinado')
+        .addUserOption(option =>
+          option.setName('membro').setDescription('Membro que receberá o VIP').setRequired(true),
+        )
+        .addRoleOption(option =>
+          option.setName('cargo').setDescription('Cargo que dá acesso às molduras VIP').setRequired(true),
+        )
+        .addIntegerOption(option =>
+          option
+            .setName('tempo')
+            .setDescription('Quantidade de tempo do VIP')
+            .setMinValue(1)
+            .setMaxValue(3650)
+            .setRequired(true),
+        )
+        .addStringOption(option =>
+          option
+            .setName('unidade')
+            .setDescription('Unidade de tempo')
+            .setRequired(true)
+            .addChoices(
+              { name: 'Minutos', value: 'minutos' },
+              { name: 'Horas', value: 'horas' },
+              { name: 'Dias', value: 'dias' },
+              { name: 'Meses (30 dias)', value: 'meses' },
+            ),
+        ),
     ),
 
   async execute(interaction) {
@@ -437,6 +582,8 @@ export default {
       const cfg = await getCfg(interaction.guildId);
       return interaction.reply({ ...buildVipConfigPayload(cfg), ephemeral: true });
     }
+
+    if (sub === 'dar') return grantVip(interaction);
   },
 
   async executePrefix(message, args) {
