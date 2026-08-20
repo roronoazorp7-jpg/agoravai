@@ -85,6 +85,7 @@ export default {
         .addOptions([
           { label: 'Banner',      value: 'profile_banner_btn',     emoji: '🖼️' },
           { label: 'Argola',      value: 'profile_ring_btn',       emoji: '💠' },
+          { label: 'Molduras VIP', value: 'profile_ring_vip',      emoji: '👑' },
           { label: 'Fundo',       value: 'profile_bg_btn',         emoji: '🎨' },
           { label: 'Painel',      value: 'profile_panel_btn',      emoji: '🟦' },
           { label: 'Pet',         value: 'profile_pet_btn',        emoji: '🐾' },
