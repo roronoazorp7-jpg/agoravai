@@ -28,6 +28,7 @@ import {
 } from './shopData.js';
 import { renderRingPreview } from './ringPreview.js';
 import { buildPetPanel, petDisplayName } from './petComponents.js';
+import { spendCoins, totalCoins } from './economyFunds.js';
 
 const SHOP_COLOR = 0x000000;
 const DIVIDER    = '┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄';
@@ -1059,7 +1060,7 @@ async function handleGiftTypeSel(interaction) {
             `> **${r.name}** — \`${r.price.toLocaleString('pt-BR')} ${COIN()}\`\n> ${r.description ?? '—'}`
           ).join('\n\n'))
           .setThumbnail(target.user.displayAvatarURL({ size: 64 }))
-          .addFields({ name: '💰 Seu Saldo', value: `**${eco.balance.toLocaleString('pt-BR')} ${COIN()}**`, inline: true }),
+          .addFields({ name: '💰 Seu Saldo', value: `**${totalCoins(eco).toLocaleString('pt-BR')} ${COIN()}**`, inline: true }),
       ],
       components: [new ActionRowBuilder().addComponents(sel)],
     });
@@ -1099,7 +1100,7 @@ async function handleGiftTypeSel(interaction) {
           ).join('\n'))
           .setImage(allBanners[0].imageUrl)
           .setThumbnail(target.user.displayAvatarURL({ size: 64 }))
-          .addFields({ name: '💰 Seu Saldo', value: `**${eco.balance.toLocaleString('pt-BR')} ${COIN()}**`, inline: true }),
+          .addFields({ name: '💰 Seu Saldo', value: `**${totalCoins(eco).toLocaleString('pt-BR')} ${COIN()}**`, inline: true }),
       ],
       components: [new ActionRowBuilder().addComponents(sel)],
     });
@@ -1122,7 +1123,7 @@ async function handleGiftItemSel(interaction) {
     alreadyGifted = !!(await prisma.userPurchase.findUnique({
       where: { userId_itemType_itemRef: { userId: targetId, itemType: 'role', itemRef: item.roleId } },
     }));
-    canAfford = eco.balance >= price;
+    canAfford = totalCoins(eco) >= price;
   } else {
     const b = await resolveBannerForGuild(ref, interaction.guildId);
     if (!b) return interaction.update({ content: '❌ Banner não encontrado.', components: [] });
@@ -1130,7 +1131,7 @@ async function handleGiftItemSel(interaction) {
     alreadyGifted = !!(await prisma.userPurchase.findUnique({
       where: { userId_itemType_itemRef: { userId: targetId, itemType: 'banner', itemRef: b.key } },
     }));
-    canAfford = eco.balance >= price;
+    canAfford = totalCoins(eco) >= price;
   }
 
   const embed = new EmbedBuilder()
@@ -1139,8 +1140,8 @@ async function handleGiftItemSel(interaction) {
     .setDescription(
       `Presentear **${target.displayName}** com **${name}**?\n\n` +
       `> 💰 Preço: **${price.toLocaleString('pt-BR')} ${COIN()}**\n` +
-      `> 👛 Seu saldo: **${eco.balance.toLocaleString('pt-BR')} ${COIN()}**\n` +
-      `> 📉 Saldo após: **${(eco.balance - price).toLocaleString('pt-BR')} ${COIN()}**`
+      `> 👛 Seu saldo: **${totalCoins(eco).toLocaleString('pt-BR')} ${COIN()}**\n` +
+      `> 📉 Saldo após: **${(totalCoins(eco) - price).toLocaleString('pt-BR')} ${COIN()}**`
     )
     .setThumbnail(target.user.displayAvatarURL({ size: 64 }));
 
@@ -1187,17 +1188,19 @@ async function handleGiftBuyExecute(interaction, client) {
     name = b.name; price = b.price; itemRef = b.key;
   }
 
-  if (eco.balance < price) return interaction.editReply({ content: `❌ Saldo insuficiente! Você tem **${eco.balance.toLocaleString('pt-BR')} ${COIN()}**.` });
+  if (totalCoins(eco) < price) return interaction.editReply({ content: `❌ Saldo insuficiente! Você tem **${totalCoins(eco).toLocaleString('pt-BR')} ${COIN()}**.` });
 
   const exists = await prisma.userPurchase.findUnique({
     where: { userId_itemType_itemRef: { userId: targetId, itemType, itemRef } },
   });
   if (exists) return interaction.editReply({ content: `❌ **${target.displayName}** já possui **${name}**!` });
 
-  await prisma.economy.update({
-    where: { userId_guildId: { userId: interaction.user.id, guildId: interaction.guildId } },
-    data:  { balance: { decrement: price } },
+  const spent = await spendCoins(prisma, {
+    userId: interaction.user.id,
+    guildId: interaction.guildId,
+    amount: price,
   });
+  if (!spent.ok) return interaction.editReply({ content: '❌ Saldo insuficiente!' });
 
   await prisma.userPurchase.create({
     data: { userId: targetId, itemType, itemRef },
@@ -1251,14 +1254,14 @@ function _navBtns(prevId, nextId, voltarId, styles, nextLabel = 'Próximo') {
 
 async function buildBannerCarousel(b, index, total, eco, owned, cfg = null) {
   const styles    = getBtnStyles(cfg);
-  const canAfford = eco.balance >= b.price;
+  const canAfford = totalCoins(eco) >= b.price;
 
   const c = new ContainerBuilder();
   const lines = [
     `🖼️ **${b.name}**`,
     b.description || null,
     `${PET_VALUE()} Valor: **${b.price.toLocaleString('pt-BR')} (${formatK(b.price)}) ${COIN()}**`,
-    `${PET_BALANCE()} Saldo: **${eco.balance.toLocaleString('pt-BR')} ${COIN()}**`,
+    `${PET_BALANCE()} Saldo: **${totalCoins(eco).toLocaleString('pt-BR')} ${COIN()}**`,
   ].filter(Boolean);
   c.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')));
 
@@ -1293,14 +1296,14 @@ async function buildBannerCarousel(b, index, total, eco, owned, cfg = null) {
 
 function buildRoleCarousel(r, index, total, eco, owned, cfg = null) {
   const styles    = getBtnStyles(cfg);
-  const canAfford = eco.balance >= r.price;
+  const canAfford = totalCoins(eco) >= r.price;
 
   const c = new ContainerBuilder();
   c.addTextDisplayComponents(new TextDisplayBuilder().setContent([
     `<@&${r.roleId}>`,
     r.description || 'Cargo exclusivo do servidor.',
     `${PET_VALUE()} Valor: **${r.price.toLocaleString('pt-BR')} (${formatK(r.price)}) ${COIN()}**`,
-    `${PET_BALANCE()} Saldo: **${eco.balance.toLocaleString('pt-BR')} ${COIN()}**`,
+    `${PET_BALANCE()} Saldo: **${totalCoins(eco).toLocaleString('pt-BR')} ${COIN()}**`,
     `${index + 1} / ${total} cargos`,
   ].join('\n')));
 
@@ -1326,7 +1329,7 @@ function buildRoleCarousel(r, index, total, eco, owned, cfg = null) {
 
 async function buildPetCarousel(p, index, total, eco, owned, cfg = null, emojiSource = null, { includeImage = true } = {}) {
   const styles    = getBtnStyles(cfg);
-  const canAfford = eco.balance >= p.price;
+  const canAfford = totalCoins(eco) >= p.price;
   const imageUrl  = safeHttpUrl(p.imageUrl);
 
   const c = new ContainerBuilder();
@@ -1334,7 +1337,7 @@ async function buildPetCarousel(p, index, total, eco, owned, cfg = null, emojiSo
     `**${petDisplayName(p, emojiSource)}**`,
     p.description || '',
     `${PET_VALUE()} Valor: **${p.price.toLocaleString('pt-BR')} (${formatK(p.price)}) ${COIN()}**`,
-    `${PET_BALANCE()} Saldo: **${eco.balance.toLocaleString('pt-BR')} ${COIN()}**`,
+    `${PET_BALANCE()} Saldo: **${totalCoins(eco).toLocaleString('pt-BR')} ${COIN()}**`,
   ].filter(Boolean).join('\n')));
 
   if (includeImage && imageUrl) {
@@ -1576,11 +1579,11 @@ async function handleItemSel(interaction) {
     const item = await prisma.shopRole.findUnique({ where: { id: ref } });
     if (!item) return interaction.editReply({ content: '❌ Cargo não encontrado.', embeds: [], components: [] });
     const owned    = !!(await prisma.userPurchase.findUnique({ where: { userId_itemType_itemRef: { userId: interaction.user.id, itemType: 'role', itemRef: item.roleId } } }));
-    const canAfford = eco.balance >= item.price;
+    const canAfford = totalCoins(eco) >= item.price;
 
     const embed = new EmbedBuilder().setColor(SHOP_COLOR).setTitle(`👑 ${item.name}`)
       .setDescription(item.description ?? 'Cargo exclusivo do servidor.')
-      .addFields({ name: '💰 Preço', value: `**${item.price.toLocaleString('pt-BR')} ${COIN()}**`, inline: true }, { name: '👛 Seu Saldo', value: `**${eco.balance.toLocaleString('pt-BR')} ${COIN()}**`, inline: true });
+      .addFields({ name: '💰 Preço', value: `**${item.price.toLocaleString('pt-BR')} ${COIN()}**`, inline: true }, { name: '👛 Seu Saldo', value: `**${totalCoins(eco).toLocaleString('pt-BR')} ${COIN()}**`, inline: true });
 
     const btn = new ButtonBuilder().setCustomId(`shop_buy_role:${item.id}`)
       .setLabel(owned ? 'Já Possui' : canAfford ? 'Comprar' : 'Sem Saldo')
@@ -1595,11 +1598,11 @@ async function handleItemSel(interaction) {
     const b = await resolveBannerForGuild(ref, interaction.guildId);
     if (!b) return interaction.editReply({ content: '❌ Banner não encontrado.', embeds: [], components: [] });
     const owned    = !!(await prisma.userPurchase.findUnique({ where: { userId_itemType_itemRef: { userId: interaction.user.id, itemType: 'banner', itemRef: b.key } } }));
-    const canAfford = eco.balance >= b.price;
+    const canAfford = totalCoins(eco) >= b.price;
 
     const embed = new EmbedBuilder().setColor(SHOP_COLOR).setTitle(b.name)
       .setDescription(b.description || '\u200b').setImage(b.imageUrl || null)
-      .addFields({ name: '💰 Preço', value: `**${b.price.toLocaleString('pt-BR')} ${COIN()}**`, inline: true }, { name: '👛 Seu Saldo', value: `**${eco.balance.toLocaleString('pt-BR')} ${COIN()}**`, inline: true });
+      .addFields({ name: '💰 Preço', value: `**${b.price.toLocaleString('pt-BR')} ${COIN()}**`, inline: true }, { name: '👛 Seu Saldo', value: `**${totalCoins(eco).toLocaleString('pt-BR')} ${COIN()}**`, inline: true });
 
     const btn = new ButtonBuilder().setCustomId(`shop_buy_banner:${b.key}`)
       .setLabel(owned ? 'Já Possui' : canAfford ? 'Comprar Banner' : 'Sem Saldo')
@@ -1617,7 +1620,7 @@ async function handleItemSel(interaction) {
       flags: MessageFlags.IsComponentsV2,
     });
     const owned     = !!(await prisma.userPurchase.findUnique({ where: { userId_itemType_itemRef: { userId: interaction.user.id, itemType: 'pet', itemRef: pet.id } } }));
-    const canAfford = eco.balance >= pet.price;
+    const canAfford = totalCoins(eco) >= pet.price;
 
     const btn = new ButtonBuilder().setCustomId(`shop_buy_pet:${pet.id}`)
       .setLabel(owned ? 'Já Possui' : canAfford ? 'Comprar Pet' : 'Sem Saldo')
@@ -1630,7 +1633,7 @@ async function handleItemSel(interaction) {
       body:
         `${pet.description ?? 'Um pet exclusivo do servidor.'}\n\n` +
         `${PET_VALUE()} **Preço:** ${pet.price.toLocaleString('pt-BR')} ${COIN()}\n` +
-        `${PET_BALANCE()} **Seu saldo:** ${eco.balance.toLocaleString('pt-BR')} ${COIN()}\n\n` +
+        `${PET_BALANCE()} **Seu saldo:** ${totalCoins(eco).toLocaleString('pt-BR')} ${COIN()}\n\n` +
         'Depois da compra, use `/perfil` → **Meu Pet** para equipar.',
       pet,
       includeActions: false,
@@ -1676,16 +1679,16 @@ async function handleBuyConfirm(interaction) {
     name = b.name; price = b.price;
   }
 
-  if (eco.balance < price) {
+  if (totalCoins(eco) < price) {
     if (type !== 'pet') {
       return interaction.editReply({
-        content: `❌ Saldo insuficiente! Você tem **${eco.balance.toLocaleString('pt-BR')} ${COIN()}**.`,
+        content: `❌ Saldo insuficiente! Você tem **${totalCoins(eco).toLocaleString('pt-BR')} ${COIN()}**.`,
       });
     }
     return interaction.editReply({
       ...buildPetPanel({
         title: '❌ Saldo insuficiente',
-        body: `${PET_BALANCE()} Você tem **${eco.balance.toLocaleString('pt-BR')} ${COIN()}**, mas precisa de **${price.toLocaleString('pt-BR')} ${COIN()}**.`,
+        body: `${PET_BALANCE()} Você tem **${totalCoins(eco).toLocaleString('pt-BR')} ${COIN()}**, mas precisa de **${price.toLocaleString('pt-BR')} ${COIN()}**.`,
         pet: petForPayload,
         includeActions: false,
       }),
@@ -1703,7 +1706,7 @@ async function handleBuyConfirm(interaction) {
         title: '⚠️ Confirmar compra',
         body:
           `Comprar **${name}** por **${price.toLocaleString('pt-BR')} ${COIN()}**?\n\n` +
-          `${PET_BALANCE()} **Saldo atual:** ${eco.balance.toLocaleString('pt-BR')} ${COIN()}\n` +
+          `${PET_BALANCE()} **Saldo atual:** ${totalCoins(eco).toLocaleString('pt-BR')} ${COIN()}\n` +
           `${PET_BALANCE()} **Saldo após:** ${(eco.balance - price).toLocaleString('pt-BR')} ${COIN()}\n\n` +
           'Esta ação não pode ser desfeita.',
         pet: petForPayload,
@@ -1716,8 +1719,8 @@ async function handleBuyConfirm(interaction) {
   const embed = new EmbedBuilder().setColor(0xFEE75C).setTitle('⚠️ Confirmar Compra')
     .setDescription(
       `Comprar **${name}** por **${price.toLocaleString('pt-BR')} ${COIN()}**?\n\n` +
-      `> 💰 Saldo atual: **${eco.balance.toLocaleString('pt-BR')} ${COIN()}**\n` +
-      `> 📉 Saldo após:  **${(eco.balance - price).toLocaleString('pt-BR')} ${COIN()}**`
+      `> 💰 Saldo atual: **${totalCoins(eco).toLocaleString('pt-BR')} ${COIN()}**\n` +
+      `> 📉 Saldo após:  **${(totalCoins(eco) - price).toLocaleString('pt-BR')} ${COIN()}**`
     ).setFooter({ text: '⚠️ Esta ação não pode ser desfeita!' });
 
   const row = new ActionRowBuilder().addComponents(
@@ -1757,11 +1760,11 @@ async function handleBuyExecute(interaction, client) {
     name = b.name; price = b.price; itemRef = b.key;
   }
 
-  if (eco.balance < price) {
+  if (totalCoins(eco) < price) {
     if (type === 'pet') {
       return interaction.editReply(buildPetPanel({
         title: '❌ Saldo insuficiente',
-        body: `Você precisa de **${price.toLocaleString('pt-BR')} ${COIN()}**, mas possui apenas **${eco.balance.toLocaleString('pt-BR')} ${COIN()}**.`,
+        body: `Você precisa de **${price.toLocaleString('pt-BR')} ${COIN()}**, mas possui apenas **${totalCoins(eco).toLocaleString('pt-BR')} ${COIN()}**.`,
         pet: petForPayload,
         includeActions: false,
       }));
@@ -1784,10 +1787,12 @@ async function handleBuyExecute(interaction, client) {
     return interaction.editReply({ content: '✅ Você já possui este item!', embeds: [], components: [] });
   }
 
-  await prisma.economy.update({
-    where: { userId_guildId: { userId: interaction.user.id, guildId: interaction.guildId } },
-    data:  { balance: { decrement: price } },
+  const spent = await spendCoins(prisma, {
+    userId: interaction.user.id,
+    guildId: interaction.guildId,
+    amount: price,
   });
+  if (!spent.ok) return interaction.editReply({ content: '❌ Saldo insuficiente!' });
   await prisma.userPurchase.create({ data: { userId: interaction.user.id, itemType: type, itemRef } });
 
   if (type === 'role' && roleId) {
@@ -1884,7 +1889,7 @@ async function handleVitrineSel(interaction) {
     prisma.userPurchase.findMany({ where: { userId: interaction.user.id, itemType: 'banner' } }),
   ]);
   const ownedSet = new Set(allOwned.map(o => o.itemRef));
-  const canAfford = eco.balance >= banner.price;
+  const canAfford = totalCoins(eco) >= banner.price;
 
   const sel = new StringSelectMenuBuilder()
     .setCustomId('shop_vitrine_sel').setPlaceholder('Ver outro banner...')
@@ -1911,7 +1916,7 @@ async function handleVitrineSel(interaction) {
   return interaction.update({
     embeds: [
       new EmbedBuilder().setColor(SHOP_COLOR).setTitle(banner.name).setDescription(banner.description || '\u200b').setImage(banner.imageUrl || null)
-        .addFields({ name: '💰 Preço', value: `**${banner.price.toLocaleString('pt-BR')} ${COIN()}**`, inline: true }, { name: '👛 Saldo', value: `**${eco.balance.toLocaleString('pt-BR')} ${COIN()}**`, inline: true }),
+        .addFields({ name: '💰 Preço', value: `**${banner.price.toLocaleString('pt-BR')} ${COIN()}**`, inline: true }, { name: '👛 Saldo', value: `**${totalCoins(eco).toLocaleString('pt-BR')} ${COIN()}**`, inline: true }),
     ],
     components: [new ActionRowBuilder().addComponents(sel), new ActionRowBuilder().addComponents(btn)],
   });
@@ -2048,7 +2053,7 @@ async function handleSaldo(interaction) {
       new EmbedBuilder().setColor(SHOP_COLOR).setTitle('💰 Meu Saldo')
         .setThumbnail(interaction.user.displayAvatarURL({ size: 64 }))
         .addFields(
-          { name: '💰 Carteira',       value: `**${eco.balance.toLocaleString('pt-BR')} ${COIN()}**`, inline: true },
+          { name: '💰 Total disponível', value: `**${totalCoins(eco).toLocaleString('pt-BR')} ${COIN()}**`, inline: true },
           { name: '🏦 Banco',          value: `**${eco.bank.toLocaleString('pt-BR')} ${COIN()}**`,   inline: true },
           { name: '📦 Itens',          value: `**${purchases}** compra(s)`,                        inline: true },
           { name: '🖼️ Banner Ativo',   value: activeBannerObj ? activeBannerObj.name : 'Nenhum',   inline: true },
@@ -2156,7 +2161,7 @@ async function hasVipFrameAccess(interaction) {
     },
     select: { roleId: true },
   });
-  return grants.some(grant => member.roles.cache.has(grant.roleId));
+  return grants.some(grant => !grant.roleId || member.roles.cache.has(grant.roleId));
 }
 
 async function handleVipRingBtn(interaction, mode) {

@@ -13,6 +13,7 @@ import prisma from '../../database/client.js';
 import { Prisma } from '@prisma/client';
 import { getEmoji } from '../../utils/emojiManager.js';
 import { generateBalanceCard, generateTopCard } from '../../utils/economyCards.js';
+import { spendCoins, totalCoins } from '../../utils/economyFunds.js';
 
 // ─── Emojis — resolvidos como application emojis (sem dependência de boost) ──
 const COIN = () => getEmoji('futecoins');
@@ -378,11 +379,12 @@ const cmdPagar = {
     if (target.id === interaction.user.id) return interaction.reply(v2Err('Você não pode pagar a si mesmo.'));
     if (target.bot) return interaction.reply(v2Err('Não é possível pagar bots.'));
     const eco = await getEco(interaction.user.id, interaction.guildId);
-    if (eco.balance < valor) return interaction.reply(v2Err(`Saldo insuficiente. Você tem **${eco.balance.toLocaleString('pt-BR')}** ${COIN()} na carteira.`));
+    if (totalCoins(eco) < valor) return interaction.reply(v2Err(`Saldo insuficiente. Você tem **${totalCoins(eco).toLocaleString('pt-BR')}** ${COIN()} disponíveis.`));
     const taxa   = Math.floor(valor * 0.03);
     const recebe = valor - taxa;
     await getEco(target.id, interaction.guildId);
-    await prisma.economy.update({ where: { userId_guildId: { userId: interaction.user.id, guildId: interaction.guildId } }, data: { balance: { decrement: valor } } });
+    const spent = await spendCoins(prisma, { userId: interaction.user.id, guildId: interaction.guildId, amount: valor });
+    if (!spent.ok) return interaction.reply(v2Err('Saldo insuficiente.'));
     await prisma.economy.update({ where: { userId_guildId: { userId: target.id,            guildId: interaction.guildId } }, data: { balance: { increment: recebe } } });
     return interaction.reply(v2Rich(
       `## ✅ Transferência concluída\n` +
@@ -400,11 +402,12 @@ const cmdPagar = {
     if (target.bot) return message.reply(v2Err('Não é possível pagar bots.'));
     if (isNaN(valor) || valor <= 0) return message.reply(v2Err('Informe o valor. Ex: `savage pagar @user 500`'));
     const eco = await getEco(message.author.id, message.guildId);
-    if (eco.balance < valor) return message.reply(v2Err(`Saldo insuficiente. Você tem **${eco.balance.toLocaleString('pt-BR')}** ${COIN()} na carteira.`));
+    if (totalCoins(eco) < valor) return message.reply(v2Err(`Saldo insuficiente. Você tem **${totalCoins(eco).toLocaleString('pt-BR')}** ${COIN()} disponíveis.`));
     const taxa   = Math.floor(valor * 0.03);
     const recebe = valor - taxa;
     await getEco(target.id, message.guildId);
-    await prisma.economy.update({ where: { userId_guildId: { userId: message.author.id, guildId: message.guildId } }, data: { balance: { decrement: valor } } });
+    const spent = await spendCoins(prisma, { userId: message.author.id, guildId: message.guildId, amount: valor });
+    if (!spent.ok) return message.reply(v2Err('Saldo insuficiente.'));
     await prisma.economy.update({ where: { userId_guildId: { userId: target.id,           guildId: message.guildId } }, data: { balance: { increment: recebe } } });
     return message.reply(v2Rich(
       `## ✅ Transferência concluída\n` +

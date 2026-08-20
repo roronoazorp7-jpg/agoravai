@@ -16,7 +16,7 @@ import {
   PermissionFlagsBits,
 } from 'discord.js';
 import prisma from '../../database/client.js';
-import { spendCoins, totalCoins } from '../../utils/economyFunds.js';
+import { spendCoins } from '../../utils/economyFunds.js';
 import { getEmoji } from '../../utils/emojiManager.js';
 import { composeFishingArtwork, composeFishingScene } from '../../utils/fishingArtwork.js';
 
@@ -985,11 +985,8 @@ export async function handleFishingInteraction(interaction) {
         create: { userId, guildId },
         update: {},
       });
-      if (economy.balance < bait.price) return { status: 'funds', balance: economy.balance };
-      await tx.economy.update({
-        where: { userId_guildId: { userId, guildId } },
-        data: { balance: { decrement: bait.price } },
-      });
+      const spent = await spendCoins(tx, { userId, guildId, amount: bait.price });
+      if (!spent.ok) return { status: 'funds', balance: spent.available };
       await tx.fishingItem.upsert({
         where: { userId_guildId_itemKey: { userId, guildId, itemKey: bait.key } },
         create: { userId, guildId, itemKey: bait.key, quantity: bait.pack },
@@ -1047,11 +1044,8 @@ export async function handleFishingInteraction(interaction) {
           create: { userId, guildId },
           update: {},
         });
-        if (economy.balance < rod.price) return { status: 'funds', balance: economy.balance };
-        await tx.economy.update({
-          where: { userId_guildId: { userId, guildId } },
-          data: { balance: { decrement: rod.price } },
-        });
+        const spent = await spendCoins(tx, { userId, guildId, amount: rod.price });
+        if (!spent.ok) return { status: 'funds', balance: spent.available };
         await tx.fishingProfile.update({
           where: { userId_guildId: { userId, guildId } },
           data: { rodKey: rod.key },

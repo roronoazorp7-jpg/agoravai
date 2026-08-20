@@ -17,7 +17,7 @@ async function checkExpiredVips(client) {
           ?? await client.guilds.fetch(grant.guildId).catch(() => null);
         if (!guild) continue;
         const member = await guild.members.fetch(grant.userId).catch(() => null);
-        if (member) await member.roles.remove(grant.roleId).catch(() => {});
+        if (member && grant.roleId) await member.roles.remove(grant.roleId).catch(() => {});
       } catch {}
     }
 
