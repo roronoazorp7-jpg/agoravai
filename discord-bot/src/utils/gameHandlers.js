@@ -17,6 +17,7 @@ import prisma from '../database/client.js';
 import { getEmoji } from './emojiManager.js';
 import { generateDarkMinesGrid } from './darkMinesGrid.js';
 import { generateBlackjackCard } from './economyCards.js';
+import { spendCoins } from './economyFunds.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(__dirname, '../../public/games');
@@ -36,10 +37,8 @@ async function getEco(userId, guildId) {
   });
 }
 async function deductBet(userId, guildId, bet) {
-  await prisma.economy.update({
-    where: { userId_guildId: { userId, guildId } },
-    data:  { balance: { decrement: bet } },
-  });
+  const result = await spendCoins(prisma, { userId, guildId, amount: bet });
+  if (!result.ok) throw new Error('Saldo insuficiente para essa aposta.');
 }
 async function addWin(userId, guildId, amount) {
   await prisma.economy.update({

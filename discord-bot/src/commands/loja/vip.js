@@ -90,7 +90,7 @@ async function grantVip(interaction) {
   if (!member) {
     return interaction.reply({ content: '❌ Esse membro não está neste servidor.', ephemeral: true });
   }
-  if (!role || role.managed || role.id === interaction.guild.id) {
+  if (role?.managed || role?.id === interaction.guild.id) {
     return interaction.reply({
       content: '❌ Escolha um cargo normal. Cargos integrados e o @everyone não podem ser usados como VIP.',
       ephemeral: true,
@@ -103,25 +103,27 @@ async function grantVip(interaction) {
     });
   }
 
-  const botMember = interaction.guild.members.me
-    ?? await interaction.guild.members.fetch(interaction.client.user.id).catch(() => null);
-  if (!botMember?.permissions.has(PermissionFlagsBits.ManageRoles)) {
-    return interaction.reply({
-      content: '❌ Eu preciso da permissão **Gerenciar cargos** para conceder e remover VIP.',
-      ephemeral: true,
-    });
-  }
-  if (role.position >= botMember.roles.highest.position) {
-    return interaction.reply({
-      content: '❌ Meu cargo precisa estar acima do cargo VIP escolhido.',
-      ephemeral: true,
-    });
-  }
-  if (role.position >= interaction.member.roles.highest.position && interaction.member.id !== interaction.guild.ownerId) {
-    return interaction.reply({
-      content: '❌ Seu cargo precisa estar acima do cargo VIP escolhido.',
-      ephemeral: true,
-    });
+  if (role) {
+    const botMember = interaction.guild.members.me
+      ?? await interaction.guild.members.fetch(interaction.client.user.id).catch(() => null);
+    if (!botMember?.permissions.has(PermissionFlagsBits.ManageRoles)) {
+      return interaction.reply({
+        content: '❌ Eu preciso da permissão **Gerenciar cargos** para conceder e remover VIP.',
+        ephemeral: true,
+      });
+    }
+    if (role.position >= botMember.roles.highest.position) {
+      return interaction.reply({
+        content: '❌ Meu cargo precisa estar acima do cargo VIP escolhido.',
+        ephemeral: true,
+      });
+    }
+    if (role.position >= interaction.member.roles.highest.position && interaction.member.id !== interaction.guild.ownerId) {
+      return interaction.reply({
+        content: '❌ Seu cargo precisa estar acima do cargo VIP escolhido.',
+        ephemeral: true,
+      });
+    }
   }
 
   const now = new Date();
@@ -130,7 +132,7 @@ async function grantVip(interaction) {
       guildId_userId_roleId: {
         guildId: interaction.guildId,
         userId: user.id,
-        roleId: role.id,
+        roleId: role?.id ?? '',
       },
     },
   });
@@ -138,16 +140,16 @@ async function grantVip(interaction) {
   const expiresAt = new Date(startsAt.getTime() + amount * VIP_TIME_UNITS[unit]);
 
   try {
-    await member.roles.add(role, `VIP concedido por ${interaction.user.tag}`);
+    if (role) await member.roles.add(role, `VIP concedido por ${interaction.user.tag}`);
     await prisma.vipGrant.upsert({
       where: {
         guildId_userId_roleId: {
           guildId: interaction.guildId,
           userId: user.id,
-          roleId: role.id,
+        roleId: role?.id ?? '',
         },
       },
-      create: { guildId: interaction.guildId, userId: user.id, roleId: role.id, expiresAt },
+      create: { guildId: interaction.guildId, userId: user.id, roleId: role?.id ?? '', expiresAt },
       update: { expiresAt },
     });
   } catch (error) {
@@ -163,7 +165,7 @@ async function grantVip(interaction) {
     content:
       `✅ VIP concedido com sucesso!\n` +
       `**Membro:** ${member}\n` +
-      `**Cargo:** ${role}\n` +
+      `**Cargo:** ${role ? role : 'VIP direto (sem cargo)'}\n` +
       `**Duração adicionada:** ${formatVipDuration(amount, unit)}\n` +
       `**Expira:** <t:${expiration}:F> (<t:${expiration}:R>)`,
     ephemeral: false,
@@ -542,7 +544,7 @@ export default {
           option.setName('membro').setDescription('Membro que receberá o VIP').setRequired(true),
         )
         .addRoleOption(option =>
-          option.setName('cargo').setDescription('Cargo que dá acesso às molduras VIP').setRequired(true),
+          option.setName('cargo').setDescription('Cargo opcional que também dará acesso ao VIP'),
         )
         .addIntegerOption(option =>
           option

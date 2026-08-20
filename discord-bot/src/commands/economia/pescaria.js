@@ -16,6 +16,7 @@ import {
   PermissionFlagsBits,
 } from 'discord.js';
 import prisma from '../../database/client.js';
+import { spendCoins, totalCoins } from '../../utils/economyFunds.js';
 import { getEmoji } from '../../utils/emojiManager.js';
 import { composeFishingArtwork, composeFishingScene } from '../../utils/fishingArtwork.js';
 
