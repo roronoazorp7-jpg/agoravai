@@ -2,6 +2,7 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  RoleSelectMenuBuilder,
   ContainerBuilder,
   TextDisplayBuilder,
   SeparatorBuilder,
@@ -135,6 +136,7 @@ export function buildPainelFuncoes(guild, cfg) {
   const tellonymOk   = !!(cfg.tellonymChannel);
   const parceiraOk   = !!(cfg.partnerEnabled && cfg.partnerChannel);
   const antiLinkOk   = !!cfg.antiLinkEnabled;
+  const boostOk      = !!cfg.boostRoles;
 
   const c = new ContainerBuilder();
 
@@ -198,6 +200,18 @@ export function buildPainelFuncoes(guild, cfg) {
       .setContent('**VIP**\nPlano VIP com benefícios e cargos exclusivos'),
   );
   c.addActionRowComponents(cfgBtn('painel_cfg_vip'));
+
+  c.addSeparatorComponents(new SeparatorBuilder());
+
+  // ── Boost ─────────────────────────────────────────────────────────────────
+  c.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent('**Boost do Servidor**'),
+  );
+  c.addTextDisplayComponents(
+    new TextDisplayBuilder()
+      .setContent(`${D(boostOk)} **Cargos de Boost**\nCargos concedidos automaticamente a quem impulsionar o servidor`),
+  );
+  c.addActionRowComponents(cfgBtn('painel_cfg_boost'));
 
   c.addSeparatorComponents(new SeparatorBuilder());
 
@@ -401,6 +415,91 @@ export function buildStatusConfigPayload() {
   return { components: [c, voltarRow()], flags: MessageFlags.IsComponentsV2 };
 }
 
+// ─── Mini-config dos cargos de boost ─────────────────────────────────────────
+
+export function buildBoostConfigPayload(guild, cfg) {
+  const roleIds = (cfg.boostRoles ?? '').split(',').map(id => id.trim()).filter(Boolean);
+  const roles = roleIds
+    .map(id => guild.roles.cache.get(id))
+    .filter(Boolean);
+
+  const roleText = roles.length
+    ? roles.map(role => `<@&${role.id}>`).join(', ')
+    : '*(nenhum cargo configurado)*';
+
+  const c = new ContainerBuilder();
+  c.addTextDisplayComponents(new TextDisplayBuilder().setContent([
+    `${D(roles.length > 0)} **Cargos de Boost**`,
+    '',
+    'Os cargos abaixo serão entregues automaticamente quando um membro impulsionar o servidor.',
+    'Quando o impulso for removido, os cargos concedidos por este módulo também serão retirados.',
+    '',
+    `**Cargos configurados:** ${roleText}`,
+  ].join('\n')));
+
+  c.addActionRowComponents(new ActionRowBuilder().addComponents(
+    new RoleSelectMenuBuilder()
+      .setCustomId('boost_roles_select')
+      .setPlaceholder('Selecione os cargos de boost...')
+      .setMinValues(0)
+      .setMaxValues(5),
+  ));
+
+  c.addActionRowComponents(new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('boost_roles_clear')
+      .setLabel('Limpar cargos')
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(roleIds.length === 0),
+  ));
+
+  return { components: [c, voltarRow()], flags: MessageFlags.IsComponentsV2 };
+}
+
+export async function handleBoostCfgRoleSelect(interaction) {
+  if (!interaction.memberPermissions?.has(0x20n)) {
+    return interaction.reply({ content: '❌ Sem permissão.', flags: 64 });
+  }
+
+  const me = interaction.guild.members.me
+    ?? await interaction.guild.members.fetchMe().catch(() => null);
+  const selected = [...new Set(interaction.values)]
+    .map(id => interaction.guild.roles.cache.get(id))
+    .filter(role => role && !role.managed && role.id !== interaction.guild.id);
+
+  const unavailable = selected.filter(role => me && role.position >= me.roles.highest.position);
+  if (unavailable.length) {
+    return interaction.reply({
+      content: `❌ Não consigo gerenciar ${unavailable.map(role => `<@&${role.id}>`).join(', ')}. Escolha cargos abaixo do meu cargo mais alto.`,
+      ephemeral: true,
+    });
+  }
+
+  const boostRoles = selected.map(role => role.id).join(',') || null;
+  await prisma.guildConfig.upsert({
+    where: { guildId: interaction.guildId },
+    create: { guildId: interaction.guildId, boostRoles },
+    update: { boostRoles },
+  });
+
+  return interaction.update(buildBoostConfigPayload(interaction.guild, await getCfg(interaction.guildId)));
+}
+
+export async function handleBoostCfgBtn(interaction) {
+  if (!interaction.memberPermissions?.has(0x20n)) {
+    return interaction.reply({ content: '❌ Sem permissão.', flags: 64 });
+  }
+
+  if (interaction.customId === 'boost_roles_clear') {
+    await prisma.guildConfig.update({
+      where: { guildId: interaction.guildId },
+      data: { boostRoles: null },
+    });
+  }
+
+  return interaction.update(buildBoostConfigPayload(interaction.guild, await getCfg(interaction.guildId)));
+}
+
 // ─── Handler: clique em "Configurar" de qualquer módulo ─────────────────────
 
 export async function handlePainelCfgBtn(interaction) {
@@ -452,6 +551,9 @@ export async function handlePainelCfgBtn(interaction) {
       break;
     case 'status':
       payload = buildStatusConfigPayload();
+      break;
+    case 'boost':
+      payload = buildBoostConfigPayload(interaction.guild, cfg);
       break;
     case 'antilink':
       payload = buildAntiLinkConfigPayload(cfg);

@@ -159,6 +159,7 @@ model GuildConfig {
 
   aiChannelId  String?
   dropAllowedRoles String?
+  boostRoles String?
 
   antiLinkEnabled          Boolean @default(false)
   antiLinkAction           String  @default("delete_warn")

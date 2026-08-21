@@ -86,6 +86,8 @@ import {
   handleInstaCfgModal,
   handlePainelModuleBtn,
   handlePainelModuleModal,
+  handleBoostCfgRoleSelect,
+  handleBoostCfgBtn,
 } from '../utils/painelHandlers.js';
 
 const tellonymSessions = new Map();
@@ -446,6 +448,10 @@ export default {
 
       // ── ROLE SELECT MENUS ──────────────────────────────────────────────────
       if (interaction.isRoleSelectMenu()) {
+        if (interaction.customId === 'boost_roles_select') {
+          return handleBoostCfgRoleSelect(interaction);
+        }
+
         // ── MONTAR-MENSAGEM: Cargo no embed ──────────────────────────────
         if (interaction.customId === 'msg_role_sel') {
           const session = getMsgSession(interaction.user.id, interaction.guildId);
@@ -1274,6 +1280,10 @@ export default {
         // ── PAINEL CENTRAL: Botões pm_* (planos VIP etc.) ────────────────
         if (customId.startsWith('pm_')) {
           return handlePainelModuleBtn(interaction);
+        }
+
+        if (customId.startsWith('boost_roles_')) {
+          return handleBoostCfgBtn(interaction);
         }
 
         // ── INSTAGRAM: Toggle like ───────────────────────────────────────
