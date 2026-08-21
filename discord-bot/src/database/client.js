@@ -5,6 +5,28 @@ const prisma = new PrismaClient({
 });
 
 export async function ensureMarriageSchema() {
+  // O schema do Prisma pode ser atualizado antes do banco do Railway.
+  // Esta alteração é aditiva e mantém o painel funcionando durante o deploy.
+  await prisma.$executeRawUnsafe(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'GuildConfig'
+      ) AND NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'GuildConfig'
+          AND column_name = 'boostRoles'
+      ) THEN
+        ALTER TABLE "GuildConfig" ADD COLUMN "boostRoles" TEXT;
+      END IF;
+    END
+    $$;
+  `);
+
   await prisma.$executeRawUnsafe(`
     DO $$
     BEGIN
