@@ -75,6 +75,7 @@ import {
   RP_COLOR_MAP,
 } from '../utils/rolePanelSessions.js';
 import { handleDropClaim, handleDropItemSelect } from '../utils/dropHandlers.js';
+import { handleDeathEventInteraction } from '../utils/deathEvent.js';
 import {
   handlePainelFuncoes,
   handlePainelVoltar,
@@ -438,6 +439,7 @@ export default {
 
   async execute(interaction, client) {
     try {
+      if (interaction.isButton() && await handleDeathEventInteraction(interaction, client)) return;
 
       // ── SLASH COMMANDS ─────────────────────────────────────────────────────
       if (interaction.isChatInputCommand()) {
