@@ -4,7 +4,7 @@ import { dirname, join } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TAROT_ASSETS_DIR = join(__dirname, '../../assets/tarot');
-const COOLDOWN_MS = 30 * 60 * 1000;
+const COOLDOWN_MS = 5 * 1000;
 const cooldowns = new Map();
 
 const CARDS = [
