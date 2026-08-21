@@ -452,6 +452,9 @@ export async function handlePainelCfgBtn(interaction) {
     case 'status':
       payload = buildStatusConfigPayload();
       break;
+    case 'antilink':
+      payload = buildAntiLinkConfigPayload(cfg);
+      break;
     default:
       return interaction.reply({ content: '❌ Módulo desconhecido.', flags: 64 });
   }
