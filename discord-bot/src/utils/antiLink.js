@@ -7,6 +7,43 @@ const SOCIAL_DOMAINS = /(facebook\.com|instagram\.com|tiktok\.com|twitter\.com|x
 const SHORTENER_DOMAINS = /(bit\.ly|tinyurl\.com|cutt\.ly|t\.co|shorturl\.at|is\.gd|ow\.ly|buff\.ly|rb\.gy)/i;
 
 const list = (value) => String(value ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+const deletionQueues = new Map();
+const warningCooldowns = new Map();
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function deleteWithRetry(message) {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      await message.delete();
+      return true;
+    } catch (error) {
+      // Discord code 10008 means the message was already removed. Treat it as
+      // success so a parallel moderation worker never retries forever.
+      if (error?.code === 10008) return true;
+      // Missing permissions cannot be fixed by retrying.
+      if (error?.code === 50013 || error?.code === 50001) return false;
+      if (attempt < 3) await wait(250 * (attempt + 1));
+    }
+  }
+  return false;
+}
+
+async function deleteFromChannelQueue(message) {
+  const channelId = message.channelId;
+  const previous = deletionQueues.get(channelId) ?? Promise.resolve();
+  const current = previous
+    .catch(() => {})
+    .then(() => deleteWithRetry(message));
+  deletionQueues.set(channelId, current);
+  try {
+    return await current;
+  } finally {
+    if (deletionQueues.get(channelId) === current) deletionQueues.delete(channelId);
+  }
+}
 const normalize = (value) => String(value ?? '')
   .toLowerCase()
   .replace(/[\u200b-\u200d\ufeff]/g, '')
@@ -40,11 +77,19 @@ export async function enforceAntiLink(message, cfg) {
   const detected = containsBlockedLink(message, cfg);
   if (!detected) return false;
   const action = cfg.antiLinkAction ?? 'delete_warn';
-  const deleted = await message.delete().then(() => true).catch(() => false);
+  // Messages from the same spam burst are handled sequentially per channel.
+  // This prevents concurrent DELETE requests from racing or being throttled
+  // while Discord is still acknowledging the previous deletion.
+  const deleted = await deleteFromChannelQueue(message);
   let warning = null;
   if (action === 'delete_warn' || action === 'timeout') {
-    warning = await message.channel.send(`⚠️ <@${message.author.id}>, links de ${detected.category} não são permitidos aqui.`).catch(() => null);
-    if (warning) setTimeout(() => warning.delete().catch(() => {}), 8_000);
+    const warningKey = `${message.guildId}:${message.channelId}:${message.author.id}`;
+    const canWarn = !warningCooldowns.has(warningKey);
+    if (canWarn) {
+      warningCooldowns.set(warningKey, setTimeout(() => warningCooldowns.delete(warningKey), 8_000));
+      warning = await message.channel.send(`⚠️ <@${message.author.id}>, links de ${detected.category} não são permitidos aqui.`).catch(() => null);
+      if (warning) setTimeout(() => warning.delete().catch(() => {}), 8_000);
+    }
   }
   if (action === 'timeout') {
     const member = message.member;
