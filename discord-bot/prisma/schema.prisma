@@ -159,6 +159,16 @@ model GuildConfig {
 
   aiChannelId  String?
   dropAllowedRoles String?
+
+  antiLinkEnabled          Boolean @default(false)
+  antiLinkAction           String  @default("delete_warn")
+  antiLinkBlockDiscord     Boolean @default(true)
+  antiLinkBlockSocial      Boolean @default(true)
+  antiLinkBlockShorteners  Boolean @default(true)
+  antiLinkAllowedDomains   String?
+  antiLinkAllowedChannels  String?
+  antiLinkAllowedRoles     String?
+  antiLinkLogChannel       String?
 }
 
 model VipPlan {

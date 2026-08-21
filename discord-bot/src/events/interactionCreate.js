@@ -80,6 +80,8 @@ import {
   handlePainelVoltar,
   handlePainelModuloSel,
   handlePainelCfgBtn,
+  handleAntiLinkCfgBtn,
+  handleAntiLinkCfgModal,
   handleInstaCfgBtn,
   handleInstaCfgModal,
   handlePainelModuleBtn,
@@ -1258,6 +1260,10 @@ export default {
         // ── PAINEL CENTRAL: Botões "Configurar" de cada módulo ───────────
         if (customId.startsWith('painel_cfg_')) {
           return handlePainelCfgBtn(interaction);
+        }
+
+        if (customId.startsWith('antilink_')) {
+          return handleAntiLinkCfgBtn(interaction);
         }
 
         // ── PAINEL CENTRAL: Botões mini-config Instagram ─────────────────
@@ -3204,6 +3210,9 @@ export default {
 
       // ── MODALS ─────────────────────────────────────────────────────────────
       if (interaction.isModalSubmit()) {
+        if (interaction.customId.startsWith('antilink_modal_')) {
+          return handleAntiLinkCfgModal(interaction);
+        }
 
         // ── PAINEL CENTRAL: Modals do mini-config Instagram ───────────
         if (interaction.customId.startsWith('insta_cfg_modal_')) {

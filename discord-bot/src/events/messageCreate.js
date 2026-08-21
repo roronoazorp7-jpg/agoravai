@@ -25,6 +25,7 @@ import {
   isGroqConfigured,
 } from '../utils/aiManager.js';
 import { clearAfkOnMessage, handleAfkMessage } from '../commands/general/afk.js';
+import { enforceAntiLink } from '../utils/antiLink.js';
 
 const PREFIXES = ['savage ', 's '];
 
@@ -336,6 +337,9 @@ export default {
     if (message.guildId) {
       const cfg = await getGuildCfg(message.guildId);
       const botMentioned = message.mentions.has(client.user);
+
+      // ── ANTI-LINK AVANÇADO ───────────────────────────────────────────────
+      if (await enforceAntiLink(message, cfg)) return;
 
       // ── CONTROLE ADMINISTRATIVO POR MENÇÃO ─────────────────────────────────
       // Administradores ainda podem acionar comandos naturais mencionando o bot.

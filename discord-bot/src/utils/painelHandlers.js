@@ -134,6 +134,7 @@ export function buildPainelFuncoes(guild, cfg) {
   const instaOk      = !!(cfg.instaChannel);
   const tellonymOk   = !!(cfg.tellonymChannel);
   const parceiraOk   = !!(cfg.partnerEnabled && cfg.partnerChannel);
+  const antiLinkOk   = !!cfg.antiLinkEnabled;
 
   const c = new ContainerBuilder();
 
@@ -210,10 +211,111 @@ export function buildPainelFuncoes(guild, cfg) {
   );
   c.addActionRowComponents(cfgBtn('painel_cfg_status'));
 
+  c.addSeparatorComponents(new SeparatorBuilder());
+  c.addTextDisplayComponents(new TextDisplayBuilder().setContent('**Segurança**'));
+  c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+    `${D(antiLinkOk)} **Anti-Link Avançado**\nBloqueie links por categoria, com exceções e registros`,
+  ));
+  c.addActionRowComponents(cfgBtn('painel_cfg_antilink'));
+
   return { components: [c, voltarRow()], flags: MessageFlags.IsComponentsV2 };
 }
 
 // ─── Mini-config do Instagram (abre pelo painel) ──────────────────────────────
+
+export function buildAntiLinkConfigPayload(cfg) {
+  const actionNames = { delete: 'apagar silenciosamente', delete_warn: 'apagar e avisar', timeout: 'apagar e silenciar' };
+  const list = (value) => value ? value.split(',').map((x) => x.trim()).filter(Boolean).join(', ') : 'nenhum';
+  const categories = [
+    cfg.antiLinkBlockDiscord && 'convites Discord',
+    cfg.antiLinkBlockSocial && 'redes sociais',
+    cfg.antiLinkBlockShorteners && 'encurtadores',
+  ].filter(Boolean).join(', ') || 'nenhuma';
+  const c = new ContainerBuilder();
+  c.addTextDisplayComponents(new TextDisplayBuilder().setContent([
+    `${D(cfg.antiLinkEnabled)} **Anti-Link Avançado** — ${cfg.antiLinkEnabled ? 'ATIVO' : 'DESATIVADO'}`,
+    '',
+    `**Ação:** ${actionNames[cfg.antiLinkAction] ?? 'apagar e avisar'}`,
+    `**Categorias:** ${categories}`,
+    `**Domínios permitidos:** ${list(cfg.antiLinkAllowedDomains)}`,
+    `**Canais liberados:** ${list(cfg.antiLinkAllowedChannels)}`,
+    `**Cargos liberados:** ${list(cfg.antiLinkAllowedRoles)}`,
+    `**Canal de registros:** ${cfg.antiLinkLogChannel ? `<#${cfg.antiLinkLogChannel}>` : 'desativado'}`,
+  ].join('\n')));
+  c.addActionRowComponents(new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('antilink_toggle').setLabel(cfg.antiLinkEnabled ? 'Desativar' : 'Ativar').setStyle(cfg.antiLinkEnabled ? ButtonStyle.Danger : ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('antilink_categories').setLabel('Categorias').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('antilink_action').setLabel('Ação').setStyle(ButtonStyle.Secondary),
+  ));
+  c.addActionRowComponents(new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('antilink_exceptions').setLabel('Exceções').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('antilink_log').setLabel('Canal de logs').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('antilink_reset').setLabel('Limpar exceções').setStyle(ButtonStyle.Danger),
+  ));
+  return { components: [c, voltarRow()], flags: MessageFlags.IsComponentsV2 };
+}
+
+export async function handleAntiLinkCfgBtn(interaction) {
+  if (!interaction.memberPermissions?.has(0x20n)) return interaction.reply({ content: '❌ Sem permissão.', flags: 64 });
+  const cfg = await getCfg(interaction.guildId);
+  const { customId } = interaction;
+  if (customId === 'antilink_toggle') {
+    await prisma.guildConfig.update({ where: { guildId: interaction.guildId }, data: { antiLinkEnabled: !cfg.antiLinkEnabled } });
+  } else if (customId === 'antilink_categories') {
+    const { ModalBuilder, TextInputBuilder, TextInputStyle } = await import('discord.js');
+    const modal = new ModalBuilder().setCustomId('antilink_modal_categories').setTitle('Categorias bloqueadas');
+    modal.addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('value').setLabel('D = Discord | S = redes | E = encurtadores').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(10).setPlaceholder('D S E')));
+    return interaction.showModal(modal);
+  } else if (customId === 'antilink_action') {
+    const { ModalBuilder, TextInputBuilder, TextInputStyle } = await import('discord.js');
+    const modal = new ModalBuilder().setCustomId('antilink_modal_action').setTitle('Ação do anti-link');
+    modal.addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('value').setLabel('delete, delete_warn ou timeout').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(20).setPlaceholder('delete_warn')));
+    return interaction.showModal(modal);
+  } else if (customId === 'antilink_exceptions') {
+    const { ModalBuilder, TextInputBuilder, TextInputStyle } = await import('discord.js');
+    const modal = new ModalBuilder().setCustomId('antilink_modal_exceptions').setTitle('Exceções do anti-link');
+    for (const [id, label, value, placeholder] of [
+      ['domains', 'Domínios permitidos (separados por vírgula)', cfg.antiLinkAllowedDomains, 'youtube.com, github.com'],
+      ['channels', 'Canais liberados (IDs separados por vírgula)', cfg.antiLinkAllowedChannels, '123456789012345678'],
+      ['roles', 'Cargos liberados (IDs separados por vírgula)', cfg.antiLinkAllowedRoles, '123456789012345678'],
+    ]) {
+      modal.addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId(id).setLabel(label).setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(800).setPlaceholder(placeholder).setValue(value ?? '')));
+    }
+    return interaction.showModal(modal);
+  } else if (customId === 'antilink_log') {
+    const { ModalBuilder, TextInputBuilder, TextInputStyle } = await import('discord.js');
+    const modal = new ModalBuilder().setCustomId('antilink_modal_log').setTitle('Canal de registros');
+    modal.addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('value').setLabel('ID do canal (vazio desativa)').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(30).setPlaceholder('123456789012345678').setValue(cfg.antiLinkLogChannel ?? '')));
+    return interaction.showModal(modal);
+  } else if (customId === 'antilink_reset') {
+    await prisma.guildConfig.update({ where: { guildId: interaction.guildId }, data: { antiLinkAllowedDomains: null, antiLinkAllowedChannels: null, antiLinkAllowedRoles: null } });
+  }
+  return interaction.update(buildAntiLinkConfigPayload(await getCfg(interaction.guildId)));
+}
+
+export async function handleAntiLinkCfgModal(interaction) {
+  await interaction.deferUpdate();
+  const cfg = await getCfg(interaction.guildId);
+  const cleanList = (value) => value.split(',').map((x) => x.trim()).filter(Boolean).join(',') || null;
+  let data = {};
+  if (interaction.customId === 'antilink_modal_categories') {
+    const categories = interaction.fields.getTextInputValue('value').toUpperCase();
+    data = { antiLinkBlockDiscord: categories.includes('D'), antiLinkBlockSocial: categories.includes('S'), antiLinkBlockShorteners: categories.includes('E') };
+  } else if (interaction.customId === 'antilink_modal_action') {
+    const action = interaction.fields.getTextInputValue('value').trim().toLowerCase();
+    data = { antiLinkAction: ['delete', 'delete_warn', 'timeout'].includes(action) ? action : cfg.antiLinkAction };
+  } else if (interaction.customId === 'antilink_modal_exceptions') {
+    data = {
+      antiLinkAllowedDomains: cleanList(interaction.fields.getTextInputValue('domains')),
+      antiLinkAllowedChannels: cleanList(interaction.fields.getTextInputValue('channels').replace(/[<#>]/g, '')),
+      antiLinkAllowedRoles: cleanList(interaction.fields.getTextInputValue('roles').replace(/[<@&>]/g, '')),
+    };
+  } else if (interaction.customId === 'antilink_modal_log') {
+    data = { antiLinkLogChannel: interaction.fields.getTextInputValue('value').replace(/[<#>]/g, '').trim() || null };
+  }
+  await prisma.guildConfig.update({ where: { guildId: interaction.guildId }, data });
+  await interaction.message.edit(buildAntiLinkConfigPayload(await getCfg(interaction.guildId)));
+}
 
 export function buildInstaConfigPayload(cfg) {
   const ativo  = !!(cfg.instaChannel);
