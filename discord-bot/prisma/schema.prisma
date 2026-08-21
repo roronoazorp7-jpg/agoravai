@@ -165,6 +165,7 @@ model GuildConfig {
   antiLinkBlockDiscord     Boolean @default(true)
   antiLinkBlockSocial      Boolean @default(true)
   antiLinkBlockShorteners  Boolean @default(true)
+  antiLinkBlockAll         Boolean @default(true)
   antiLinkAllowedDomains   String?
   antiLinkAllowedChannels  String?
   antiLinkAllowedRoles     String?

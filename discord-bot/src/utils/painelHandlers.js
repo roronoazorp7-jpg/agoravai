@@ -227,6 +227,7 @@ export function buildAntiLinkConfigPayload(cfg) {
   const actionNames = { delete: 'apagar silenciosamente', delete_warn: 'apagar e avisar', timeout: 'apagar e silenciar' };
   const list = (value) => value ? value.split(',').map((x) => x.trim()).filter(Boolean).join(', ') : 'nenhum';
   const categories = [
+    cfg.antiLinkBlockAll && 'todos os links',
     cfg.antiLinkBlockDiscord && 'convites Discord',
     cfg.antiLinkBlockSocial && 'redes sociais',
     cfg.antiLinkBlockShorteners && 'encurtadores',
@@ -264,7 +265,7 @@ export async function handleAntiLinkCfgBtn(interaction) {
   } else if (customId === 'antilink_categories') {
     const { ModalBuilder, TextInputBuilder, TextInputStyle } = await import('discord.js');
     const modal = new ModalBuilder().setCustomId('antilink_modal_categories').setTitle('Categorias bloqueadas');
-    modal.addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('value').setLabel('D = Discord | S = redes | E = encurtadores').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(10).setPlaceholder('D S E')));
+    modal.addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('value').setLabel('A = todos | D = Discord | S = redes | E = encurtadores').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(10).setPlaceholder('A D S E')));
     return interaction.showModal(modal);
   } else if (customId === 'antilink_action') {
     const { ModalBuilder, TextInputBuilder, TextInputStyle } = await import('discord.js');
@@ -300,7 +301,7 @@ export async function handleAntiLinkCfgModal(interaction) {
   let data = {};
   if (interaction.customId === 'antilink_modal_categories') {
     const categories = interaction.fields.getTextInputValue('value').toUpperCase();
-    data = { antiLinkBlockDiscord: categories.includes('D'), antiLinkBlockSocial: categories.includes('S'), antiLinkBlockShorteners: categories.includes('E') };
+    data = { antiLinkBlockAll: categories.includes('A'), antiLinkBlockDiscord: categories.includes('D'), antiLinkBlockSocial: categories.includes('S'), antiLinkBlockShorteners: categories.includes('E') };
   } else if (interaction.customId === 'antilink_modal_action') {
     const action = interaction.fields.getTextInputValue('value').trim().toLowerCase();
     data = { antiLinkAction: ['delete', 'delete_warn', 'timeout'].includes(action) ? action : cfg.antiLinkAction };
