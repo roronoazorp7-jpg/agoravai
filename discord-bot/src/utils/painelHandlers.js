@@ -140,97 +140,54 @@ export function buildPainelFuncoes(guild, cfg) {
 
   const c = new ContainerBuilder();
 
-  // ── Boas-Vindas ──────────────────────────────────────────────────────────
-  c.addTextDisplayComponents(
-    new TextDisplayBuilder()
-      .setContent(`${D(boasVindasOk)} **Boas-Vindas**\nMensagem e cargos ao entrar no servidor`),
-  );
-  c.addActionRowComponents(cfgBtn('painel_cfg_boasvindas'));
+  const moduleBtn = (customId, label) => new ButtonBuilder()
+    .setCustomId(customId)
+    .setLabel(label)
+    .setStyle(ButtonStyle.Secondary);
 
-  c.addSeparatorComponents(new SeparatorBuilder());
-
-  // ── Suporte ───────────────────────────────────────────────────────────────
-  c.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent('**Suporte**'),
-  );
-  c.addTextDisplayComponents(
-    new TextDisplayBuilder()
-      .setContent(`${D(ticketOk)} **Ticket**\nSuporte via thread privada com a equipe`),
-  );
-  c.addActionRowComponents(cfgBtn('painel_cfg_ticket'));
-
-  c.addSeparatorComponents(new SeparatorBuilder());
-
-  // ── Engajamento ───────────────────────────────────────────────────────────
-  c.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent('**Engajamento**'),
-  );
-  c.addTextDisplayComponents(
-    new TextDisplayBuilder()
-      .setContent(`${D(instaOk)} **Instagram**\nFeed de fotos com curtidas e comentários`),
-  );
-  c.addActionRowComponents(cfgBtn('painel_cfg_instagram'));
-
-  c.addTextDisplayComponents(
-    new TextDisplayBuilder()
-      .setContent(`${D(tellonymOk)} **Tellonym**\nMensagens anônimas entre os membros`),
-  );
-  c.addActionRowComponents(cfgBtn('painel_cfg_tellonym'));
-
-  c.addTextDisplayComponents(
-    new TextDisplayBuilder()
-      .setContent(`${D(parceiraOk)} **Parceria**\nSistema de parcerias do servidor`),
-  );
-  c.addActionRowComponents(cfgBtn('painel_cfg_parceria'));
-
-  c.addSeparatorComponents(new SeparatorBuilder());
-
-  // ── Loja & Economia ───────────────────────────────────────────────────────
-  c.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent('**Loja & Economia**'),
-  );
-  c.addTextDisplayComponents(
-    new TextDisplayBuilder()
-      .setContent('**Loja**\nLoja do servidor com cargos e banners personalizados'),
-  );
-  c.addActionRowComponents(cfgBtn('painel_cfg_loja'));
-
-  c.addTextDisplayComponents(
-    new TextDisplayBuilder()
-      .setContent('**VIP**\nPlano VIP com benefícios e cargos exclusivos'),
-  );
-  c.addActionRowComponents(cfgBtn('painel_cfg_vip'));
-
-  c.addSeparatorComponents(new SeparatorBuilder());
-
-  // ── Boost ─────────────────────────────────────────────────────────────────
-  c.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent('**Boost do Servidor**'),
-  );
-  c.addTextDisplayComponents(
-    new TextDisplayBuilder()
-      .setContent(`${D(boostOk)} **Cargos de Boost**\nCargos concedidos automaticamente a quem impulsionar o servidor`),
-  );
-  c.addActionRowComponents(cfgBtn('painel_cfg_boost'));
-
-  c.addSeparatorComponents(new SeparatorBuilder());
-
-  // ── Ferramentas ───────────────────────────────────────────────────────────
-  c.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent('**Ferramentas**'),
-  );
-  c.addTextDisplayComponents(
-    new TextDisplayBuilder()
-      .setContent('**Status**\nStatus de streaming exibido no perfil do bot'),
-  );
-  c.addActionRowComponents(cfgBtn('painel_cfg_status'));
-
-  c.addSeparatorComponents(new SeparatorBuilder());
-  c.addTextDisplayComponents(new TextDisplayBuilder().setContent('**Segurança**'));
-  c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-    `${D(antiLinkOk)} **Anti-Link Avançado**\nBloqueie links por categoria, com exceções e registros`,
+  // A tela é agrupada em poucas linhas para respeitar o limite de componentes
+  // de um Container V2 no Discord. Cada linha ainda mantém o módulo original.
+  c.addTextDisplayComponents(new TextDisplayBuilder().setContent([
+    '**Entrada & Suporte**',
+    `${D(boasVindasOk)} Boas-Vindas · ${D(ticketOk)} Ticket`,
+    'Configure mensagens de entrada e atendimento privado.',
+  ].join('\n')));
+  c.addActionRowComponents(new ActionRowBuilder().addComponents(
+    moduleBtn('painel_cfg_boasvindas', 'Boas-Vindas'),
+    moduleBtn('painel_cfg_ticket', 'Ticket'),
   ));
-  c.addActionRowComponents(cfgBtn('painel_cfg_antilink'));
+
+  c.addTextDisplayComponents(new TextDisplayBuilder().setContent([
+    '**Engajamento**',
+    `${D(instaOk)} Instagram · ${D(tellonymOk)} Tellonym · ${D(parceiraOk)} Parceria`,
+    'Feed, mensagens anônimas e divulgação de parceiros.',
+  ].join('\n')));
+  c.addActionRowComponents(new ActionRowBuilder().addComponents(
+    moduleBtn('painel_cfg_instagram', 'Instagram'),
+    moduleBtn('painel_cfg_tellonym', 'Tellonym'),
+    moduleBtn('painel_cfg_parceria', 'Parceria'),
+  ));
+
+  c.addTextDisplayComponents(new TextDisplayBuilder().setContent([
+    '**Loja & Boost**',
+    `${D(boostOk)} Cargos de Boost`,
+    'Gerencie a loja, os planos VIP e os cargos concedidos por impulsos.',
+  ].join('\n')));
+  c.addActionRowComponents(new ActionRowBuilder().addComponents(
+    moduleBtn('painel_cfg_loja', 'Loja'),
+    moduleBtn('painel_cfg_vip', 'VIP'),
+    moduleBtn('painel_cfg_boost', 'Cargos de Boost'),
+  ));
+
+  c.addTextDisplayComponents(new TextDisplayBuilder().setContent([
+    '**Ferramentas & Segurança**',
+    `${D(antiLinkOk)} Anti-Link Avançado`,
+    'Status do bot e proteção contra links indesejados.',
+  ].join('\n')));
+  c.addActionRowComponents(new ActionRowBuilder().addComponents(
+    moduleBtn('painel_cfg_status', 'Status'),
+    moduleBtn('painel_cfg_antilink', 'Anti-Link'),
+  ));
 
   return { components: [c, voltarRow()], flags: MessageFlags.IsComponentsV2 };
 }
