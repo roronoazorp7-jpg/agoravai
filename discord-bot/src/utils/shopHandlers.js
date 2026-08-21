@@ -2182,6 +2182,10 @@ async function handleVipRingBtn(interaction, mode) {
       .setLabel(`${frame.emoji} ${frame.label}`)
       .setStyle(current === `vipframe:${frame.key}` ? ButtonStyle.Primary : ButtonStyle.Secondary),
   );
+  const frameRows = [];
+  for (let i = 0; i < frameButtons.length; i += 5) {
+    frameRows.push(new ActionRowBuilder().addComponents(frameButtons.slice(i, i + 5)));
+  }
 
   return interaction.reply({
     embeds: [
@@ -2192,7 +2196,7 @@ async function handleVipRingBtn(interaction, mode) {
         .setFooter({ text: ringFooter(mode) }),
     ],
     components: [
-      new ActionRowBuilder().addComponents(frameButtons),
+      ...frameRows,
       new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId(`${mode}_ring_vip_back`).setLabel('← Voltar para argolas').setStyle(ButtonStyle.Secondary),
       ),

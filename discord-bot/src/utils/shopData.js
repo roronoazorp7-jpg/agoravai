@@ -225,6 +225,8 @@ export const VIP_FRAME_PRESETS = [
   { key: 'prophesy', label: 'Olho da Profecia', emoji: '🔮', c1: '#f0a0ff', c2: '#8c1fc7', image: 'eye_of_prophesy.webp' },
   { key: 'venom',    label: 'Venom',            emoji: '🕷️', c1: '#a86cff', c2: '#37008c', image: 'marvel_snap_venom.webp' },
   { key: 'gallica',  label: 'Gallica',          emoji: '🌊', c1: '#b9f7ff', c2: '#167d95', image: 'gallica.webp' },
+  { key: 'celestial', label: 'Asas Celestiais', emoji: '🪽', c1: '#dbeafe', c2: '#2563eb', image: 'asas_celestiais.png' },
+  { key: 'carmesim',  label: 'Risco Carmesim',  emoji: '🩸', c1: '#f87171', c2: '#991b1b', image: 'risco_carmesim.png' },
 ];
 
 export function getFrame(value) {
