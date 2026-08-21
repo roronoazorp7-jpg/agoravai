@@ -106,15 +106,26 @@ async function grantRandomReward(interaction) {
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
+  // O prêmio máximo é raro, mas possível.
+  const roll = Math.random();
+  if (roll < 0.01) {
+    await addCoins(userId, guildId, 1_000_000);
+    return {
+      title: '🏆 SUPER PRÊMIO',
+      description: `🏆 **${interaction.user}** foi escolhido pela Morte e ganhou o **SUPER PRÊMIO de 1.000.000 moedas**!\n\n> Nem a própria Morte esperava por esse resultado.`,
+    };
+  }
+
   const [roles, banners] = await Promise.all([
     prisma.shopRole.findMany({ where: { guildId, active: true } }).catch(() => []),
     prisma.customBanner.findMany({ where: { guildId, active: true } }).catch(() => []),
   ]);
 
   const rewards = [
-    { type: 'coins', amount: 1_000, label: '1.000 moedas' },
-    { type: 'coins', amount: 2_000, label: '2.000 moedas' },
-    { type: 'coins', amount: 3_000, label: '3.000 moedas' },
+    { type: 'coins', amount: 5_000, label: '5.000 moedas' },
+    { type: 'coins', amount: 12_500, label: '12.500 moedas' },
+    { type: 'coins', amount: 35_000, label: '35.000 moedas' },
+    { type: 'coins', amount: 100_000, label: '100.000 moedas' },
     ...roles.map(role => ({ type: 'role', role, label: `cargo **${role.name}**` })),
     ...banners.map(banner => ({ type: 'banner', banner, label: `banner **${banner.name}**` })),
   ];
@@ -158,9 +169,9 @@ async function grantRandomReward(interaction) {
 
   // Se o cargo ficou inválido ou acima do bot entre o sorteio e a entrega,
   // nunca deixa o vencedor sem prêmio.
-  await addCoins(userId, guildId, 3_000);
+  await addCoins(userId, guildId, 15_000);
   return {
-    description: `🎲 **${interaction.user}** desafiou o destino e ganhou **3.000 moedas**!\n\n> O prêmio original se perdeu nas sombras, mas a Morte compensou você.`,
+    description: `🎲 **${interaction.user}** desafiou o destino e ganhou **15.000 moedas**!\n\n> O prêmio original se perdeu nas sombras, mas a Morte compensou você.`,
   };
 }
 
@@ -244,9 +255,9 @@ export async function handleDeathEventInteraction(interaction, client) {
     }
   } catch (err) {
     console.error('[MORTE] Erro ao entregar prêmio:', err);
-    await addCoins(interaction.user.id, interaction.guildId, 3_000).catch(() => {});
+    await addCoins(interaction.user.id, interaction.guildId, 5_000).catch(() => {});
     result = {
-      description: `🪙 **${interaction.user}** recebeu **3.000 moedas** como compensação.\n\n> O destino falhou em se decidir, mas a Morte honrou a promessa.`,
+      description: `🪙 **${interaction.user}** recebeu **5.000 moedas** como compensação.\n\n> O destino falhou em se decidir, mas a Morte honrou a promessa.`,
     };
   }
 
