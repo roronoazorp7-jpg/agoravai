@@ -3,9 +3,29 @@ import prisma from '../../database/client.js';
 import { buildUtilityV2 } from '../../utils/utilityV2.js';
 
 const MAX_REASON = 240;
+const AFK_MESSAGE_TTL = 40_000;
 
 function reasonFromArgs(args = []) {
   return args.join(' ').trim().slice(0, MAX_REASON) || 'Não especificado';
+}
+
+async function replyAndExpire(target, payload) {
+  const isInteraction = typeof target.isChatInputCommand === 'function'
+    || typeof target.isCommand === 'function';
+
+  if (isInteraction) {
+    await target.reply(payload);
+    const timer = setTimeout(() => target.deleteReply().catch(() => {}), AFK_MESSAGE_TTL);
+    timer.unref?.();
+    return target.fetchReply().catch(() => null);
+  }
+
+  const sent = await target.reply(payload).catch(() => null);
+  if (sent) {
+    const timer = setTimeout(() => sent.delete().catch(() => {}), AFK_MESSAGE_TTL);
+    timer.unref?.();
+  }
+  return sent;
 }
 
 export async function handleAfkMessage(message) {
@@ -24,13 +44,13 @@ export async function handleAfkMessage(message) {
     `<@${record.userId}> está ausente.\n**Motivo:** ${record.reason || 'Não especificado'}`,
   );
 
-  await message.reply({
+  await replyAndExpire(message, {
     ...buildUtilityV2({
       text: `## Estado ausente\n\n${lines.join('\n\n')}\n\n-# Vou avisar quem você mencionou.`,
       thumbnailUrl: message.author.displayAvatarURL({ extension: 'png', size: 128 }),
     }),
     allowedMentions: { users: [] },
-  }).catch(() => {});
+  });
 }
 
 export async function clearAfkOnMessage(message) {
@@ -41,9 +61,9 @@ export async function clearAfkOnMessage(message) {
 
   if (!removed.count) return false;
 
-  await message.reply({
+  await replyAndExpire(message, {
     ...buildUtilityV2({ text: '## Estado ausente desativado\n\nVocê voltou e seu AFK foi removido.' }),
-  }).catch(() => {});
+  });
   return true;
 }
 
@@ -62,7 +82,7 @@ export default {
 
   async execute(interaction) {
     if (!interaction.guildId) {
-      return interaction.reply(buildUtilityV2({ text: '❌ Este comando só pode ser usado em um servidor.' }));
+      return replyAndExpire(interaction, buildUtilityV2({ text: '❌ Este comando só pode ser usado em um servidor.' }));
     }
     const reason = interaction.options.getString('motivo');
     const existing = await prisma.userAfk.findUnique({
@@ -71,7 +91,7 @@ export default {
 
     if (existing && !reason) {
       await prisma.userAfk.delete({ where: { id: existing.id } }).catch(() => {});
-      return interaction.reply(buildUtilityV2({ text: '## Estado ausente desativado\n\nVocê voltou e seu AFK foi removido.' }));
+      return replyAndExpire(interaction, buildUtilityV2({ text: '## Estado ausente desativado\n\nVocê voltou e seu AFK foi removido.' }));
     }
 
     const record = await prisma.userAfk.upsert({
@@ -80,7 +100,7 @@ export default {
       update: { reason: reasonFromArgs([reason ?? '']) },
     });
 
-    return interaction.reply(buildUtilityV2({
+    return replyAndExpire(interaction, buildUtilityV2({
       text: `## Estado ausente ativado\n\n**Motivo:** ${record.reason}\n\n-# Vou avisar quem mencionar você.`,
       thumbnailUrl: interaction.user.displayAvatarURL({ extension: 'png', size: 128 }),
     }));
@@ -88,7 +108,7 @@ export default {
 
   async executePrefix(message, args) {
     if (!message.guildId) {
-      return message.reply(buildUtilityV2({ text: '❌ Este comando só pode ser usado em um servidor.' }));
+      return replyAndExpire(message, buildUtilityV2({ text: '❌ Este comando só pode ser usado em um servidor.' }));
     }
     const existing = await prisma.userAfk.findUnique({
       where: { guildId_userId: { guildId: message.guildId, userId: message.author.id } },
@@ -96,7 +116,7 @@ export default {
 
     if (existing && !args.length) {
       await prisma.userAfk.delete({ where: { id: existing.id } }).catch(() => {});
-      return message.reply(buildUtilityV2({ text: '## Estado ausente desativado\n\nVocê voltou e seu AFK foi removido.' }));
+      return replyAndExpire(message, buildUtilityV2({ text: '## Estado ausente desativado\n\nVocê voltou e seu AFK foi removido.' }));
     }
 
     const reason = reasonFromArgs(args);
@@ -106,7 +126,7 @@ export default {
       update: { reason },
     });
 
-    return message.reply(buildUtilityV2({
+    return replyAndExpire(message, buildUtilityV2({
       text: `## Estado ausente ativado\n\n**Motivo:** ${record.reason}\n\n-# Vou avisar quem mencionar você.`,
       thumbnailUrl: message.author.displayAvatarURL({ extension: 'png', size: 128 }),
     }));
