@@ -7,7 +7,7 @@ const SOCIAL_DOMAINS = /(facebook\.com|instagram\.com|tiktok\.com|twitter\.com|x
 const SHORTENER_DOMAINS = /(bit\.ly|tinyurl\.com|cutt\.ly|t\.co|shorturl\.at|is\.gd|ow\.ly|buff\.ly|rb\.gy)/i;
 
 const list = (value) => String(value ?? '').split(',').map((x) => x.trim()).filter(Boolean);
-const deletionQueues = new Map();
+const deletionBatches = new Map();
 const warningCooldowns = new Map();
 
 function wait(ms) {
@@ -31,18 +31,40 @@ async function deleteWithRetry(message) {
   return false;
 }
 
-async function deleteFromChannelQueue(message) {
+async function deleteFromChannelBatch(message) {
   const channelId = message.channelId;
-  const previous = deletionQueues.get(channelId) ?? Promise.resolve();
-  const current = previous
-    .catch(() => {})
-    .then(() => deleteWithRetry(message));
-  deletionQueues.set(channelId, current);
-  try {
-    return await current;
-  } finally {
-    if (deletionQueues.get(channelId) === current) deletionQueues.delete(channelId);
+  let batch = deletionBatches.get(channelId);
+  if (!batch) {
+    batch = { messages: [], waiters: [], timer: null };
+    deletionBatches.set(channelId, batch);
   }
+  batch.messages.push(message);
+  const result = new Promise((resolve) => batch.waiters.push(resolve));
+  if (!batch.timer) {
+    batch.timer = setTimeout(async () => {
+      deletionBatches.delete(channelId);
+      const messages = [...new Map(batch.messages.map((item) => [item.id, item])).values()];
+      const deletedIds = new Set();
+      try {
+        for (let start = 0; start < messages.length; start += 100) {
+          const chunk = messages.slice(start, start + 100);
+          const deleted = await message.channel.bulkDelete(chunk.map((item) => item.id), true);
+          for (const item of chunk) {
+            if (deleted?.has?.(item.id)) deletedIds.add(item.id);
+          }
+        }
+      } catch {
+        // If bulk deletion is unavailable, the individual fallback below
+        // still retries every message instead of losing the moderation event.
+      }
+      const missing = messages.filter((item) => !deletedIds.has(item.id));
+      const fallback = await Promise.all(missing.map((item) => deleteWithRetry(item)));
+      const fallbackIds = new Set(missing.filter((_, index) => fallback[index]).map((item) => item.id));
+      const ok = messages.map((item) => deletedIds.has(item.id) || fallbackIds.has(item.id));
+      batch.waiters.forEach((resolve, index) => resolve(ok[index] ?? false));
+    }, 75);
+  }
+  return result;
 }
 const normalize = (value) => String(value ?? '')
   .toLowerCase()
@@ -55,13 +77,25 @@ const normalize = (value) => String(value ?? '')
   .replace(/^www\./, '');
 
 export function containsBlockedLink(message, cfg) {
-  if (!cfg?.antiLinkEnabled || !message.guildId || !message.content) return null;
+  const hasScannableContent = message.content
+    || message.embeds?.length
+    || message.components?.length;
+  if (!cfg?.antiLinkEnabled || !message.guildId || !hasScannableContent) return null;
   if (message.member?.permissions?.has(PermissionFlagsBits.ManageGuild)) return null;
   if (cfg.partnerChannel && cfg.partnerChannel === message.channelId) return null;
   if (list(cfg.antiLinkAllowedChannels).includes(message.channelId)) return null;
   if (list(cfg.antiLinkAllowedRoles).some((id) => message.member?.roles?.cache?.has(id))) return null;
   const allowed = list(cfg.antiLinkAllowedDomains).map(normalize);
-  const scanText = normalize(message.content);
+  const extraText = [
+    ...(message.embeds ?? []).flatMap((embed) => [
+      embed.url, embed.title, embed.description, embed.footer?.text,
+      ...(embed.fields ?? []).flatMap((field) => [field.name, field.value]),
+    ]),
+    ...(message.components ?? []).flatMap((row) => (row.components ?? []).flatMap((component) => [
+      component.url, component.label,
+    ])),
+  ].filter(Boolean).join(' ');
+  const scanText = normalize(`${message.content ?? ''} ${extraText}`);
   for (const raw of scanText.match(URL_REGEX) ?? []) {
     const normalized = normalize(raw);
     if (allowed.some((domain) => normalized === domain || normalized.startsWith(`${domain}/`) || normalized.endsWith(`.${domain}`))) continue;
@@ -77,10 +111,9 @@ export async function enforceAntiLink(message, cfg) {
   const detected = containsBlockedLink(message, cfg);
   if (!detected) return false;
   const action = cfg.antiLinkAction ?? 'delete_warn';
-  // Messages from the same spam burst are handled sequentially per channel.
-  // This prevents concurrent DELETE requests from racing or being throttled
-  // while Discord is still acknowledging the previous deletion.
-  const deleted = await deleteFromChannelQueue(message);
+  // A short batch window lets Discord remove a burst of identical links in
+  // one request. Every item missing from the batch is retried individually.
+  const deleted = await deleteFromChannelBatch(message);
   let warning = null;
   if (action === 'delete_warn' || action === 'timeout') {
     const warningKey = `${message.guildId}:${message.channelId}:${message.author.id}`;
