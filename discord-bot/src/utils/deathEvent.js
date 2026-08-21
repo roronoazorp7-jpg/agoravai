@@ -13,6 +13,8 @@ const DEATH_CHANNEL_ID = '1536533809049108560';
 const EVENT_PREFIX = 'death_event:';
 const IMAGE_PATH = join(dirname(fileURLToPath(import.meta.url)), '../assets/morte.jpg');
 const EVENT_LIFETIME_MS = 90_000;
+const DEATH_MARK_DURATION_MS = 10 * 60 * 1000;
+const DEATH_PUNISHMENT_CHANCE = 0.2;
 const FIRST_DELAY_MIN = 2 * 60 * 1000;
 const FIRST_DELAY_MAX = 5 * 60 * 1000;
 const NEXT_DELAY_MIN = 12 * 60 * 1000;
@@ -102,6 +104,45 @@ async function addCoins(userId, guildId, amount) {
   });
 }
 
+async function punishDeathChallenge(interaction) {
+  const guildId = interaction.guildId;
+  const userId = interaction.user.id;
+  const economy = await prisma.economy.upsert({
+    where: { userId_guildId: { userId, guildId } },
+    create: { userId, guildId },
+    update: {},
+  });
+  const coinsTaken = Math.min(economy.balance, 1_000);
+
+  if (coinsTaken > 0) {
+    await prisma.economy.update({
+      where: { userId_guildId: { userId, guildId } },
+      data: { balance: { decrement: coinsTaken } },
+    });
+  }
+
+  const member = await interaction.guild.members.fetch(userId).catch(() => null);
+  const botMember = interaction.guild.members.me
+    ?? await interaction.guild.members.fetchMe().catch(() => null);
+  let deathMark = interaction.guild.roles.cache.find(role => role.name === 'Marcado pela Morte');
+
+  if (!deathMark && botMember?.permissions.has('ManageRoles')) {
+    deathMark = await interaction.guild.roles.create({
+      name: 'Marcado pela Morte',
+      reason: 'Punição temporária do evento da Morte',
+    }).catch(() => null);
+  }
+
+  if (member && deathMark && deathMark.position < (botMember?.roles.highest.position ?? 0)) {
+    await member.roles.add(deathMark, 'Punição temporária do evento da Morte').catch(() => {});
+    setTimeout(() => member.roles.remove(deathMark, 'Fim da marca temporária da Morte').catch(() => {}), DEATH_MARK_DURATION_MS);
+  }
+
+  return {
+    description: `☠️ **${interaction.user}** desafiou a Morte, mas ela rejeitou sua aposta e levou **${coinsTaken.toLocaleString('pt-BR')} moedas**.\n\n> Você foi marcado pela Morte por 10 minutos. Talvez pensar duas vezes seja uma boa ideia.`,
+  };
+}
+
 async function grantRandomReward(interaction) {
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
@@ -114,6 +155,9 @@ async function grantRandomReward(interaction) {
       title: '🏆 SUPER PRÊMIO',
       description: `🏆 **${interaction.user}** foi escolhido pela Morte e ganhou o **SUPER PRÊMIO de 1.000.000 moedas**!\n\n> Nem a própria Morte esperava por esse resultado.`,
     };
+  }
+  if (roll < DEATH_PUNISHMENT_CHANCE) {
+    return punishDeathChallenge(interaction);
   }
 
   const [roles, banners] = await Promise.all([
