@@ -23,10 +23,6 @@ let scheduler = null;
 
 const COIN_CHOICES = [
   { amount: 3_000, label: '3.000 moedas' },
-  { amount: 7_500, label: '7.500 moedas' },
-  { amount: 15_000, label: '15.000 moedas' },
-  { amount: 30_000, label: '30.000 moedas' },
-  { amount: 75_000, label: '75.000 moedas' },
 ];
 
 const DEATH_LINES = [
@@ -44,7 +40,18 @@ function pick(list) {
   return list[Math.floor(Math.random() * list.length)];
 }
 
-function eventButtons(disabled = false) {
+function eventButtons({ disabled = false, initial = false } = {}) {
+  if (initial) {
+    return new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`${EVENT_PREFIX}start`)
+        .setLabel('Conversar com a Morte')
+        .setEmoji('☠️')
+        .setStyle(ButtonStyle.Danger)
+        .setDisabled(disabled),
+    );
+  }
+
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`${EVENT_PREFIX}coins`)
@@ -99,26 +106,15 @@ async function grantRandomReward(interaction) {
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
 
-  // O prêmio máximo é raro, mas possível.
-  const roll = Math.random();
-  if (roll < 0.01) {
-    await addCoins(userId, guildId, 1_000_000);
-    return {
-      title: '🏆 SUPER PRÊMIO',
-      description: `🏆 **${interaction.user}** foi escolhido pela Morte e ganhou o **SUPER PRÊMIO de 1.000.000 moedas**!\n\n> Nem a própria Morte esperava por esse resultado.`,
-    };
-  }
-
   const [roles, banners] = await Promise.all([
     prisma.shopRole.findMany({ where: { guildId, active: true } }).catch(() => []),
     prisma.customBanner.findMany({ where: { guildId, active: true } }).catch(() => []),
   ]);
 
   const rewards = [
-    { type: 'coins', amount: 5_000, label: '5.000 moedas' },
-    { type: 'coins', amount: 12_500, label: '12.500 moedas' },
-    { type: 'coins', amount: 35_000, label: '35.000 moedas' },
-    { type: 'coins', amount: 100_000, label: '100.000 moedas' },
+    { type: 'coins', amount: 1_000, label: '1.000 moedas' },
+    { type: 'coins', amount: 2_000, label: '2.000 moedas' },
+    { type: 'coins', amount: 3_000, label: '3.000 moedas' },
     ...roles.map(role => ({ type: 'role', role, label: `cargo **${role.name}**` })),
     ...banners.map(banner => ({ type: 'banner', banner, label: `banner **${banner.name}**` })),
   ];
@@ -162,9 +158,9 @@ async function grantRandomReward(interaction) {
 
   // Se o cargo ficou inválido ou acima do bot entre o sorteio e a entrega,
   // nunca deixa o vencedor sem prêmio.
-  await addCoins(userId, guildId, 15_000);
+  await addCoins(userId, guildId, 3_000);
   return {
-    description: `🎲 **${interaction.user}** desafiou o destino e ganhou **15.000 moedas**!\n\n> O prêmio original se perdeu nas sombras, mas a Morte compensou você.`,
+    description: `🎲 **${interaction.user}** desafiou o destino e ganhou **3.000 moedas**!\n\n> O prêmio original se perdeu nas sombras, mas a Morte compensou você.`,
   };
 }
 
@@ -188,7 +184,7 @@ async function spawnDeathEvent(client) {
   const message = await channel.send({
     embeds: [eventEmbed()],
     files: [new AttachmentBuilder(IMAGE_PATH, { name: 'morte.jpg' })],
-    components: [eventButtons()],
+    components: [eventButtons({ initial: true })],
   }).catch(err => {
     console.error('[MORTE] Não consegui enviar no canal geral:', err.message);
     return null;
@@ -199,7 +195,7 @@ async function spawnDeathEvent(client) {
   setTimeout(async () => {
     if (!activeEvent || activeEvent.messageId !== message.id || activeEvent.claimed) return;
     activeEvent.claimed = true;
-    await message.edit({ embeds: [eventEmbed({ expired: true })], components: [eventButtons(true)] }).catch(() => {});
+    await message.edit({ embeds: [eventEmbed({ expired: true })], components: [eventButtons({ disabled: true })] }).catch(() => {});
     activeEvent = null;
     scheduleNext(client);
   }, EVENT_LIFETIME_MS);
@@ -226,6 +222,11 @@ export async function handleDeathEventInteraction(interaction, client) {
     return true;
   }
 
+  if (interaction.customId === `${EVENT_PREFIX}start`) {
+    await interaction.update({ components: [eventButtons()] }).catch(() => {});
+    return true;
+  }
+
   // Reserva o evento antes de qualquer await: somente o primeiro clique vence.
   activeEvent.claimed = true;
   await interaction.deferUpdate().catch(() => {});
@@ -243,15 +244,15 @@ export async function handleDeathEventInteraction(interaction, client) {
     }
   } catch (err) {
     console.error('[MORTE] Erro ao entregar prêmio:', err);
-    await addCoins(interaction.user.id, interaction.guildId, 5_000).catch(() => {});
+    await addCoins(interaction.user.id, interaction.guildId, 3_000).catch(() => {});
     result = {
-      description: `🪙 **${interaction.user}** recebeu **5.000 moedas** como compensação.\n\n> O destino falhou em se decidir, mas a Morte honrou a promessa.`,
+      description: `🪙 **${interaction.user}** recebeu **3.000 moedas** como compensação.\n\n> O destino falhou em se decidir, mas a Morte honrou a promessa.`,
     };
   }
 
   await interaction.editReply({
     embeds: [eventEmbed({ result })],
-    components: [eventButtons(true)],
+    components: [eventButtons({ disabled: true })],
   }).catch(() => {});
   activeEvent = null;
   scheduleNext(client);
