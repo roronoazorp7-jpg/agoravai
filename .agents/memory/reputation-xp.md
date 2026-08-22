@@ -3,8 +3,8 @@ name: Interaction reputation and XP
 description: Progression rules for profile reputation and experience.
 ---
 
-Reputação e XP devem ser concedidos por interações reais com o bot, não por mensagens comuns. A progressão de nível usa metas crescentes e o perfil mostra uma barra compacta.
+Reputação é social: um membro concede +1 a outro pelo comando `/reputacao @membro`, com limite diário por dupla. XP continua vindo de interações reais com o bot, não de mensagens comuns. O perfil mostra ambos com uma barra compacta de XP.
 
-**Why:** XP por mensagem fazia o nível subir rápido demais e incentivava spam no chat.
+**Why:** XP por mensagem fazia o nível subir rápido demais; reputação automática não representava reconhecimento entre membros.
 
-**How to apply:** Novos comandos, botões, menus e modais devem passar pelo registro de interação existente; não adicionar XP em messageCreate.
+**How to apply:** Novos comandos, botões, menus e modais podem conceder XP pelo registro de interação existente; reputação só deve ser alterada pelo fluxo de concessão entre membros.

@@ -76,7 +76,7 @@ import {
 } from '../utils/rolePanelSessions.js';
 import { handleDropClaim, handleDropItemSelect } from '../utils/dropHandlers.js';
 import { handleDeathEventInteraction } from '../utils/deathEvent.js';
-import { awardInteractionReputation } from '../utils/reputation.js';
+import { awardInteractionXp } from '../utils/reputation.js';
 import {
   handlePainelFuncoes,
   handlePainelVoltar,
@@ -449,7 +449,7 @@ export default {
         || interaction.isUserSelectMenu()
         || interaction.isModalSubmit()
       ) {
-        awardInteractionReputation(interaction);
+        awardInteractionXp(interaction);
       }
       if (interaction.isButton() && await handleDeathEventInteraction(interaction, client)) return;
 

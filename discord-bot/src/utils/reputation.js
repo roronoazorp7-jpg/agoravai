@@ -6,7 +6,7 @@ const interactionCooldowns = new Map();
 const INTERACTION_COOLDOWN_MS = 30_000;
 const XP_PER_INTERACTION = 8;
 
-export function awardInteractionReputation(interaction) {
+export function awardInteractionXp(interaction) {
   const userId = interaction.user?.id;
   const guildId = interaction.guildId;
   if (!userId || !guildId || interaction.user?.bot) return;
@@ -23,13 +23,8 @@ export function awardInteractionReputation(interaction) {
       create: { userId, guildId, xp: XP_PER_INTERACTION },
       update: { xp: { increment: XP_PER_INTERACTION } },
     }),
-    prisma.userProfile.upsert({
-      where: { userId },
-      create: { userId, guildId, reps: 1 },
-      update: { reps: { increment: 1 } },
-    }),
   ]).catch(err => {
-    console.error('[REPUTAÇÃO] Erro ao registrar interação:', err.message);
+    console.error('[XP] Erro ao registrar interação:', err.message);
   });
 
   // O mapa é apenas uma proteção em memória; não precisa crescer

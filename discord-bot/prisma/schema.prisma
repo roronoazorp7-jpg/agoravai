@@ -18,6 +18,17 @@ model Interaction {
   @@unique([type, fromId, toId])
 }
 
+model ReputationGive {
+  id           String   @id @default(cuid())
+  guildId      String
+  giverId      String
+  receiverId   String
+  lastGivenAt  DateTime @default(now())
+
+  @@unique([guildId, giverId, receiverId])
+  @@index([guildId, receiverId])
+}
+
 model TellonymProfile {
   id     String @id @default(cuid())
   userId String @unique
