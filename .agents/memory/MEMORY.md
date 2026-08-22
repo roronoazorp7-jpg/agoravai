@@ -15,3 +15,4 @@
 - [Discord ticket interactions](discord-ticket-interactions.md) — toda ação em customId de ticket precisa ser roteada e reconhecida imediatamente antes de consultar Prisma ou editar mensagens.
 - [GitHub PAT push](github-pat-push.md) — para push HTTPS, use Basic com x-access-token; Bearer pode ser rejeitado mesmo com PAT válido.
 - [Pet Components V2](pet-components-v2.md) — fluxo de pets usa painéis V2 compartilhados, ações pet_action:* e mantém persistência atual.
+- [Reputação e XP](reputation-xp.md) — progressão vem de interações reais com o bot, com metas crescentes e barra compacta no perfil.
