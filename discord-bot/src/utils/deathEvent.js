@@ -17,6 +17,7 @@ const DEATH_CHANNEL_ID = '1536533809049108560';
 const EVENT_PREFIX = 'death_event:';
 const IMAGE_PATH = join(dirname(fileURLToPath(import.meta.url)), '../assets/morte.jpg');
 const EVENT_LIFETIME_MS = 90_000;
+const RESPONDED_DELETE_DELAY_MS = 30 * 1000;
 const DEATH_MARK_DURATION_MS = 10 * 60 * 1000;
 const DEATH_PUNISHMENT_CHANCE = 0.2;
 const FIRST_DELAY_MIN = 2 * 60 * 1000;
@@ -322,6 +323,7 @@ export async function handleDeathEventInteraction(interaction, client) {
     components: [eventContainer({ result }), eventButtons({ disabled: true })],
     flags: MessageFlags.IsComponentsV2,
   }).catch(() => {});
+  setTimeout(() => interaction.message.delete().catch(() => {}), RESPONDED_DELETE_DELAY_MS);
   activeEvent = null;
   scheduleNext(client);
   return true;
