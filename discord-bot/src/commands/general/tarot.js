@@ -1,4 +1,12 @@
-import { AttachmentBuilder, EmbedBuilder, SlashCommandBuilder } from 'discord.js';
+import {
+  AttachmentBuilder,
+  ContainerBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
+  MessageFlags,
+  SlashCommandBuilder,
+  TextDisplayBuilder,
+} from 'discord.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -148,22 +156,26 @@ function buildPayload(question, cards) {
     { name: `tarot-${index}.jpg` },
   ));
 
-  const embeds = cards.map((card, index) => {
+  const components = cards.map((card, index) => {
     const orientation = card.isReversed ? 'Invertida' : 'Normal';
     const interpretation = card.isReversed ? card.reversed : card.upright;
-    return new EmbedBuilder()
-      .setColor(card.isReversed ? 0x4c1d95 : 0x7f1d1d)
-      .setTitle(`${positionLabel(cards.length, index)} · ${card.name}`)
-      .setDescription(
+    const container = new ContainerBuilder();
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+      `## 🔮 ${positionLabel(cards.length, index)} · ${card.name}\n\n` +
         `**Pergunta:** ${question}\n\n` +
         `**Posição:** ${orientation}\n\n` +
-        `${interpretation}`,
-      )
-      .setImage(`attachment://tarot-${index}.jpg`)
-      .setFooter({ text: 'Tarô Savage · A leitura é uma reflexão, não uma certeza absoluta.' });
+        `${interpretation}\n\n` +
+        `-# Tarô Savage · A leitura é uma reflexão, não uma certeza absoluta.`,
+    ));
+    container.addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(
+        new MediaGalleryItemBuilder().setURL(`attachment://tarot-${index}.jpg`),
+      ),
+    );
+    return container;
   });
 
-  return { embeds, files };
+  return { components, files, flags: MessageFlags.IsComponentsV2 };
 }
 
 function cooldownKey(interaction) {

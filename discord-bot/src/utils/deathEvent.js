@@ -3,7 +3,11 @@ import {
   AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder,
+  ContainerBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
+  MessageFlags,
+  TextDisplayBuilder,
 } from 'discord.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -70,11 +74,8 @@ function eventButtons({ disabled = false, initial = false } = {}) {
   );
 }
 
-function eventEmbed({ result = null, expired = false } = {}) {
-  const embed = new EmbedBuilder()
-    .setColor(result ? 0x7f1d1d : 0xb91c1c)
-    .setTitle(result ? '☠️ A Morte fez sua escolha' : '☠️ Uma visita do outro lado')
-    .setDescription(
+function eventContainer({ result = null, expired = false } = {}) {
+  const description =
       result
         ? result.description
         : expired
@@ -82,18 +83,24 @@ function eventEmbed({ result = null, expired = false } = {}) {
         : `*${pick(DEATH_LINES)}*\n\n` +
           '**Você só tem uma chance.**\n' +
           'Escolha suas moedas ou arrisque tudo por um prêmio aleatório da loja.\n\n' +
-          '> Apenas a primeira pessoa a clicar será escolhida pela Morte.',
-    )
-    .setImage('attachment://morte.jpg')
-    .setFooter({
-      text: expired
+          '> Apenas a primeira pessoa a clicar será escolhida pela Morte.';
+  const footer = expired
         ? 'A oportunidade se perdeu nas sombras.'
         : result
           ? 'O destino já foi selado.'
-          : 'A aparição desaparece em 90 segundos.',
-    })
-    .setTimestamp();
-  return embed;
+          : 'A aparição desaparece em 90 segundos.';
+  const container = new ContainerBuilder();
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+    `## ${result ? '☠️ A Morte fez sua escolha' : '☠️ Uma visita do outro lado'}\n\n` +
+      `${description}\n\n` +
+      `-# ${footer}`,
+  ));
+  container.addMediaGalleryComponents(
+    new MediaGalleryBuilder().addItems(
+      new MediaGalleryItemBuilder().setURL('attachment://morte.jpg'),
+    ),
+  );
+  return container;
 }
 
 async function addCoins(userId, guildId, amount) {
@@ -237,9 +244,9 @@ async function spawnDeathEvent(client) {
   if (!channel?.isTextBased()) return scheduleNext(client);
 
   const message = await channel.send({
-    embeds: [eventEmbed()],
+    components: [eventContainer(), eventButtons({ initial: true })],
     files: [new AttachmentBuilder(IMAGE_PATH, { name: 'morte.jpg' })],
-    components: [eventButtons({ initial: true })],
+    flags: MessageFlags.IsComponentsV2,
   }).catch(err => {
     console.error('[MORTE] Não consegui enviar no canal geral:', err.message);
     return null;
@@ -250,7 +257,10 @@ async function spawnDeathEvent(client) {
   setTimeout(async () => {
     if (!activeEvent || activeEvent.messageId !== message.id || activeEvent.claimed) return;
     activeEvent.claimed = true;
-    await message.edit({ embeds: [eventEmbed({ expired: true })], components: [eventButtons({ disabled: true })] }).catch(() => {});
+    await message.edit({
+      components: [eventContainer({ expired: true }), eventButtons({ disabled: true })],
+      flags: MessageFlags.IsComponentsV2,
+    }).catch(() => {});
     activeEvent = null;
     scheduleNext(client);
   }, EVENT_LIFETIME_MS);
@@ -278,7 +288,10 @@ export async function handleDeathEventInteraction(interaction, client) {
   }
 
   if (interaction.customId === `${EVENT_PREFIX}start`) {
-    await interaction.update({ components: [eventButtons()] }).catch(() => {});
+    await interaction.update({
+      components: [eventContainer(), eventButtons()],
+      flags: MessageFlags.IsComponentsV2,
+    }).catch(() => {});
     return true;
   }
 
@@ -306,8 +319,8 @@ export async function handleDeathEventInteraction(interaction, client) {
   }
 
   await interaction.editReply({
-    embeds: [eventEmbed({ result })],
-    components: [eventButtons({ disabled: true })],
+    components: [eventContainer({ result }), eventButtons({ disabled: true })],
+    flags: MessageFlags.IsComponentsV2,
   }).catch(() => {});
   activeEvent = null;
   scheduleNext(client);
