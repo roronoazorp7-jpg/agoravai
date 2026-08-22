@@ -164,8 +164,7 @@ function buildPayload(question, cards) {
       `## 🔮 ${positionLabel(cards.length, index)} · ${card.name}\n\n` +
         `**Pergunta:** ${question}\n\n` +
         `**Posição:** ${orientation}\n\n` +
-        `${interpretation}\n\n` +
-        `-# Tarô Savage · A leitura é uma reflexão, não uma certeza absoluta.`,
+        `${interpretation}`,
     ));
     container.addMediaGalleryComponents(
       new MediaGalleryBuilder().addItems(
