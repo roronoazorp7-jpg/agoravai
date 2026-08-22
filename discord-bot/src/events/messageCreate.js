@@ -323,13 +323,12 @@ export default {
       await handleAfkMessage(message);
     }
 
-    // ── ECONOMIA: Contador de mensagens + XP ────────────────────────────────
+    // ── ECONOMIA: contador de mensagens (XP só vem de interações reais) ────
     if (message.guildId) {
-      const XP_GAIN = Math.floor(Math.random() * 11) + 10; // 10–20 XP por mensagem
       prisma.economy.upsert({
         where:  { userId_guildId: { userId: message.author.id, guildId: message.guildId } },
-        create: { userId: message.author.id, guildId: message.guildId, messageCount: 1, xp: XP_GAIN },
-        update: { messageCount: { increment: 1 }, xp: { increment: XP_GAIN } },
+        create: { userId: message.author.id, guildId: message.guildId, messageCount: 1 },
+        update: { messageCount: { increment: 1 } },
       }).catch(() => {});
     }
 

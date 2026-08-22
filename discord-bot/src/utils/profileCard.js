@@ -41,10 +41,18 @@ export function computeEarnedBadgeKeys({ balance, bank, purchases, activePet, ac
 }
 
 export function computeLevel(xp) {
-  const XP_PER_LEVEL = 300;
-  const level   = Math.floor((xp ?? 0) / XP_PER_LEVEL) + 1;
-  const current = (xp ?? 0) % XP_PER_LEVEL;
-  return { level, current, needed: XP_PER_LEVEL };
+  // A cada nível a meta cresce um pouco; isso mantém a progressão visível
+  // sem deixar que usuários ativos subam dezenas de níveis em poucos dias.
+  const totalXp = Math.max(0, Number(xp) || 0);
+  let level = 1;
+  let spent = 0;
+  let needed = 300;
+  while (totalXp >= spent + needed) {
+    spent += needed;
+    level += 1;
+    needed = 300 + (level - 1) * 100;
+  }
+  return { level, current: totalXp - spent, needed };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -573,8 +581,8 @@ export async function generateProfileCard({
   // ── Seis cápsulas de estatísticas no grid da referência ─────────────────────
   const statsData = [
     { text: `Level: ${level}` },
-    { text: `${xpCurrent}/${xpNeeded}` },
-    { text: `${reps} Reps` },
+    { text: `XP ${xpCurrent}/${xpNeeded}` },
+    { text: `Reputação: ${reps}` },
     { text: fmtCompact(balance ?? 0) },
     { text: marriedToName ?? 'Nenhum' },
     { text: bestFriendName ?? 'Nenhum' },
@@ -618,6 +626,20 @@ export async function generateProfileCard({
     ctx.fillStyle = darkPanel ? '#ffffff' : '#111111';
     ctx.textAlign = 'left';
     ctx.fillText(statText, cX + ISZ + 14, cY + 37);
+
+    if (i === 1) {
+      const barX = cX + ISZ + 14;
+      const barY = cY + 44;
+      const barW = maxW;
+      const barH = 6;
+      const progress = Math.min(1, Math.max(0, xpNeeded ? xpCurrent / xpNeeded : 0));
+      ctx.fillStyle = darkPanel ? 'rgba(255,255,255,0.24)' : 'rgba(40,40,40,0.16)';
+      roundRect(ctx, barX, barY, barW, barH, barH / 2); ctx.fill();
+      if (progress > 0) {
+        ctx.fillStyle = '#8b5cf6';
+        roundRect(ctx, barX, barY, Math.max(barH, barW * progress), barH, barH / 2); ctx.fill();
+      }
+    }
   }
 
   ctx.textAlign = 'left';

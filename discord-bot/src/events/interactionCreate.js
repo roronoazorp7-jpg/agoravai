@@ -76,6 +76,7 @@ import {
 } from '../utils/rolePanelSessions.js';
 import { handleDropClaim, handleDropItemSelect } from '../utils/dropHandlers.js';
 import { handleDeathEventInteraction } from '../utils/deathEvent.js';
+import { awardInteractionReputation } from '../utils/reputation.js';
 import {
   handlePainelFuncoes,
   handlePainelVoltar,
@@ -439,6 +440,17 @@ export default {
 
   async execute(interaction, client) {
     try {
+      if (
+        interaction.isChatInputCommand()
+        || interaction.isButton()
+        || interaction.isStringSelectMenu()
+        || interaction.isRoleSelectMenu()
+        || interaction.isChannelSelectMenu()
+        || interaction.isUserSelectMenu()
+        || interaction.isModalSubmit()
+      ) {
+        awardInteractionReputation(interaction);
+      }
       if (interaction.isButton() && await handleDeathEventInteraction(interaction, client)) return;
 
       // ── SLASH COMMANDS ─────────────────────────────────────────────────────
