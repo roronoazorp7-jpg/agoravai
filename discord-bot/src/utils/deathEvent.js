@@ -16,8 +16,7 @@ import prisma from '../database/client.js';
 const DEATH_CHANNEL_ID = '1536533809049108560';
 const EVENT_PREFIX = 'death_event:';
 const IMAGE_PATH = join(dirname(fileURLToPath(import.meta.url)), '../assets/morte.jpg');
-const EVENT_LIFETIME_MS = 90_000;
-const RESPONDED_DELETE_DELAY_MS = 30 * 1000;
+const EVENT_DELETE_DELAY_MS = 30 * 1000;
 const DEATH_MARK_DURATION_MS = 10 * 60 * 1000;
 const DEATH_PUNISHMENT_CHANCE = 0.2;
 const FIRST_DELAY_MIN = 2 * 60 * 1000;
@@ -238,6 +237,17 @@ function scheduleNext(client, first = false) {
   }), delay);
 }
 
+function armEventDeletion(message, client) {
+  if (!activeEvent || activeEvent.messageId !== message.id) return;
+  clearTimeout(activeEvent.deleteTimer);
+  activeEvent.deleteTimer = setTimeout(async () => {
+    if (!activeEvent || activeEvent.messageId !== message.id) return;
+    await message.delete().catch(() => {});
+    activeEvent = null;
+    scheduleNext(client);
+  }, EVENT_DELETE_DELAY_MS);
+}
+
 async function spawnDeathEvent(client) {
   if (activeEvent) return scheduleNext(client);
 
@@ -255,16 +265,7 @@ async function spawnDeathEvent(client) {
   if (!message) return scheduleNext(client);
 
   activeEvent = { messageId: message.id, claimed: false };
-  setTimeout(async () => {
-    if (!activeEvent || activeEvent.messageId !== message.id || activeEvent.claimed) return;
-    activeEvent.claimed = true;
-    await message.edit({
-      components: [eventContainer({ expired: true }), eventButtons({ disabled: true })],
-      flags: MessageFlags.IsComponentsV2,
-    }).catch(() => {});
-    activeEvent = null;
-    scheduleNext(client);
-  }, EVENT_LIFETIME_MS);
+  armEventDeletion(message, client);
 }
 
 export function startDeathEventScheduler(client) {
@@ -289,6 +290,7 @@ export async function handleDeathEventInteraction(interaction, client) {
   }
 
   if (interaction.customId === `${EVENT_PREFIX}start`) {
+    armEventDeletion(interaction.message, client);
     await interaction.update({
       components: [eventContainer(), eventButtons()],
       flags: MessageFlags.IsComponentsV2,
@@ -323,8 +325,12 @@ export async function handleDeathEventInteraction(interaction, client) {
     components: [eventContainer({ result }), eventButtons({ disabled: true })],
     flags: MessageFlags.IsComponentsV2,
   }).catch(() => {});
-  setTimeout(() => interaction.message.delete().catch(() => {}), RESPONDED_DELETE_DELAY_MS);
-  activeEvent = null;
-  scheduleNext(client);
+  clearTimeout(activeEvent.deleteTimer);
+  activeEvent.deleteTimer = setTimeout(async () => {
+    if (!activeEvent || activeEvent.messageId !== interaction.message.id) return;
+    await interaction.message.delete().catch(() => {});
+    activeEvent = null;
+    scheduleNext(client);
+  }, EVENT_DELETE_DELAY_MS);
   return true;
 }
