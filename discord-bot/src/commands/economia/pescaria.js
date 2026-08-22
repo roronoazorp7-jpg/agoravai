@@ -26,10 +26,10 @@ const FISH_SEAL = () => getEmoji('fish_seal');
 const FISH_LEGENDARY = () => getEmoji('fish_legendary');
 const FISH_ROD = () => getEmoji('fish_rod');
 const FISH_SHARK = () => getEmoji('fish_shark');
-const FISH_CD = 1 * 60 * 1000;
+const FISH_CD = 5 * 1000;
 const SHARK_BATTLE_START_HP = 12;
-const SHARK_REWARD_MIN = 8000;
-const SHARK_REWARD_MAX = 12000;
+const SHARK_REWARD_MIN = 650;
+const SHARK_REWARD_MAX = 950;
 const LEGENDARY_ROUNDS = 2;
 const LEGENDARY_BATTLE_MS = 10 * 60 * 1000;
 const LEGENDARY_CHOICES = ['left', 'center', 'right'];
@@ -44,17 +44,17 @@ function rodEmoji(rod) {
 }
 
 export const FISH = Object.freeze([
-  { key: 'peixe_comum', name: 'Peixe comum', emoji: FISH_COMMON, value: 80, chance: 48, rarity: 0, artwork: 'common', description: 'O peixe mais comum e fácil de conseguir.' },
-  { key: 'tubarao_comum', name: 'Tubarão comum', emoji: FISH_SHARK, value: 650, chance: 13, rarity: 1, artwork: 'shark', description: 'Um tubarão que vale muitas coins.' },
-  { key: 'carpa_lendaria', name: 'Carpa Solar lendária', emoji: FISH_LEGENDARY, value: 2400, chance: 4, rarity: 2.2, artwork: 'legendary', description: 'Uma carpa dourada rara que pode aparecer por conta própria — e ainda exige duas escolhas certeiras.' },
-  { key: 'piranha_rubra', name: 'Piranha Rubra', emoji: () => '🐡', value: 560, chance: 6, rarity: 1.2, artwork: 'piranha', ability: 'piranha', description: 'Uma mordida nervosa que transforma respeito em coins.' },
-  { key: 'betta_fogo', name: 'Betta de Fogo', emoji: () => '🐠', value: 420, chance: 5, rarity: 1.1, artwork: 'betta', ability: 'betta', description: 'Dança com as nadadeiras e chama a sorte para perto.' },
-  { key: 'marlin_neon', name: 'Agulhão Neon', emoji: () => '🐟', value: 900, chance: 3.5, rarity: 2, artwork: 'marlin', ability: 'marlin', description: 'Um velocista do oceano que encurta a espera da próxima pescaria.' },
-  { key: 'lagosta_espinhosa', name: 'Lagosta Espinhosa', emoji: () => '🦞', value: 760, chance: 7, rarity: 1.4, artwork: 'lobster', ability: 'lobster', description: 'Uma pinça dourada que recompensa quem tem coragem de segurá-la.' },
-  { key: 'estrela_do_mar', name: 'Estrela do Mar', emoji: () => '⭐', value: 500, chance: 5.5, rarity: 1.2, artwork: 'starfish', ability: 'starfish', description: 'Faça um pedido: esta estrela pode abrir uma maré lendária.' },
-  { key: 'polvo_rosa', name: 'Polvo Rosa', emoji: () => '🐙', value: 1100, chance: 4.5, rarity: 1.8, artwork: 'octopus', ability: 'octopus', description: 'Oito tentáculos, oito chances de encontrar uma isca especial.' },
-  { key: 'tartaruga_marinha', name: 'Tartaruga Marinha', emoji: () => '🐢', value: 1300, chance: 3.5, rarity: 2, artwork: 'turtle', ability: 'turtle', description: 'Um casco antigo que ensina a esperar menos pela próxima maré.' },
-  { key: 'orca', name: 'Orca da Maré', emoji: () => '🐋', value: 3000, chance: 1.5, rarity: 3, artwork: 'orca', ability: 'orca', description: 'Um chamado raro que traz tesouro e coins para o pescador.' },
+  { key: 'peixe_comum', name: 'Peixe comum', emoji: FISH_COMMON, value: 7, chance: 48, rarity: 0, artwork: 'common', description: 'O peixe mais comum e fácil de conseguir.' },
+  { key: 'tubarao_comum', name: 'Tubarão comum', emoji: FISH_SHARK, value: 54, chance: 13, rarity: 1, artwork: 'shark', description: 'Um tubarão que vale muitas coins.' },
+  { key: 'carpa_lendaria', name: 'Carpa Solar lendária', emoji: FISH_LEGENDARY, value: 200, chance: 4, rarity: 2.2, artwork: 'legendary', description: 'Uma carpa dourada rara que pode aparecer por conta própria — e ainda exige duas escolhas certeiras.' },
+  { key: 'piranha_rubra', name: 'Piranha Rubra', emoji: () => '🐡', value: 47, chance: 6, rarity: 1.2, artwork: 'piranha', ability: 'piranha', description: 'Uma mordida nervosa que transforma respeito em coins.' },
+  { key: 'betta_fogo', name: 'Betta de Fogo', emoji: () => '🐠', value: 35, chance: 5, rarity: 1.1, artwork: 'betta', ability: 'betta', description: 'Dança com as nadadeiras e chama a sorte para perto.' },
+  { key: 'marlin_neon', name: 'Agulhão Neon', emoji: () => '🐟', value: 75, chance: 3.5, rarity: 2, artwork: 'marlin', ability: 'marlin', description: 'Um velocista do oceano que encurta a espera da próxima pescaria.' },
+  { key: 'lagosta_espinhosa', name: 'Lagosta Espinhosa', emoji: () => '🦞', value: 63, chance: 7, rarity: 1.4, artwork: 'lobster', ability: 'lobster', description: 'Uma pinça dourada que recompensa quem tem coragem de segurá-la.' },
+  { key: 'estrela_do_mar', name: 'Estrela do Mar', emoji: () => '⭐', value: 42, chance: 5.5, rarity: 1.2, artwork: 'starfish', ability: 'starfish', description: 'Faça um pedido: esta estrela pode abrir uma maré lendária.' },
+  { key: 'polvo_rosa', name: 'Polvo Rosa', emoji: () => '🐙', value: 92, chance: 4.5, rarity: 1.8, artwork: 'octopus', ability: 'octopus', description: 'Oito tentáculos, oito chances de encontrar uma isca especial.' },
+  { key: 'tartaruga_marinha', name: 'Tartaruga Marinha', emoji: () => '🐢', value: 108, chance: 3.5, rarity: 2, artwork: 'turtle', ability: 'turtle', description: 'Um casco antigo que ensina a esperar menos pela próxima maré.' },
+  { key: 'orca', name: 'Orca da Maré', emoji: () => '🐋', value: 250, chance: 1.5, rarity: 3, artwork: 'orca', ability: 'orca', description: 'Um chamado raro que traz tesouro e coins para o pescador.' },
   { key: 'escama_lendaria', name: 'Escama lendária', emoji: FISH_LEGENDARY, value: 0, chance: 0, rarity: 0, sellable: false, description: 'Uma escama obtida ao derrotar o tubarão raivoso.' },
   // Mantém capturas antigas vendáveis e visíveis após a evolução do sistema.
   { key: 'sardinha', name: 'Sardinha', emoji: FISH_COMMON, value: 80, chance: 0, rarity: 0, artwork: 'common', legacy: true, description: 'Captura antiga.' },
@@ -256,15 +256,15 @@ const FISHING_BAITS = Object.freeze([
 ]);
 
 const FISHING_MISSIONS = Object.freeze([
-  { key: 'casts', name: 'Lançador de linha', target: 3, reward: 900, description: 'Faça 3 pescarias.' },
-  { key: 'rare', name: 'Olho de pescador', target: 2, reward: 1400, description: 'Capture 2 peixes raros.' },
-  { key: 'treasure', name: 'Caçador de tesouros', target: 1, reward: 1800, description: 'Encontre 1 tesouro.' },
-  { key: 'ability', name: 'Peixe de estimação', target: 1, reward: 1100, description: 'Use a habilidade de 1 peixe.' },
+  { key: 'casts', name: 'Lançador de linha', target: 3, reward: 75, description: 'Faça 3 pescarias.' },
+  { key: 'rare', name: 'Olho de pescador', target: 2, reward: 115, description: 'Capture 2 peixes raros.' },
+  { key: 'treasure', name: 'Caçador de tesouros', target: 1, reward: 150, description: 'Encontre 1 tesouro.' },
+  { key: 'ability', name: 'Peixe de estimação', target: 1, reward: 90, description: 'Use a habilidade de 1 peixe.' },
 ]);
 
 const FISHING_TREASURES = Object.freeze([
-  { key: 'bau_coins', name: 'Baú submerso', emoji: '🧰', kind: 'coins', min: 450, max: 950 },
-  { key: 'perola', name: 'Pérola do recife', emoji: '🫧', kind: 'coins', min: 700, max: 1500 },
+  { key: 'bau_coins', name: 'Baú submerso', emoji: '🧰', kind: 'coins', min: 40, max: 80 },
+  { key: 'perola', name: 'Pérola do recife', emoji: '🫧', kind: 'coins', min: 60, max: 125 },
   { key: 'isca_brilhante', name: 'Isca brilhante', emoji: '🌟', kind: 'bait', baitKey: 'brilhante', quantity: 1 },
   { key: 'isca_dourada', name: 'Isca dourada', emoji: '🪙', kind: 'bait', baitKey: 'dourada', quantity: 1 },
 ]);
@@ -732,7 +732,7 @@ export function buildFishingShopPayload() {
       `Compre uma vara melhor para aumentar suas chances de capturar peixes raros.\n` +
       `Os peixes ficam no seu balde até você decidir vender.\n\n` +
       `**Como funciona**\n` +
-      `\`/pescar\` → uma pescaria a cada 1 minuto\n` +
+       `\`/pescar\` → uma pescaria a cada 5 segundos\n` +
       `\`/pesca inventario\` → veja suas capturas\n` +
       `\`/pesca vender\` → transforme peixes em ${COIN()}\n` +
       `\`/pesca iscas\` → compre e equipe iscas\n` +
@@ -1240,7 +1240,7 @@ async function handleLegendaryChoice(interaction, choice) {
     return interaction.update(await fishingArtworkPayload(
       `## ${FISH_LEGENDARY()} A carpa lendária escapou!\n` +
       `Você escolheu uma posição errada e perdeu esta oportunidade. A bênção da foca foi consumida.\n\n` +
-       `${FISH_ROD()} Você poderá pescar novamente em **1 minuto**.`,
+        `${FISH_ROD()} Você poderá pescar novamente em **5 segundos**.`,
       'legendary',
       [],
       { large: true },
@@ -1259,8 +1259,8 @@ async function handleLegendaryChoice(interaction, choice) {
   return interaction.update(await fishingArtworkPayload(
     `## ${FISH_LEGENDARY()} Carpa lendária fisgada!\n` +
     `Você venceu a tentativa especial e guardou a captura no seu inventário.\n\n` +
-    `${COIN()} Valor de venda: **2.400** ${COIN()}\n` +
-       `${FISH_ROD()} Próxima pescaria em **1 minuto**.`,
+    `${COIN()} Valor de venda: **200** ${COIN()}\n` +
+       `${FISH_ROD()} Próxima pescaria em **5 segundos**.`,
     'legendary',
     [],
     { large: true },
@@ -1343,7 +1343,7 @@ async function handleFishAbility(interaction) {
       if (!caught?.quantity) return { status: 'missing', scene };
 
       if (fish.ability === 'piranha') {
-        const bonus = 180;
+        const bonus = 15;
         await tx.economy.upsert({
           where: { userId_guildId: { userId: ownerId, guildId: interaction.guildId } },
           create: { userId: ownerId, guildId: interaction.guildId, balance: bonus },
@@ -1369,7 +1369,7 @@ async function handleFishAbility(interaction) {
       }
 
       if (fish.ability === 'marlin' || fish.ability === 'turtle') {
-        const waitMs = fish.ability === 'turtle' ? 20 * 1000 : 15 * 1000;
+        const waitMs = fish.ability === 'turtle' ? 1 * 1000 : 2 * 1000;
         const nextFishingAt = new Date(Date.now() - (FISH_CD - waitMs));
         await tx.fishingProfile.update({
           where: { userId_guildId: { userId: ownerId, guildId: interaction.guildId } },
@@ -1384,7 +1384,7 @@ async function handleFishAbility(interaction) {
       }
 
       if (fish.ability === 'lobster') {
-        const bonus = 350;
+        const bonus = 30;
         await tx.economy.upsert({
           where: { userId_guildId: { userId: ownerId, guildId: interaction.guildId } },
           create: { userId: ownerId, guildId: interaction.guildId, balance: bonus },
@@ -1413,7 +1413,7 @@ async function handleFishAbility(interaction) {
         const bait = fish.ability === 'octopus'
           ? getFishingBait(['brilhante', 'eletrica'][Math.floor(Math.random() * 2)])
           : getFishingBait('brilhante');
-        const bonus = fish.ability === 'orca' ? 1200 : 0;
+        const bonus = fish.ability === 'orca' ? 100 : 0;
         if (bonus) {
           await tx.economy.upsert({
             where: { userId_guildId: { userId: ownerId, guildId: interaction.guildId } },
@@ -1551,7 +1551,7 @@ async function executeFishing(userId, guildId, isAdmin, reply, requestedSpotKey 
 const cmdPescar = {
   data: new SlashCommandBuilder()
     .setName('pescar')
-    .setDescription('Pesque peixes para vender por coins (1 min cooldown)')
+    .setDescription('Pesque peixes para vender por coins (5s cooldown)')
     .addStringOption(option => option
       .setName('ponto')
       .setDescription('Escolha onde jogar a linha')
