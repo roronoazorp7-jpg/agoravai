@@ -7,7 +7,7 @@ The fishing feature is intentionally separate from the general shop: it uses Eco
 
 **Why:** Fishing was requested as an economy activity without changing existing shop, profile, game, or daily/work behavior.
 
-**How to apply:** Keep new fishing buttons and select menus under the `fish_` prefix and route them through the fishing handler; preserve the 45-minute cooldown and sell-through-wallet flow unless the user explicitly asks to rebalance it.
+**How to apply:** Keep new fishing buttons and select menus under the `fish_` prefix and route them through the fishing handler; preserve the 5-second cooldown and balanced reward scale unless the user explicitly asks to rebalance it.
 
 ## Development database safety
 
