@@ -874,6 +874,7 @@ export async function handleShopInteraction(interaction, client) {
     if (id.startsWith('shop_car_r:'))            return handleCarouselRoleNav(interaction);
     if (id.startsWith('shop_car_p:'))            return handleCarouselPetNav(interaction);
     if (id === 'shop_car_back')                  return handleCarouselBack(interaction);
+    if (id === 'shop_weapon_back')               return handleWeaponBack(interaction);
     if (id === 'shop_converter')                 return handleConverter(interaction);
     if (id === 'shop_conv_msgs')                 return handleConvMsgs(interaction);
     if (id === 'shop_conv_call')                 return handleConvCall(interaction);
@@ -1478,6 +1479,11 @@ async function handleWeaponCategory(interaction) {
   });
 }
 
+async function handleWeaponBack(interaction) {
+  await interaction.deferUpdate();
+  return handleWeaponCategory(interaction);
+}
+
 function buildShopTypeSelect(roles, allBanners, pets) {
   const sel = new StringSelectMenuBuilder()
     .setCustomId('shop_type_sel')
@@ -1486,7 +1492,7 @@ function buildShopTypeSelect(roles, allBanners, pets) {
       new StringSelectMenuOptionBuilder().setLabel('Cargos').setValue('roles').setDescription(`${roles.length} cargos disponíveis`).setEmoji(SHOP_CATEGORY_EMOJI()),
       new StringSelectMenuOptionBuilder().setLabel('Banners').setValue('banners').setDescription(`${allBanners.length} banners disponíveis`).setEmoji(SHOP_CATEGORY_EMOJI()),
       new StringSelectMenuOptionBuilder().setLabel('Pets').setValue('pets').setDescription(`${pets.length} pets disponíveis`).setEmoji(SHOP_CATEGORY_EMOJI()),
-      new StringSelectMenuOptionBuilder().setLabel('Armas').setValue('weapons').setDescription(`${ROBBERY_WEAPONS.length} armas para roubos`).setEmoji('🔫'),
+      new StringSelectMenuOptionBuilder().setLabel('Armas').setValue('weapons').setDescription(`${ROBBERY_WEAPONS.length} armas para roubos`).setEmoji(SHOP_CATEGORY_EMOJI()),
     );
   return sel;
 }
@@ -1498,7 +1504,7 @@ function _buildComprarPayload(roles, allBanners, pets) {
     `${SHOP_CATEGORY_EMOJI()} **Cargos** — ${roles.length} disponível(is)`,
     `${SHOP_CATEGORY_EMOJI()} **Banners** — ${allBanners.length} banner(s)`,
     `${SHOP_CATEGORY_EMOJI()} **Pets** — ${pets.length} pet(s)`,
-    `🔫 **Armas** — ${ROBBERY_WEAPONS.length} disponível(is)`,
+    `${SHOP_CATEGORY_EMOJI()} **Armas** — ${ROBBERY_WEAPONS.length} disponível(is)`,
   ].join('\n');
   const sel = buildShopTypeSelect(roles, allBanners, pets);
 
@@ -1641,8 +1647,13 @@ async function handleItemSel(interaction) {
       .setEmoji(owned ? '✅' : '🛒')
       .setStyle(owned ? ButtonStyle.Secondary : ButtonStyle.Success)
       .setDisabled(owned || !canAfford);
+    const back = new ButtonBuilder()
+      .setCustomId('shop_weapon_back')
+      .setLabel('Voltar')
+      .setEmoji('↩')
+      .setStyle(ButtonStyle.Secondary);
     return interaction.editReply({
-      components: [c, new ActionRowBuilder().addComponents(buy)],
+      components: [c, new ActionRowBuilder().addComponents(buy, back)],
       files,
       flags: MessageFlags.IsComponentsV2,
     });
