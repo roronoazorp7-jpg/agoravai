@@ -40,6 +40,8 @@ export async function handleAfkMessage(message) {
 
   if (!records.length) return;
 
+  const mentionedUser = message.mentions.users.get(records[0].userId)
+    ?? await message.client.users.fetch(records[0].userId).catch(() => null);
   const lines = records.map(record =>
     `<@${record.userId}> está ausente.\n**Motivo:** ${record.reason || 'Não especificado'}`,
   );
@@ -47,7 +49,7 @@ export async function handleAfkMessage(message) {
   await replyAndExpire(message, {
     ...buildUtilityV2({
       text: `## Estado ausente\n\n${lines.join('\n\n')}\n\n-# Vou avisar quem você mencionou.`,
-      thumbnailUrl: message.author.displayAvatarURL({ extension: 'png', size: 128 }),
+      thumbnailUrl: mentionedUser?.displayAvatarURL({ extension: 'png', size: 128 }),
     }),
     allowedMentions: { users: [] },
   });
