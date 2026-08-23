@@ -118,7 +118,7 @@ export function buildPetActionRows({ includeShop = true } = {}) {
   return [
     row,
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('shop_comprar').setLabel('Abrir loja de pets').setEmoji('🛍️').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('profile_pet_btn').setLabel('Seus pets').setEmoji('🐾').setStyle(ButtonStyle.Secondary),
     ),
   ];
 }
