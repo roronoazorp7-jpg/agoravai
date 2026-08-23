@@ -13,6 +13,8 @@ import {
   StringSelectMenuOptionBuilder,
   PermissionFlagsBits,
   AttachmentBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
 } from 'discord.js';
 import prisma from '../database/client.js';
 import { getEmoji } from './emojiManager.js';
@@ -26,6 +28,7 @@ import {
   getVipFrame,
   buildBannerUrl,
 } from './shopData.js';
+import { ROBBERY_WEAPONS, getRobberyWeapon } from './robberyData.js';
 import { renderRingPreview } from './ringPreview.js';
 import { buildPetPanel, petDisplayName } from './petComponents.js';
 import { spendCoins, totalCoins } from './economyFunds.js';
@@ -1445,6 +1448,36 @@ async function handleCarouselPetNav(interaction) {
   return editPetCarousel(interaction, p, safeIdx, pets.length, eco, ownedSet.has(p.id), cfg);
 }
 
+async function handleWeaponCategory(interaction) {
+  const owned = new Set((await prisma.userPurchase.findMany({
+    where: { userId: interaction.user.id, itemType: 'weapon' },
+  })).map(item => item.itemRef));
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId('shop_item_sel')
+    .setPlaceholder('Escolha uma arma para ver os detalhes')
+    .addOptions(ROBBERY_WEAPONS.map(weapon =>
+      new StringSelectMenuOptionBuilder()
+        .setLabel(weapon.name)
+        .setValue(`weapon:${weapon.key}`)
+        .setDescription(owned.has(weapon.key) ? 'Já adquirida' : `${weapon.price.toLocaleString('pt-BR')} coins`)
+        .setEmoji(weapon.key === 'faca' ? '🔪' : '🔫'),
+    ));
+  return interaction.editReply({
+    components: [
+      new ContainerBuilder().addTextDisplayComponents(new TextDisplayBuilder().setContent(
+        '## 🔫 Armas para roubos\n\n' +
+        'A arma mais forte que você possuir será usada automaticamente. Armas melhores aumentam o roubo, mas também o risco de prisão.\n\n' +
+        'Escolha uma arma abaixo para comprar:',
+      )),
+      new ActionRowBuilder().addComponents(menu),
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('shop_car_back').setLabel('Voltar').setEmoji('↩').setStyle(ButtonStyle.Secondary),
+      ),
+    ],
+    flags: MessageFlags.IsComponentsV2,
+  });
+}
+
 function buildShopTypeSelect(roles, allBanners, pets) {
   const sel = new StringSelectMenuBuilder()
     .setCustomId('shop_type_sel')
@@ -1453,6 +1486,7 @@ function buildShopTypeSelect(roles, allBanners, pets) {
       new StringSelectMenuOptionBuilder().setLabel('Cargos').setValue('roles').setDescription(`${roles.length} cargos disponíveis`).setEmoji(SHOP_CATEGORY_EMOJI()),
       new StringSelectMenuOptionBuilder().setLabel('Banners').setValue('banners').setDescription(`${allBanners.length} banners disponíveis`).setEmoji(SHOP_CATEGORY_EMOJI()),
       new StringSelectMenuOptionBuilder().setLabel('Pets').setValue('pets').setDescription(`${pets.length} pets disponíveis`).setEmoji(SHOP_CATEGORY_EMOJI()),
+      new StringSelectMenuOptionBuilder().setLabel('Armas').setValue('weapons').setDescription(`${ROBBERY_WEAPONS.length} armas para roubos`).setEmoji('🔫'),
     );
   return sel;
 }
@@ -1464,6 +1498,7 @@ function _buildComprarPayload(roles, allBanners, pets) {
     `${SHOP_CATEGORY_EMOJI()} **Cargos** — ${roles.length} disponível(is)`,
     `${SHOP_CATEGORY_EMOJI()} **Banners** — ${allBanners.length} banner(s)`,
     `${SHOP_CATEGORY_EMOJI()} **Pets** — ${pets.length} pet(s)`,
+    `🔫 **Armas** — ${ROBBERY_WEAPONS.length} disponível(is)`,
   ].join('\n');
   const sel = buildShopTypeSelect(roles, allBanners, pets);
 
@@ -1560,6 +1595,8 @@ async function handleTypeSel(interaction) {
       return editPetCarousel(interaction, p, 0, pets.length, eco, ownedSet.has(p.id), cfg);
     }
 
+    if (type === 'weapons') return handleWeaponCategory(interaction);
+
     return interaction.editReply(errPayload('❌ Categoria inválida. Abra a loja novamente.'));
   } catch (error) {
     console.error('[SHOP CATEGORY]', error);
@@ -1574,6 +1611,42 @@ async function handleItemSel(interaction) {
 
   const [itemType, ref] = interaction.values[0].split(':');
   const eco = await getEco(interaction.user.id, interaction.guildId);
+
+  if (itemType === 'weapon') {
+    const weapon = getRobberyWeapon(ref);
+    const owned = !!(await prisma.userPurchase.findUnique({
+      where: { userId_itemType_itemRef: { userId: interaction.user.id, itemType: 'weapon', itemRef: weapon.key } },
+    }));
+    const canAfford = totalCoins(eco) >= weapon.price;
+    const c = new ContainerBuilder().addTextDisplayComponents(new TextDisplayBuilder().setContent([
+      `## ${weapon.key === 'faca' ? '🔪' : '🔫'} ${weapon.name}`,
+      weapon.description,
+      `💰 **Preço:** ${weapon.price.toLocaleString('pt-BR')} ${COIN()}`,
+      `👛 **Seu saldo:** ${totalCoins(eco).toLocaleString('pt-BR')} ${COIN()}`,
+      `🎯 **Roubo:** +${Math.round((weapon.stealMultiplier - 1) * 100)}%`,
+      `🚔 **Risco de prisão:** ${Math.round(weapon.arrestChance * 100)}%`,
+    ].join('\n')));
+    const files = [];
+    if (weapon.image) {
+      files.push(new AttachmentBuilder(weapon.image, { name: `arma-${weapon.key}.jpg` }));
+      c.addMediaGalleryComponents(
+        new MediaGalleryBuilder().addItems(
+          new MediaGalleryItemBuilder().setURL(`attachment://arma-${weapon.key}.jpg`),
+        ),
+      );
+    }
+    const buy = new ButtonBuilder()
+      .setCustomId(`shop_buy_weapon:${weapon.key}`)
+      .setLabel(owned ? 'Já possui' : canAfford ? 'Comprar' : 'Sem saldo')
+      .setEmoji(owned ? '✅' : '🛒')
+      .setStyle(owned ? ButtonStyle.Secondary : ButtonStyle.Success)
+      .setDisabled(owned || !canAfford);
+    return interaction.editReply({
+      components: [c, new ActionRowBuilder().addComponents(buy)],
+      files,
+      flags: MessageFlags.IsComponentsV2,
+    });
+  }
 
   if (itemType === 'role') {
     const item = await prisma.shopRole.findUnique({ where: { id: ref } });
@@ -1673,6 +1746,10 @@ async function handleBuyConfirm(interaction) {
       }),
     });
     name = petDisplayName(petForPayload, interaction.guild); price = petForPayload.price;
+  } else if (type === 'weapon') {
+    const weapon = getRobberyWeapon(key);
+    name = weapon.name;
+    price = weapon.price;
   } else {
     const b = await resolveBannerForGuild(key, interaction.guildId);
     if (!b) return interaction.editReply({ content: '❌ Banner não encontrado. Abra a loja novamente para atualizar a lista.' });
@@ -1754,6 +1831,11 @@ async function handleBuyExecute(interaction, client) {
       flags: MessageFlags.IsComponentsV2,
     });
     name = petDisplayName(petForPayload, interaction.guild); price = petForPayload.price; itemRef = petForPayload.id;
+  } else if (type === 'weapon') {
+    const weapon = getRobberyWeapon(key);
+    name = weapon.name;
+    price = weapon.price;
+    itemRef = weapon.key;
   } else {
     const b = await resolveBannerForGuild(key, interaction.guildId);
     if (!b) return interaction.editReply({ content: '❌ Banner não encontrado.', embeds: [], components: [] });

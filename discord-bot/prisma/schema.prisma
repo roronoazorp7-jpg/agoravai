@@ -228,6 +228,21 @@ model Economy {
   @@unique([userId, guildId])
 }
 
+model CriminalRecord {
+  id          String   @id @default(cuid())
+  userId      String
+  guildId     String
+  debt        Int      @default(0)
+  arrests     Int      @default(0)
+  crimes      Int      @default(0)
+  lastCrime   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, guildId])
+  @@index([guildId, userId])
+}
+
 model FishingProfile {
   id               String   @id @default(cuid())
   userId           String
