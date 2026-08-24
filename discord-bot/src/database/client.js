@@ -105,6 +105,25 @@ export async function ensureMarriageSchema() {
     CREATE INDEX IF NOT EXISTS "CriminalRecord_guildId_userId_idx"
       ON "CriminalRecord" ("guildId", "userId")
   `);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "CardCollection" (
+      "id" TEXT NOT NULL,
+      "userId" TEXT NOT NULL,
+      "cardKey" TEXT NOT NULL,
+      "quantity" INTEGER NOT NULL DEFAULT 1,
+      "firstObtainedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "CardCollection_pkey" PRIMARY KEY ("id")
+    )
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "CardCollection_userId_cardKey_key"
+      ON "CardCollection" ("userId", "cardKey")
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "CardCollection_userId_idx"
+      ON "CardCollection" ("userId")
+  `);
 }
 
 export default prisma;
