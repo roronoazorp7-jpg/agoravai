@@ -43,3 +43,44 @@ export async function generateCardSheet(cards) {
   ));
   return canvas.toBuffer('image/png');
 }
+
+export async function generatePokedexSheet(cards, ownedKeys) {
+  const columns = 5;
+  const gap = 18;
+  const cardWidth = 220;
+  const cardHeight = Math.round(CARD_H * (cardWidth / CARD_W));
+  const rows = Math.ceil(cards.length / columns);
+  const width = columns * cardWidth + (columns + 1) * gap;
+  const height = rows * cardHeight + (rows + 1) * gap;
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#11131a';
+  ctx.fillRect(0, 0, width, height);
+
+  const images = await Promise.all(cards.map(async card => {
+    const file = path.join(CARDS_DIR, card.artFile);
+    return loadImage(await readFile(file));
+  }));
+
+  cards.forEach((card, index) => {
+    const x = gap + (index % columns) * (cardWidth + gap);
+    const y = gap + Math.floor(index / columns) * (cardHeight + gap);
+    const unlocked = ownedKeys.has(card.key);
+    ctx.save();
+    if (!unlocked) ctx.globalAlpha = 0.3;
+    ctx.drawImage(images[index], x, y, cardWidth, cardHeight);
+    ctx.restore();
+    if (!unlocked) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(5, 8, 18, 0.48)';
+      ctx.fillRect(x, y, cardWidth, cardHeight);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 92px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('?', x + cardWidth / 2, y + cardHeight / 2);
+      ctx.restore();
+    }
+  });
+  return canvas.toBuffer('image/png');
+}

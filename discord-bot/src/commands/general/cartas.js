@@ -21,7 +21,7 @@ import {
   getCard,
   pickPackCards,
 } from '../../utils/cardData.js';
-import { generateCardSheet, loadPackCover } from '../../utils/cardVisuals.js';
+import { generateCardSheet, generatePokedexSheet, loadPackCover } from '../../utils/cardVisuals.js';
 
 function packCount(value) {
   return Math.min(Math.max(Number(value) || 1, 1), 3);
@@ -248,13 +248,15 @@ export default {
       .setName('colecao')
       .setDescription('Veja suas cartas e seu progresso'))
     .addSubcommand(sub => sub
+      .setName('pokedex')
+      .setDescription('Veja as cartas descobertas e as que ainda faltam'))
+    .addSubcommand(sub => sub
       .setName('ver')
       .setDescription('Veja os detalhes de uma carta')
       .addStringOption(option => option
         .setName('carta')
         .setDescription('Carta que deseja consultar')
-        .setRequired(true)
-        .addChoices(...CARD_DEFS.map(card => ({ name: card.name, value: card.key }))))),
+        .setRequired(true))),
   name: 'cartas',
   aliases: ['carta', 'cards'],
 
@@ -271,6 +273,16 @@ export default {
         .setDescription(`**${ownedUnique}/${CARD_DEFS.length}** cartas descobertas\n\n${collectionText(rows)}`)
         .setFooter({ text: 'Use /cartas abrir para comprar um pacote.' });
       return interaction.editReply({ embeds: [embed] });
+    }
+
+    if (sub === 'pokedex') {
+      const rows = await prisma.cardCollection.findMany({ where: { userId: interaction.user.id } });
+      const ownedKeys = new Set(rows.map(row => row.cardKey));
+      const image = await generatePokedexSheet(CARD_DEFS, ownedKeys);
+      return interaction.editReply({
+        content: `## Pokédex Pokémon\n**${ownedKeys.size}/${CARD_DEFS.length}** cartas descobertas\n\nCartas bloqueadas aparecem esmaecidas com **?**.`,
+        files: [new AttachmentBuilder(image, { name: 'pokedex-pokemon.png' })],
+      });
     }
 
     if (sub === 'ver') {
@@ -299,6 +311,15 @@ export default {
           .setColor(0x8e6cff)
           .setTitle('Arcana — Sua coleção')
           .setDescription(`**${rows.length}/${CARD_DEFS.length}** cartas descobertas\n\n${collectionText(rows)}`)],
+      });
+    }
+    if (sub === 'pokedex' || sub === 'dex') {
+      const rows = await prisma.cardCollection.findMany({ where: { userId: message.author.id } });
+      const ownedKeys = new Set(rows.map(row => row.cardKey));
+      const image = await generatePokedexSheet(CARD_DEFS, ownedKeys);
+      return message.reply({
+        content: `## Pokédex Pokémon\n**${ownedKeys.size}/${CARD_DEFS.length}** cartas descobertas\n\nCartas bloqueadas aparecem esmaecidas com **?**.`,
+        files: [new AttachmentBuilder(image, { name: 'pokedex-pokemon.png' })],
       });
     }
     if (sub === 'abrir' || sub === 'open') {
