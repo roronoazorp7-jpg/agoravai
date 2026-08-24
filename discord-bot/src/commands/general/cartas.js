@@ -2,6 +2,14 @@ import {
   SlashCommandBuilder,
   AttachmentBuilder,
   EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
+  MessageFlags,
 } from 'discord.js';
 import prisma from '../../database/client.js';
 import { spendCoins, totalCoins } from '../../utils/economyFunds.js';
@@ -17,6 +25,100 @@ import { generateCardSheet, loadPackCover } from '../../utils/cardVisuals.js';
 
 function packCount(value) {
   return Math.min(Math.max(Number(value) || 1, 1), 3);
+}
+
+const packSessions = new Map();
+const SESSION_TTL = 10 * 60 * 1000;
+
+function createPackSession({ userId, guildId, count }) {
+  const token = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+  packSessions.set(token, {
+    userId,
+    guildId,
+    count,
+    cards: null,
+    index: 0,
+    expiresAt: Date.now() + SESSION_TTL,
+  });
+  return token;
+}
+
+function getPackSession(token) {
+  const session = packSessions.get(token);
+  if (!session || session.expiresAt < Date.now()) {
+    packSessions.delete(token);
+    return null;
+  }
+  return session;
+}
+
+async function buildPackCoverPayload(token, count) {
+  const cover = await loadPackCover();
+  const container = new ContainerBuilder()
+    .addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(
+        new MediaGalleryItemBuilder().setURL('attachment://capa-pack-pokemon.jpg'),
+      ),
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `## Pack Pokémon\n\n` +
+        `Um pack com **${CARD_PACK_SIZE} cartas** da coleção Pokémon.\n` +
+        `Você está abrindo **${count} pack${count > 1 ? 's' : ''}** por **${(CARD_PACK_PRICE * count).toLocaleString('pt-BR')} coins**.`,
+      ),
+    );
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`pokemon_pack_open:${token}`)
+      .setLabel('Abrir pack')
+      .setStyle(ButtonStyle.Primary),
+  );
+  return {
+    components: [container, row],
+    files: [new AttachmentBuilder(cover, { name: 'capa-pack-pokemon.jpg' })],
+    flags: MessageFlags.IsComponentsV2,
+  };
+}
+
+function buildCardRevealPayload(session) {
+  const card = session.cards[session.index];
+  const isLast = session.index >= session.cards.length - 1;
+  const container = new ContainerBuilder()
+    .addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(
+        new MediaGalleryItemBuilder().setURL('attachment://carta-revelada.png'),
+      ),
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `## Carta ${session.index + 1} de ${session.cards.length}\n\n` +
+        `**${card.name}** — ${rarityData(card.rarity).label}`,
+      ),
+    );
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(isLast ? `pokemon_pack_finish:${session.token}` : `pokemon_pack_next:${session.token}`)
+      .setLabel(isLast ? 'Ver pack completo' : 'Passar carta')
+      .setStyle(ButtonStyle.Primary),
+  );
+  return { components: [container, row], flags: MessageFlags.IsComponentsV2 };
+}
+
+function buildPackFinishedPayload(session) {
+  const container = new ContainerBuilder()
+    .addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(
+        new MediaGalleryItemBuilder().setURL('attachment://cartas-pokemon.png'),
+      ),
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `## Pack Pokémon completo\n\n` +
+        session.cards.map((card, i) => `${i + 1}. **${card.name}** — ${rarityData(card.rarity).label}`).join('\n') +
+        `\n\n${session.duplicates ? `♻️ ${session.duplicates} duplicata(s) convertida(s) em **${session.refund.toLocaleString('pt-BR')} coins**.` : '✨ Todas as cartas são novas!'}`,
+      ),
+    );
+  return { components: [container], flags: MessageFlags.IsComponentsV2 };
 }
 
 async function getEco(userId, guildId, db = prisma) {
@@ -73,6 +175,63 @@ async function openPacks(userId, guildId, count) {
   });
 }
 
+export async function handleCardPackInteraction(interaction) {
+  const [action, token] = interaction.customId.split(':');
+  const session = getPackSession(token);
+  if (!session) {
+    return interaction.reply({ content: 'Este pack expirou. Use `s cartas abrir` para começar outro.', ephemeral: true });
+  }
+  if (session.userId !== interaction.user.id) {
+    return interaction.reply({ content: 'Este pack pertence a outra pessoa.', ephemeral: true });
+  }
+
+  if (action === 'pokemon_pack_open') {
+    const result = await openPacks(session.userId, session.guildId, session.count);
+    if (!result.ok) {
+      packSessions.delete(token);
+      return interaction.update({
+        components: [
+          new ContainerBuilder().addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+              `## Não foi possível abrir o pack\n\nVocê precisa de **${result.total.toLocaleString('pt-BR')} coins**, mas possui **${result.balance.toLocaleString('pt-BR')} coins**.`,
+            ),
+          ),
+        ],
+        flags: MessageFlags.IsComponentsV2,
+      });
+    }
+    session.cards = result.cards;
+    session.index = 0;
+    session.duplicates = result.duplicates;
+    session.refund = result.refund;
+    const cardImage = await generateCardSheet([session.cards[0]]);
+    return interaction.update({
+      ...buildCardRevealPayload({ ...session, token }),
+      files: [new AttachmentBuilder(cardImage, { name: 'carta-revelada.png' })],
+    });
+  }
+
+  if (action === 'pokemon_pack_next') {
+    if (!session.cards) return interaction.reply({ content: 'Abra o pack primeiro.', ephemeral: true });
+    session.index += 1;
+    const cardImage = await generateCardSheet([session.cards[session.index]]);
+    return interaction.update({
+      ...buildCardRevealPayload({ ...session, token }),
+      files: [new AttachmentBuilder(cardImage, { name: 'carta-revelada.png' })],
+    });
+  }
+
+  if (action === 'pokemon_pack_finish') {
+    if (!session.cards) return interaction.reply({ content: 'Abra o pack primeiro.', ephemeral: true });
+    const image = await generateCardSheet(session.cards);
+    packSessions.delete(token);
+    return interaction.update({
+      ...buildPackFinishedPayload(session),
+      files: [new AttachmentBuilder(image, { name: 'cartas-pokemon.png' })],
+    });
+  }
+}
+
 export default {
   data: new SlashCommandBuilder()
     .setName('cartas')
@@ -126,31 +285,9 @@ export default {
       });
     }
 
-    const result = await openPacks(
-      interaction.user.id,
-      interaction.guildId,
-      packCount(interaction.options.getInteger('pacotes')),
-    );
-    if (!result.ok) {
-      return interaction.editReply(`Você precisa de **${result.total.toLocaleString('pt-BR')} coins**, mas possui **${result.balance.toLocaleString('pt-BR')} coins**.`);
-    }
-    const image = await generateCardSheet(result.cards);
-    const cover = await loadPackCover();
-    const summary = result.cards
-      .map(card => `${rarityData(card.rarity).label} — **${card.name}**`)
-      .join('\n');
-    return interaction.editReply({
-      content:
-        `## Pack Pokémon aberto!\n${summary}\n\n` +
-        (result.duplicates
-          ? `♻️ ${result.duplicates} duplicata(s) convertida(s) em **${result.refund.toLocaleString('pt-BR')} coins**.`
-          : '✨ Todas as cartas são novas!') +
-        `\n💰 Valor pago: **${(CARD_PACK_PRICE * packCount(interaction.options.getInteger('pacotes'))).toLocaleString('pt-BR')} coins**`,
-      files: [
-        new AttachmentBuilder(cover, { name: 'capa-pack-pokemon.jpg' }),
-        new AttachmentBuilder(image, { name: 'cartas-pokemon.png' }),
-      ],
-    });
+    const count = packCount(interaction.options.getInteger('pacotes'));
+    const token = createPackSession({ userId: interaction.user.id, guildId: interaction.guildId, count });
+    return interaction.editReply(await buildPackCoverPayload(token, count));
   },
 
   async executePrefix(message, args) {
@@ -166,18 +303,8 @@ export default {
     }
     if (sub === 'abrir' || sub === 'open') {
       const count = packCount(args[1]);
-      const result = await openPacks(message.author.id, message.guildId, count);
-      if (!result.ok) return message.reply(`Você precisa de **${result.total.toLocaleString('pt-BR')} coins**, mas possui **${result.balance.toLocaleString('pt-BR')} coins**.`);
-      const image = await generateCardSheet(result.cards);
-      const cover = await loadPackCover();
-      return message.reply({
-        content: `## Pack Pokémon aberto!\n${result.cards.map(card => `${rarityData(card.rarity).label} — **${card.name}**`).join('\n')}\n\n` +
-          (result.duplicates ? `♻️ Duplicatas convertidas em **${result.refund.toLocaleString('pt-BR')} coins**.` : '✨ Todas as cartas são novas!'),
-        files: [
-          new AttachmentBuilder(cover, { name: 'capa-pack-pokemon.jpg' }),
-          new AttachmentBuilder(image, { name: 'cartas-pokemon.png' }),
-        ],
-      });
+      const token = createPackSession({ userId: message.author.id, guildId: message.guildId, count });
+      return message.reply(await buildPackCoverPayload(token, count));
     }
     const card = getCard(args[1]);
     if (!card) return message.reply('Use `savage cartas abrir`, `savage cartas colecao` ou `savage cartas ver <chave>`. Veja as chaves disponíveis em `/cartas ver`.');

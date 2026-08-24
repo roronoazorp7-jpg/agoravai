@@ -45,6 +45,7 @@ import { handlePetButton } from '../commands/general/pet.js';
 import { handleModerationButton } from '../commands/admin/moderacao.js';
 import { handleVipButton, handleVipConfigModal } from '../commands/loja/vip.js';
 import { handleFishingInteraction } from '../commands/economia/pescaria.js';
+import { handleCardPackInteraction } from '../commands/general/cartas.js';
 import { handleBJHit, handleBJStand, handleMinesCell, handleMinesCashout } from '../utils/gameHandlers.js';
 import { handleAjudaCatSel } from '../commands/general/ajuda.js';
 import { radioSessions, createRadioSession } from '../utils/radioManager.js';
@@ -1105,6 +1106,11 @@ export default {
       // ── BUTTONS ────────────────────────────────────────────────────────────
       if (interaction.isButton()) {
         const { customId } = interaction;
+
+        // ── PACK POKÉMON: abertura carta por carta ─────────────────────────
+        if (customId.startsWith('pokemon_pack_')) {
+          return handleCardPackInteraction(interaction);
+        }
 
         // ── MODERAÇÃO: confirmações de ban, kick e mute ────────────────────
         if (customId.startsWith('mod_confirm:') || customId.startsWith('mod_cancel:')) {
