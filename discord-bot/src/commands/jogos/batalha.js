@@ -1,4 +1,5 @@
 import {
+  AttachmentBuilder,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
@@ -7,6 +8,7 @@ import {
 } from 'discord.js';
 import prisma from '../../database/client.js';
 import { CARD_DEFS, getCard, rarityData } from '../../utils/cardData.js';
+import { generateBattleBoard } from '../../utils/battleVisuals.js';
 
 const TEAM_SIZE = 3;
 const TEAM_PAGE_SIZE = 24;
@@ -151,17 +153,15 @@ function hashCard(card) {
 }
 
 function cardPower(card) {
-  const base = rarityData(card.rarity).label === 'Mítica' ? 2200 : card.rarity === 'incomum' ? 1500 : 900;
-  return base + (hashCard(card) % 600);
+  const base = card.rarity === 'mitica' ? 1550 : card.rarity === 'incomum' ? 1250 : 1000;
+  return base + (hashCard(card) % 260);
 }
 
 function cardStats(card) {
   const cp = cardPower(card);
   return {
     cp,
-    maxHp: 105 + Math.floor(cp / 12),
-    fastDamage: 16 + Math.floor(cp / 125),
-    chargedDamage: 42 + Math.floor(cp / 70),
+    maxHp: 120 + Math.floor(cp / 16),
   };
 }
 
@@ -184,6 +184,69 @@ function renderBar(value, max, size = 12) {
   return `${'█'.repeat(filled)}${'░'.repeat(size - filled)}`;
 }
 
+const MOVES = Object.freeze({
+  Fogo: [
+    ['Brasa Rápida', 18, 20],
+    ['Presas Flamejantes', 31, 45],
+    ['Explosão Solar', 45, 70],
+  ],
+  Água: [
+    ['Jato d’Água', 18, 20],
+    ['Onda de Espuma', 30, 45],
+    ['Hidrocanhão', 44, 70],
+  ],
+  Planta: [
+    ['Folha Navalha', 18, 20],
+    ['Chicote de Vinha', 30, 45],
+    ['Raio Solar', 43, 70],
+  ],
+  Raio: [
+    ['Faísca', 18, 20],
+    ['Eletrochoque', 31, 45],
+    ['Trovão', 45, 70],
+  ],
+  Psíquico: [
+    ['Confusão', 18, 20],
+    ['Pulso Psíquico', 30, 45],
+    ['Psíquico', 44, 70],
+  ],
+  Sombrio: [
+    ['Mordida', 18, 20],
+    ['Jogo Sujo', 30, 45],
+    ['Pulso Sombrio', 44, 70],
+  ],
+  Luta: [
+    ['Golpe Rápido', 18, 20],
+    ['Corpo a Corpo', 31, 45],
+    ['Força Bruta', 44, 70],
+  ],
+  Metal: [
+    ['Garra de Metal', 18, 20],
+    ['Cabeça de Ferro', 30, 45],
+    ['Canhão de Flash', 43, 70],
+  ],
+  Incolor: [
+    ['Investida', 18, 20],
+    ['Ataque Rápido', 29, 45],
+    ['Hiper Voz', 42, 70],
+  ],
+});
+
+const TYPE_ADVANTAGE = Object.freeze({
+  Fogo: { Planta: 1.25, Água: 0.8 },
+  Água: { Fogo: 1.25, Planta: 0.8 },
+  Planta: { Água: 1.25, Fogo: 0.8 },
+  Raio: { Água: 1.25, Planta: 0.8 },
+  Psíquico: { Luta: 1.25, Sombrio: 0.8 },
+  Sombrio: { Psíquico: 1.25 },
+  Luta: { Sombrio: 1.25, Psíquico: 0.8 },
+  Metal: { Psíquico: 1.15 },
+});
+
+function movesFor(pokemon) {
+  return MOVES[pokemon.card.element] ?? MOVES.Incolor;
+}
+
 function renderPokemon(pokemon) {
   return [
     `**${pokemon.card.name}** • CP **${pokemon.cp}**`,
@@ -192,7 +255,7 @@ function renderPokemon(pokemon) {
   ].join('\n');
 }
 
-function battlePayload(battle, extra = '') {
+async function battlePayload(battle, extra = '') {
   if (battle.finished) {
     const winner = battle.players[battle.winner];
     return {
@@ -208,12 +271,31 @@ function battlePayload(battle, extra = '') {
   const second = battle.players[battle.playerIds[1]];
   const turnPlayer = battle.players[battle.turn];
   const current = activePokemon(battle, battle.turn);
+  const moves = movesFor(current);
+  const moveMenu = new StringSelectMenuBuilder()
+    .setCustomId(`battle_move:${battle.id}`)
+    .setPlaceholder(`Escolha um golpe de ${current.card.name}`)
+    .addOptions(moves.map(([name, power, cost], index) => ({
+      label: name,
+      description: `${power} poder • ${cost === 20 ? 'rápido' : `custa ${cost} energia`}`,
+      value: String(index),
+      emoji: cost === 20 ? '⚡' : '💥',
+    })));
   const controls = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`battle_action:${battle.id}:fast`).setLabel('Ataque rápido').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`battle_action:${battle.id}:charged`).setLabel(`Ataque carregado (${current.energy}/100)`).setStyle(ButtonStyle.Success),
+    moveMenu,
+  );
+  const utilityControls = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`battle_action:${battle.id}:switch`).setLabel('Trocar Pokémon').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId(`battle_action:${battle.id}:surrender`).setLabel('Desistir').setStyle(ButtonStyle.Danger),
   );
+  let image;
+  try {
+    image = await generateBattleBoard(
+      activePokemon(battle, first.id),
+      activePokemon(battle, second.id),
+      turnPlayer.name,
+    );
+  } catch {}
   return {
     content: [
       '## Batalha Pokémon GO',
@@ -221,10 +303,11 @@ function battlePayload(battle, extra = '') {
       '',
       `**${second.name}**\n${renderPokemon(activePokemon(battle, second.id))}`,
       '',
-      `Vez de **${turnPlayer.name}** — use os botões abaixo.`,
+      `Vez de **${turnPlayer.name}** — escolha um dos golpes da carta ativa.`,
       extra || battle.log,
     ].join('\n'),
-    components: [controls],
+    components: [controls, utilityControls],
+    ...(image ? { files: [new AttachmentBuilder(image, { name: `battle-${battle.id}.png` })] } : {}),
   };
 }
 
@@ -386,7 +469,42 @@ export async function handleBattleInteraction(interaction) {
       challenge.opponentTeam,
     );
     battles.set(battle.id, battle);
-    return interaction.update(battlePayload(battle));
+     return interaction.update(await battlePayload(battle));
+  }
+
+  if (action === 'battle_move') {
+    const battle = battles.get(id);
+    if (!battle || battle.finished) return interaction.reply({ content: 'Esta batalha já terminou.', ephemeral: true });
+    if (!battle.players[interaction.user.id]) return interaction.reply({ content: 'Você não participa desta batalha.', ephemeral: true });
+    if (battle.turn !== interaction.user.id) return interaction.reply({ content: 'Aguarde a vez do adversário.', ephemeral: true });
+
+    const current = activePokemon(battle, interaction.user.id);
+    const defenderId = otherPlayer(battle, interaction.user.id);
+    const defender = activePokemon(battle, defenderId);
+    const moveIndex = Number(interaction.values?.[0]);
+    const move = movesFor(current)[moveIndex];
+    if (!move) return interaction.reply({ content: 'Esse golpe não está disponível.', ephemeral: true });
+
+    const [moveName, power, energyCost] = move;
+    if (current.energy < energyCost) {
+      return interaction.reply({
+        content: `Energia insuficiente para **${moveName}**. Você tem ${current.energy}/100 e precisa de ${energyCost}.`,
+        ephemeral: true,
+      });
+    }
+
+    const typeMultiplier = TYPE_ADVANTAGE[current.card.element]?.[defender.card.element] ?? 1;
+    const rarityMultiplier = defender.card.rarity === 'mitica' ? 0.9 : defender.card.rarity === 'comum' ? 1.05 : 1;
+    const cpMultiplier = 0.9 + (current.cp / 2000) * 0.1;
+    const damage = Math.max(8, Math.round(power * cpMultiplier * typeMultiplier * rarityMultiplier));
+    defender.hp -= damage;
+    current.energy = Math.min(100, current.energy - energyCost + (energyCost === 20 ? 32 : 8));
+
+    const advantageText = typeMultiplier > 1 ? ' Foi super eficaz!' : typeMultiplier < 1 ? ' Não foi muito eficaz...' : '';
+    battle.log = `${current.card.name} usou **${moveName}** e causou **${damage} de dano**.${advantageText}`;
+    if (finishIfNeeded(battle, defenderId)) return interaction.update(await battlePayload(battle));
+    battle.turn = defenderId;
+    return interaction.update(await battlePayload(battle));
   }
 
   if (action === 'battle_action') {
@@ -401,7 +519,7 @@ export async function handleBattleInteraction(interaction) {
       battle.finished = true;
       battle.winner = defenderId;
       battle.log = `${battle.players[interaction.user.id].name} desistiu.`;
-      return interaction.update(battlePayload(battle));
+       return interaction.update(await battlePayload(battle));
     }
     if (value === 'switch') {
       if (!availableSwitches(battle.players[interaction.user.id])) {
@@ -411,19 +529,9 @@ export async function handleBattleInteraction(interaction) {
         (pokemon, index) => index !== battle.players[interaction.user.id].active && pokemon.hp > 0,
       );
       battle.log = `${battle.players[interaction.user.id].name} fez uma troca rápida!`;
-    } else {
-      const charged = value === 'charged';
-      if (charged && current.energy < 100) {
-        return interaction.reply({ content: 'Energia insuficiente. Use o ataque rápido para carregar energia.', ephemeral: true });
-      }
-      const damage = charged ? current.chargedDamage : current.fastDamage;
-      defender.hp -= damage;
-      current.energy = Math.min(100, current.energy + (charged ? -100 : 35));
-      battle.log = `${current.card.name} causou **${damage} de dano**${charged ? ' com o ataque carregado' : ''}.`;
-      if (finishIfNeeded(battle, defenderId)) return interaction.update(battlePayload(battle));
-    }
+     }
     battle.turn = defenderId;
-    return interaction.update(battlePayload(battle));
+     return interaction.update(await battlePayload(battle));
   }
 }
 
