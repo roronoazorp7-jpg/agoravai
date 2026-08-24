@@ -46,6 +46,7 @@ import { handleModerationButton } from '../commands/admin/moderacao.js';
 import { handleVipButton, handleVipConfigModal } from '../commands/loja/vip.js';
 import { handleFishingInteraction } from '../commands/economia/pescaria.js';
 import { handleCardPackInteraction, handleCardCollectionInteraction } from '../commands/general/cartas.js';
+import { handleBattleInteraction } from '../commands/jogos/batalha.js';
 import { handleBJHit, handleBJStand, handleMinesCell, handleMinesCashout } from '../utils/gameHandlers.js';
 import { handleAjudaCatSel } from '../commands/general/ajuda.js';
 import { radioSessions, createRadioSession } from '../utils/radioManager.js';
@@ -552,6 +553,9 @@ export default {
 
       // ── STRING SELECT MENUS ────────────────────────────────────────────────
       if (interaction.isStringSelectMenu()) {
+        if (interaction.customId.startsWith('battle_team_select:')) {
+          return handleBattleInteraction(interaction);
+        }
         if (interaction.customId.startsWith('pokemon_dex_card:')) {
           return handleCardCollectionInteraction(interaction);
         }
@@ -1123,6 +1127,9 @@ export default {
         // ── PACK POKÉMON: abertura carta por carta ─────────────────────────
         if (customId.startsWith('pokemon_pack_')) {
           return handleCardPackInteraction(interaction);
+        }
+        if (customId.startsWith('battle_')) {
+          return handleBattleInteraction(interaction);
         }
         if (
           customId.startsWith('pokemon_dex_') ||
