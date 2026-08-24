@@ -1,11 +1,11 @@
 export const CARD_PACK_PRICE = 2500;
 export const CARD_PACK_SIZE = 2;
-export const CARD_REPEAT_CHANCE = 0.78;
+export const CARD_REPEAT_CHANCE = 0.45;
 
 export const CARD_RARITIES = Object.freeze({
-  comum: { label: 'Comum', color: '#8290a8', weight: 56, duplicateValue: 250 },
-  incomum: { label: 'Incomum', color: '#46b8ff', weight: 28, duplicateValue: 600 },
-  mitica: { label: 'Mítica', color: '#ff4fd8', weight: 16, duplicateValue: 3500 },
+  comum: { label: 'Comum', color: '#8290a8', weight: 65, duplicateValue: 250 },
+  incomum: { label: 'Incomum', color: '#46b8ff', weight: 30, duplicateValue: 600 },
+  mitica: { label: 'Mítica', color: '#ff4fd8', weight: 5, duplicateValue: 3500 },
 });
 
 export const CARD_DEFS = Object.freeze([
@@ -50,24 +50,31 @@ export function getCard(key) {
   return CARD_DEFS.find(card => card.key === key) ?? null;
 }
 
-export function pickCard() {
-  const total = Object.values(CARD_RARITIES).reduce((sum, rarity) => sum + rarity.weight, 0);
-  let roll = Math.random() * total;
-  let rarity = 'comum';
-  for (const [key, data] of Object.entries(CARD_RARITIES)) {
-    roll -= data.weight;
-    if (roll <= 0) {
-      rarity = key;
-      break;
+export function pickCard(rarityOverride = null, excludedKey = null) {
+  let rarity = rarityOverride;
+  if (!rarity) {
+    const total = Object.values(CARD_RARITIES).reduce((sum, data) => sum + data.weight, 0);
+    let roll = Math.random() * total;
+    rarity = 'comum';
+    for (const [key, data] of Object.entries(CARD_RARITIES)) {
+      roll -= data.weight;
+      if (roll <= 0) {
+        rarity = key;
+        break;
+      }
     }
   }
-  const pool = CARD_DEFS.filter(card => card.rarity === rarity);
+
+  let pool = CARD_DEFS.filter(card => card.rarity === rarity && card.key !== excludedKey);
+  if (!pool.length) pool = CARD_DEFS.filter(card => card.rarity === rarity);
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
 export function pickPackCards() {
   const first = pickCard();
-  const second = Math.random() < CARD_REPEAT_CHANCE ? first : pickCard();
+  const second = Math.random() < CARD_REPEAT_CHANCE
+    ? pickCard(first.rarity, first.key)
+    : pickCard(null, first.key);
   return [first, second];
 }
 
