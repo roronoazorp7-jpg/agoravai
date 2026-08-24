@@ -29,6 +29,7 @@ function packCount(value) {
 
 const packSessions = new Map();
 const dexSessions = new Map();
+const activeDexSessions = new Map();
 const SESSION_TTL = 10 * 60 * 1000;
 const DEX_PAGE_SIZE = 8;
 const SELL_PAGE_SIZE = 25;
@@ -57,20 +58,26 @@ function getPackSession(token) {
 
 function createDexSession({ userId, guildId, page = 0 }) {
   const token = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
-  dexSessions.set(token, {
+  const session = {
     token,
     userId,
     guildId,
     page,
     expiresAt: Date.now() + SESSION_TTL,
-  });
+  };
+  dexSessions.set(token, session);
+  activeDexSessions.set(`${guildId}:${userId}`, token);
   return token;
 }
 
-function getDexSession(token) {
-  const session = dexSessions.get(token);
+function getDexSession(token, userId = null, guildId = null) {
+  let session = dexSessions.get(token);
+  if (!session && userId && guildId) {
+    const activeToken = activeDexSessions.get(`${guildId}:${userId}`);
+    session = activeToken ? dexSessions.get(activeToken) : null;
+  }
   if (!session || session.expiresAt < Date.now()) {
-    dexSessions.delete(token);
+    if (token) dexSessions.delete(token);
     return null;
   }
   session.expiresAt = Date.now() + SESSION_TTL;
@@ -315,7 +322,14 @@ async function sellCards(userId, guildId, cardKey, requestedQuantity = 1) {
   });
 }
 
-async function buildCardDetailPayload({ userId, guildId, card, backCustomId = 'pokemon_collection_open', backLabel = 'Voltar à coleção' }) {
+async function buildCardDetailPayload({
+  userId,
+  guildId,
+  card,
+  backCustomId = 'pokemon_collection_open',
+  backLabel = 'Voltar à coleção',
+  sessionToken = null,
+}) {
   const owned = await prisma.cardCollection.findUnique({
     where: { userId_cardKey: { userId, cardKey: card.key } },
   });
@@ -323,12 +337,16 @@ async function buildCardDetailPayload({ userId, guildId, card, backCustomId = 'p
   const quantity = owned?.quantity ?? 0;
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId(`pokemon_card_sell:${card.key}:1`)
+      .setCustomId(sessionToken
+        ? `pokemon_card_sell:${sessionToken}:${card.key}:1`
+        : `pokemon_card_sell:${card.key}:1`)
       .setLabel(`Vender 1 • ${rarityData(card.rarity).duplicateValue.toLocaleString('pt-BR')} coins`)
       .setStyle(ButtonStyle.Success)
       .setDisabled(quantity < 1),
     new ButtonBuilder()
-      .setCustomId(`pokemon_card_sell:${card.key}:all`)
+      .setCustomId(sessionToken
+        ? `pokemon_card_sell:${sessionToken}:${card.key}:all`
+        : `pokemon_card_sell:${card.key}:all`)
       .setLabel('Vender todas')
       .setStyle(ButtonStyle.Danger)
       .setDisabled(quantity < 1),
@@ -443,7 +461,7 @@ export async function handleCardPackInteraction(interaction) {
 export async function handleCardCollectionInteraction(interaction) {
   const [action, token, value] = interaction.customId.split(':');
   if (action === 'pokemon_dex_card') {
-    const session = getDexSession(token);
+    const session = getDexSession(token, interaction.user.id, interaction.guildId);
     if (!session) return interaction.reply({ content: 'Esta Pokédex expirou. Use `/cartas colecao` novamente.', ephemeral: true });
     if (session.userId !== interaction.user.id) return interaction.reply({ content: 'Esta Pokédex pertence a outra pessoa.', ephemeral: true });
     const card = getCard(interaction.values[0]);
@@ -456,7 +474,7 @@ export async function handleCardCollectionInteraction(interaction) {
     }));
   }
   if (action === 'pokemon_dex_page') {
-    const session = getDexSession(token);
+    const session = getDexSession(token, interaction.user.id, interaction.guildId);
     if (!session) return interaction.reply({ content: 'Esta Pokédex expirou. Use `/cartas colecao` novamente.', ephemeral: true });
     if (session.userId !== interaction.user.id) return interaction.reply({ content: 'Esta Pokédex pertence a outra pessoa.', ephemeral: true });
     session.page = Number(value) || 0;
@@ -464,7 +482,7 @@ export async function handleCardCollectionInteraction(interaction) {
   }
 
   if (action === 'pokemon_vitrine') {
-    const session = getDexSession(token);
+    const session = getDexSession(token, interaction.user.id, interaction.guildId);
     if (!session) return interaction.reply({ content: 'Esta vitrine expirou. Abra `/cartas colecao` novamente.', ephemeral: true });
     if (session.userId !== interaction.user.id) return interaction.reply({ content: 'Esta vitrine pertence a outra pessoa.', ephemeral: true });
     session.collectionPage = session.page;
@@ -473,7 +491,7 @@ export async function handleCardCollectionInteraction(interaction) {
   }
 
   if (action === 'pokemon_sell') {
-    const session = getDexSession(token);
+    const session = getDexSession(token, interaction.user.id, interaction.guildId);
     if (!session) return interaction.reply({ content: 'Esta área expirou. Abra `/cartas colecao` novamente.', ephemeral: true });
     if (session.userId !== interaction.user.id) return interaction.reply({ content: 'Esta área pertence a outra pessoa.', ephemeral: true });
     session.collectionPage = session.page;
@@ -487,7 +505,7 @@ export async function handleCardCollectionInteraction(interaction) {
   }
 
   if (action === 'pokemon_collection_back') {
-    const session = getDexSession(token);
+    const session = getDexSession(token, interaction.user.id, interaction.guildId);
     if (!session) return interaction.reply({ content: 'Esta coleção expirou. Abra `/cartas colecao` novamente.', ephemeral: true });
     if (session.userId !== interaction.user.id) return interaction.reply({ content: 'Esta coleção pertence a outra pessoa.', ephemeral: true });
     session.page = session.collectionPage ?? 0;
@@ -509,7 +527,7 @@ export async function handleCardCollectionInteraction(interaction) {
   }
 
   if (action === 'pokemon_sell_page') {
-    const session = getDexSession(token);
+    const session = getDexSession(token, interaction.user.id, interaction.guildId);
     if (!session) return interaction.reply({ content: 'Esta área expirou. Abra `/cartas colecao` novamente.', ephemeral: true });
     if (session.userId !== interaction.user.id) return interaction.reply({ content: 'Esta área pertence a outra pessoa.', ephemeral: true });
     session.page = Number(value) || 0;
@@ -522,7 +540,7 @@ export async function handleCardCollectionInteraction(interaction) {
   }
 
   if (action === 'pokemon_sell_card') {
-    const session = getDexSession(token);
+    const session = getDexSession(token, interaction.user.id, interaction.guildId);
     if (!session) return interaction.reply({ content: 'Esta área expirou. Abra `/cartas colecao` novamente.', ephemeral: true });
     if (session.userId !== interaction.user.id) return interaction.reply({ content: 'Esta área pertence a outra pessoa.', ephemeral: true });
     const card = getCard(interaction.values[0]);
@@ -533,11 +551,12 @@ export async function handleCardCollectionInteraction(interaction) {
       card,
       backCustomId: `pokemon_sell_page:${token}:${session.page}`,
       backLabel: 'Voltar à venda',
+      sessionToken: token,
     }));
   }
 
   if (action === 'pokemon_vitrine_page') {
-    const session = getDexSession(token);
+    const session = getDexSession(token, interaction.user.id, interaction.guildId);
     if (!session) return interaction.reply({ content: 'Esta vitrine expirou. Abra `/cartas colecao` novamente.', ephemeral: true });
     if (session.userId !== interaction.user.id) return interaction.reply({ content: 'Esta vitrine pertence a outra pessoa.', ephemeral: true });
     session.page = Number(value) || 0;
