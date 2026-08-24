@@ -7,6 +7,11 @@ import { loadImage } from '@napi-rs/canvas';
 const CARD_W = 358;
 const CARD_H = 500;
 const CARDS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '../assets/cards');
+const PACK_COVER_FILE = path.join(CARDS_DIR, 'pokemon-pack-cover.jpg');
+
+export function loadPackCover() {
+  return readFile(PACK_COVER_FILE);
+}
 
 function drawCard(ctx, card, image, x, y, scale = 1) {
   const w = CARD_W * scale;

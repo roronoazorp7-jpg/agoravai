@@ -13,7 +13,7 @@ import {
   getCard,
   pickPackCards,
 } from '../../utils/cardData.js';
-import { generateCardSheet } from '../../utils/cardVisuals.js';
+import { generateCardSheet, loadPackCover } from '../../utils/cardVisuals.js';
 
 function packCount(value) {
   return Math.min(Math.max(Number(value) || 1, 1), 3);
@@ -135,17 +135,21 @@ export default {
       return interaction.editReply(`Você precisa de **${result.total.toLocaleString('pt-BR')} coins**, mas possui **${result.balance.toLocaleString('pt-BR')} coins**.`);
     }
     const image = await generateCardSheet(result.cards);
+    const cover = await loadPackCover();
     const summary = result.cards
       .map(card => `${rarityData(card.rarity).label} — **${card.name}**`)
       .join('\n');
     return interaction.editReply({
       content:
-        `## Pacote Arcana aberto!\n${summary}\n\n` +
+        `## Pack Pokémon aberto!\n${summary}\n\n` +
         (result.duplicates
           ? `♻️ ${result.duplicates} duplicata(s) convertida(s) em **${result.refund.toLocaleString('pt-BR')} coins**.`
           : '✨ Todas as cartas são novas!') +
         `\n💰 Valor pago: **${(CARD_PACK_PRICE * packCount(interaction.options.getInteger('pacotes'))).toLocaleString('pt-BR')} coins**`,
-      files: [new AttachmentBuilder(image, { name: 'pacote-arcana.png' })],
+      files: [
+        new AttachmentBuilder(cover, { name: 'capa-pack-pokemon.jpg' }),
+        new AttachmentBuilder(image, { name: 'cartas-pokemon.png' }),
+      ],
     });
   },
 
@@ -165,10 +169,14 @@ export default {
       const result = await openPacks(message.author.id, message.guildId, count);
       if (!result.ok) return message.reply(`Você precisa de **${result.total.toLocaleString('pt-BR')} coins**, mas possui **${result.balance.toLocaleString('pt-BR')} coins**.`);
       const image = await generateCardSheet(result.cards);
+      const cover = await loadPackCover();
       return message.reply({
-        content: `## Pacote Arcana aberto!\n${result.cards.map(card => `${rarityData(card.rarity).label} — **${card.name}**`).join('\n')}\n\n` +
+        content: `## Pack Pokémon aberto!\n${result.cards.map(card => `${rarityData(card.rarity).label} — **${card.name}**`).join('\n')}\n\n` +
           (result.duplicates ? `♻️ Duplicatas convertidas em **${result.refund.toLocaleString('pt-BR')} coins**.` : '✨ Todas as cartas são novas!'),
-        files: [new AttachmentBuilder(image, { name: 'pacote-arcana.png' })],
+        files: [
+          new AttachmentBuilder(cover, { name: 'capa-pack-pokemon.jpg' }),
+          new AttachmentBuilder(image, { name: 'cartas-pokemon.png' }),
+        ],
       });
     }
     const card = getCard(args[1]);
