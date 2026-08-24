@@ -31,6 +31,7 @@ const packSessions = new Map();
 const dexSessions = new Map();
 const SESSION_TTL = 10 * 60 * 1000;
 const DEX_PAGE_SIZE = 8;
+const SELL_PAGE_SIZE = 25;
 
 function createPackSession({ userId, guildId, count }) {
   const token = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
@@ -180,14 +181,105 @@ async function buildDexPayload({ userId, guildId, token, page }) {
       .setLabel('Próxima página')
       .setStyle(ButtonStyle.Primary)
       .setDisabled(safePage >= totalPages - 1),
+    new ButtonBuilder()
+      .setCustomId(`pokemon_vitrine:${token}:0`)
+      .setLabel('Vitrine')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(`pokemon_sell:${token}:0`)
+      .setLabel('Vender cartas')
+      .setStyle(ButtonStyle.Success),
   );
   return {
     content:
       `## Pokédex Pokémon\n` +
       `**${owned.size}/${CARD_DEFS.length}** cartas descobertas • Página **${safePage + 1}/${totalPages}**\n` +
-      `Cartas bloqueadas aparecem esmaecidas. Use \`/cartas ver\` para abrir uma carta e vendê-la.`,
+      `Cartas bloqueadas aparecem esmaecidas. Use \`/cartas ver\` para abrir uma carta.`,
     files: [new AttachmentBuilder(image, { name: 'pokedex-pokemon.png' })],
     components: [selectRow, navigationRow],
+  };
+}
+
+async function buildSellPayload({ userId, guildId, token, page = 0 }) {
+  const rows = await prisma.cardCollection.findMany({
+    where: { userId, quantity: { gt: 0 } },
+    orderBy: { cardKey: 'asc' },
+  });
+  const ownedCards = rows
+    .map(row => ({ card: getCard(row.cardKey), quantity: row.quantity }))
+    .filter(item => item.card);
+  const totalPages = Math.max(1, Math.ceil(ownedCards.length / SELL_PAGE_SIZE));
+  const safePage = Math.min(Math.max(page, 0), totalPages - 1);
+  const pageCards = ownedCards.slice(safePage * SELL_PAGE_SIZE, (safePage + 1) * SELL_PAGE_SIZE);
+  const container = new ContainerBuilder().addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `## Vender cartas\n\n` +
+      (ownedCards.length
+        ? `Selecione uma carta que você possui. Página **${safePage + 1}/${totalPages}**.`
+        : 'Você ainda não possui cartas para vender.'),
+    ),
+  );
+  const components = [container];
+  if (pageCards.length) {
+    components.push(new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(`pokemon_sell_card:${token}`)
+        .setPlaceholder('Escolha uma carta para vender')
+        .addOptions(pageCards.map(({ card, quantity }) => ({
+          label: card.name.slice(0, 100),
+          description: `${quantity}x • ${rarityData(card.rarity).duplicateValue.toLocaleString('pt-BR')} coins por unidade`,
+          value: card.key,
+        }))),
+    ));
+  }
+  components.push(new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`pokemon_sell_page:${token}:${safePage - 1}`)
+      .setLabel('Página anterior')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(safePage === 0),
+    new ButtonBuilder()
+      .setCustomId(`pokemon_sell_page:${token}:${safePage + 1}`)
+      .setLabel('Próxima página')
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(safePage >= totalPages - 1),
+    new ButtonBuilder()
+      .setCustomId(`pokemon_collection_back:${token}`)
+      .setLabel('Voltar à coleção')
+      .setStyle(ButtonStyle.Secondary),
+  ));
+  return { content: null, components, flags: MessageFlags.IsComponentsV2 };
+}
+
+async function buildShowcasePayload({ token, page = 0 }) {
+  const totalPages = CARD_DEFS.length;
+  const safePage = Math.min(Math.max(page, 0), totalPages - 1);
+  const card = CARD_DEFS[safePage];
+  const image = await generateCardSheet([card]);
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`pokemon_vitrine_page:${token}:${safePage - 1}`)
+      .setLabel('Carta anterior')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(safePage === 0),
+    new ButtonBuilder()
+      .setCustomId(`pokemon_vitrine_page:${token}:${safePage + 1}`)
+      .setLabel('Próxima carta')
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(safePage >= totalPages - 1),
+    new ButtonBuilder()
+      .setCustomId(`pokemon_collection_back:${token}`)
+      .setLabel('Voltar à coleção')
+      .setStyle(ButtonStyle.Secondary),
+  );
+  return {
+    content:
+      `## Vitrine Pokémon\n` +
+      `Carta **${safePage + 1}/${totalPages}**\n\n` +
+      `**${card.name}** — ${rarityData(card.rarity).label}\n` +
+      `${card.element} • ${card.description}`,
+    files: [new AttachmentBuilder(image, { name: 'carta-vitrine.png' })],
+    components: [row],
   };
 }
 
@@ -222,7 +314,7 @@ async function sellCards(userId, guildId, cardKey, requestedQuantity = 1) {
   });
 }
 
-async function buildCardDetailPayload({ userId, guildId, card, token = null }) {
+async function buildCardDetailPayload({ userId, guildId, card, backCustomId = 'pokemon_collection_open', backLabel = 'Voltar à coleção' }) {
   const owned = await prisma.cardCollection.findUnique({
     where: { userId_cardKey: { userId, cardKey: card.key } },
   });
@@ -239,6 +331,10 @@ async function buildCardDetailPayload({ userId, guildId, card, token = null }) {
       .setLabel('Vender todas')
       .setStyle(ButtonStyle.Danger)
       .setDisabled(quantity < 1),
+    new ButtonBuilder()
+      .setCustomId(backCustomId)
+      .setLabel(backLabel)
+      .setStyle(ButtonStyle.Secondary),
   );
   return {
     content:
@@ -355,6 +451,7 @@ export async function handleCardCollectionInteraction(interaction) {
       userId: interaction.user.id,
       guildId: interaction.guildId,
       card,
+      backCustomId: `pokemon_collection_back:${token}`,
     }));
   }
   if (action === 'pokemon_dex_page') {
@@ -363,6 +460,87 @@ export async function handleCardCollectionInteraction(interaction) {
     if (session.userId !== interaction.user.id) return interaction.reply({ content: 'Esta Pokédex pertence a outra pessoa.', ephemeral: true });
     session.page = Number(value) || 0;
     return interaction.update(await buildDexPayload(session));
+  }
+
+  if (action === 'pokemon_vitrine') {
+    const session = getDexSession(token);
+    if (!session) return interaction.reply({ content: 'Esta vitrine expirou. Abra `/cartas colecao` novamente.', ephemeral: true });
+    if (session.userId !== interaction.user.id) return interaction.reply({ content: 'Esta vitrine pertence a outra pessoa.', ephemeral: true });
+    session.collectionPage = session.page;
+    session.page = 0;
+    return interaction.update(await buildShowcasePayload({ token, page: 0 }));
+  }
+
+  if (action === 'pokemon_sell') {
+    const session = getDexSession(token);
+    if (!session) return interaction.reply({ content: 'Esta área expirou. Abra `/cartas colecao` novamente.', ephemeral: true });
+    if (session.userId !== interaction.user.id) return interaction.reply({ content: 'Esta área pertence a outra pessoa.', ephemeral: true });
+    session.collectionPage = session.page;
+    session.page = 0;
+    return interaction.update(await buildSellPayload({
+      userId: session.userId,
+      guildId: session.guildId,
+      token,
+      page: 0,
+    }));
+  }
+
+  if (action === 'pokemon_collection_back') {
+    const session = getDexSession(token);
+    if (!session) return interaction.reply({ content: 'Esta coleção expirou. Abra `/cartas colecao` novamente.', ephemeral: true });
+    if (session.userId !== interaction.user.id) return interaction.reply({ content: 'Esta coleção pertence a outra pessoa.', ephemeral: true });
+    session.page = session.collectionPage ?? 0;
+    return interaction.update(await buildDexPayload(session));
+  }
+
+  if (action === 'pokemon_collection_open') {
+    const newToken = createDexSession({
+      userId: interaction.user.id,
+      guildId: interaction.guildId,
+      page: 0,
+    });
+    return interaction.update(await buildDexPayload({
+      userId: interaction.user.id,
+      guildId: interaction.guildId,
+      token: newToken,
+      page: 0,
+    }));
+  }
+
+  if (action === 'pokemon_sell_page') {
+    const session = getDexSession(token);
+    if (!session) return interaction.reply({ content: 'Esta área expirou. Abra `/cartas colecao` novamente.', ephemeral: true });
+    if (session.userId !== interaction.user.id) return interaction.reply({ content: 'Esta área pertence a outra pessoa.', ephemeral: true });
+    session.page = Number(value) || 0;
+    return interaction.update(await buildSellPayload({
+      userId: session.userId,
+      guildId: session.guildId,
+      token,
+      page: session.page,
+    }));
+  }
+
+  if (action === 'pokemon_sell_card') {
+    const session = getDexSession(token);
+    if (!session) return interaction.reply({ content: 'Esta área expirou. Abra `/cartas colecao` novamente.', ephemeral: true });
+    if (session.userId !== interaction.user.id) return interaction.reply({ content: 'Esta área pertence a outra pessoa.', ephemeral: true });
+    const card = getCard(interaction.values[0]);
+    if (!card) return interaction.reply({ content: 'Carta não encontrada.', ephemeral: true });
+    return interaction.update(await buildCardDetailPayload({
+      userId: interaction.user.id,
+      guildId: interaction.guildId,
+      card,
+      backCustomId: `pokemon_sell_page:${token}:${session.page}`,
+      backLabel: 'Voltar à venda',
+    }));
+  }
+
+  if (action === 'pokemon_vitrine_page') {
+    const session = getDexSession(token);
+    if (!session) return interaction.reply({ content: 'Esta vitrine expirou. Abra `/cartas colecao` novamente.', ephemeral: true });
+    if (session.userId !== interaction.user.id) return interaction.reply({ content: 'Esta vitrine pertence a outra pessoa.', ephemeral: true });
+    session.page = Number(value) || 0;
+    return interaction.update(await buildShowcasePayload({ token, page: session.page }));
   }
 
   if (action === 'pokemon_card_sell') {
@@ -375,6 +553,8 @@ export async function handleCardCollectionInteraction(interaction) {
       userId: interaction.user.id,
       guildId: interaction.guildId,
       card,
+      backCustomId: `pokemon_sell_page:${token}:0`,
+      backLabel: 'Voltar à venda',
     })).then(async () => {
       await interaction.followUp({
         content: `Você vendeu **${result.sold}x ${card.name}** por **${result.value.toLocaleString('pt-BR')} coins**.`,

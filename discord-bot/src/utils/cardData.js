@@ -3,9 +3,9 @@ export const CARD_PACK_SIZE = 2;
 export const CARD_REPEAT_CHANCE = 0.45;
 
 export const CARD_RARITIES = Object.freeze({
-  comum: { label: 'Comum', color: '#8290a8', weight: 65, duplicateValue: 250 },
+  comum: { label: 'Comum', color: '#8290a8', weight: 69, duplicateValue: 250 },
   incomum: { label: 'Incomum', color: '#46b8ff', weight: 30, duplicateValue: 600 },
-  mitica: { label: 'Mítica', color: '#ff4fd8', weight: 5, duplicateValue: 3500 },
+  mitica: { label: 'Mítica', color: '#ff4fd8', weight: 1, duplicateValue: 3500 },
 });
 
 export const CARD_DEFS = Object.freeze([

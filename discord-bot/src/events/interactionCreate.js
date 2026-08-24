@@ -555,6 +555,9 @@ export default {
         if (interaction.customId.startsWith('pokemon_dex_card:')) {
           return handleCardCollectionInteraction(interaction);
         }
+        if (interaction.customId.startsWith('pokemon_sell_card:')) {
+          return handleCardCollectionInteraction(interaction);
+        }
 
         if (
           interaction.customId === 'fish_rod_select' ||
@@ -1121,7 +1124,13 @@ export default {
         if (customId.startsWith('pokemon_pack_')) {
           return handleCardPackInteraction(interaction);
         }
-        if (customId.startsWith('pokemon_dex_') || customId.startsWith('pokemon_card_')) {
+        if (
+          customId.startsWith('pokemon_dex_') ||
+          customId.startsWith('pokemon_card_') ||
+          customId.startsWith('pokemon_collection_') ||
+          customId.startsWith('pokemon_sell_') ||
+          customId.startsWith('pokemon_vitrine')
+        ) {
           return handleCardCollectionInteraction(interaction);
         }
 
