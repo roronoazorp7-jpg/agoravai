@@ -95,6 +95,10 @@ model GuildConfig {
   instaEmoji   String  @default("💜")
   instaHandle  String?
 
+  bumpEnabled  Boolean  @default(false)
+  bumpChannel  String?
+  bumpNextAt   DateTime?
+
   tellonymChannel  String?
   tellonymColor    String?
   tellonymBanner   String?

@@ -26,6 +26,7 @@ import {
 } from '../utils/aiManager.js';
 import { clearAfkOnMessage, handleAfkMessage } from '../commands/general/afk.js';
 import { enforceAntiLink } from '../utils/antiLink.js';
+import { DISBOARD_BOT_ID, handleDisboardBump } from '../utils/bumpReminder.js';
 
 const PREFIXES = ['savage ', 's '];
 
@@ -315,7 +316,10 @@ export default {
   once: false,
 
   async execute(message, client) {
-    if (message.author.bot) return;
+    if (message.author.bot) {
+      if (message.author.id === DISBOARD_BOT_ID) await handleDisboardBump(message);
+      return;
+    }
 
     if (message.guildId) {
       const isAfkCommand = /^(?:savage\s+afk|s\s+afk|safk)(?:\s|$)/i.test(message.content);

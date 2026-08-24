@@ -91,6 +91,8 @@ import {
   handlePainelModuleModal,
   handleBoostCfgRoleSelect,
   handleBoostCfgBtn,
+  handleBumpCfgBtn,
+  handleBumpCfgChannelSelect,
 } from '../utils/painelHandlers.js';
 
 const tellonymSessions = new Map();
@@ -612,6 +614,10 @@ export default {
       // ── CHANNEL SELECT MENUS ───────────────────────────────────────────────
       if (interaction.isChannelSelectMenu()) {
         const channelId = interaction.values[0];
+
+        if (interaction.customId === 'bump_channel_select') {
+          return handleBumpCfgChannelSelect(interaction);
+        }
 
         if (interaction.customId === 'chansel_wc') {
           await prisma.guildConfig.upsert({
@@ -1293,6 +1299,10 @@ export default {
         // ── PAINEL CENTRAL: Botões "Configurar" de cada módulo ───────────
         if (customId.startsWith('painel_cfg_')) {
           return handlePainelCfgBtn(interaction);
+        }
+
+        if (customId === 'bump_toggle' || customId === 'bump_channel_clear') {
+          return handleBumpCfgBtn(interaction);
         }
 
         if (customId.startsWith('antilink_')) {

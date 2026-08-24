@@ -124,6 +124,23 @@ export async function ensureMarriageSchema() {
     CREATE INDEX IF NOT EXISTS "CardCollection_userId_idx"
       ON "CardCollection" ("userId")
   `);
+  await prisma.$executeRawUnsafe(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'GuildConfig'
+      ) THEN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'GuildConfig' AND column_name = 'bumpEnabled')
+          THEN ALTER TABLE "GuildConfig" ADD COLUMN "bumpEnabled" BOOLEAN NOT NULL DEFAULT false; END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'GuildConfig' AND column_name = 'bumpChannel')
+          THEN ALTER TABLE "GuildConfig" ADD COLUMN "bumpChannel" TEXT; END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'GuildConfig' AND column_name = 'bumpNextAt')
+          THEN ALTER TABLE "GuildConfig" ADD COLUMN "bumpNextAt" TIMESTAMP(3); END IF;
+      END IF;
+    END
+    $$;
+  `);
 }
 
 export default prisma;

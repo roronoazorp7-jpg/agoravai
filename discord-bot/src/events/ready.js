@@ -3,6 +3,7 @@ import { registerSlashCommands } from '../utils/loader.js';
 import { initEmojis } from '../utils/emojiManager.js';
 import prisma from '../database/client.js';
 import { startDeathEventScheduler } from '../utils/deathEvent.js';
+import { startBumpReminderScheduler } from '../utils/bumpReminder.js';
 
 // ─── VIP expirado ─────────────────────────────────────────────────────────────
 
@@ -50,6 +51,7 @@ export default {
     await checkExpiredVips(client);
     setInterval(() => checkExpiredVips(client), 5 * 60 * 1000);
     startDeathEventScheduler(client);
+    startBumpReminderScheduler(client);
 
     // Registro de comandos e emojis em background (não bloqueia o monitor)
     Promise.all([

@@ -2,6 +2,7 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ChannelSelectMenuBuilder,
   RoleSelectMenuBuilder,
   ContainerBuilder,
   TextDisplayBuilder,
@@ -137,6 +138,7 @@ export function buildPainelFuncoes(guild, cfg) {
   const parceiraOk   = !!(cfg.partnerEnabled && cfg.partnerChannel);
   const antiLinkOk   = !!cfg.antiLinkEnabled;
   const boostOk      = !!cfg.boostRoles;
+  const bumpOk       = !!(cfg.bumpEnabled && cfg.bumpChannel);
 
   const c = new ContainerBuilder();
 
@@ -181,15 +183,76 @@ export function buildPainelFuncoes(guild, cfg) {
 
   c.addTextDisplayComponents(new TextDisplayBuilder().setContent([
     '**Ferramentas & Segurança**',
-    `${D(antiLinkOk)} Anti-Link Avançado`,
-    'Status do bot e proteção contra links indesejados.',
+    `${D(antiLinkOk)} Anti-Link Avançado · ${D(bumpOk)} Bump Reminder`,
+    'Status do bot, proteção contra links e lembretes automáticos do DISBOARD.',
   ].join('\n')));
   c.addActionRowComponents(new ActionRowBuilder().addComponents(
     moduleBtn('painel_cfg_status', 'Status'),
     moduleBtn('painel_cfg_antilink', 'Anti-Link'),
+    moduleBtn('painel_cfg_bump', 'Bump Reminder'),
   ));
 
   return { components: [c, voltarRow()], flags: MessageFlags.IsComponentsV2 };
+}
+
+export function buildBumpConfigPayload(cfg) {
+  const c = new ContainerBuilder()
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent([
+      `${D(cfg.bumpEnabled && cfg.bumpChannel)} **Bump Reminder** — ${cfg.bumpEnabled ? 'ATIVO' : 'DESATIVADO'}`,
+      '',
+      'O bot reconhece a confirmação do DISBOARD e avisa quando o próximo bump estiver liberado.',
+      `**Canal:** ${cfg.bumpChannel ? `<#${cfg.bumpChannel}>` : 'não configurado'}`,
+      `**Próximo bump:** ${cfg.bumpNextAt ? `<t:${Math.floor(new Date(cfg.bumpNextAt).getTime() / 1000)}:R>` : 'aguardando um bump'}`,
+    ].join('\n')))
+    .addActionRowComponents(new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('bump_toggle')
+        .setLabel(cfg.bumpEnabled ? 'Desativar lembrete' : 'Ativar lembrete')
+        .setStyle(cfg.bumpEnabled ? ButtonStyle.Danger : ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId('bump_channel_clear')
+        .setLabel('Limpar canal')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(!cfg.bumpChannel),
+    ))
+    .addActionRowComponents(new ActionRowBuilder().addComponents(
+      new ChannelSelectMenuBuilder()
+        .setCustomId('bump_channel_select')
+        .setPlaceholder('Escolha o canal dos lembretes')
+        .setChannelTypes(0),
+    ));
+  return { components: [c, voltarRow()], flags: MessageFlags.IsComponentsV2 };
+}
+
+export async function handleBumpCfgChannelSelect(interaction) {
+  if (!interaction.memberPermissions?.has(0x20n)) {
+    return interaction.reply({ content: '❌ Sem permissão.', flags: 64 });
+  }
+  await prisma.guildConfig.upsert({
+    where: { guildId: interaction.guildId },
+    create: { guildId: interaction.guildId, bumpChannel: interaction.values[0] },
+    update: { bumpChannel: interaction.values[0] },
+  });
+  return interaction.update(buildBumpConfigPayload(await getCfg(interaction.guildId)));
+}
+
+export async function handleBumpCfgBtn(interaction) {
+  if (!interaction.memberPermissions?.has(0x20n)) {
+    return interaction.reply({ content: '❌ Sem permissão.', flags: 64 });
+  }
+  const cfg = await getCfg(interaction.guildId);
+  if (interaction.customId === 'bump_toggle') {
+    await prisma.guildConfig.update({
+      where: { guildId: interaction.guildId },
+      data: { bumpEnabled: !cfg.bumpEnabled },
+    });
+  } else if (interaction.customId === 'bump_channel_clear') {
+    await prisma.guildConfig.update({
+      where: { guildId: interaction.guildId },
+      data: { bumpChannel: null, bumpNextAt: null },
+    });
+  }
+  return interaction.update(buildBumpConfigPayload(await getCfg(interaction.guildId)));
 }
 
 // ─── Mini-config do Instagram (abre pelo painel) ──────────────────────────────
@@ -514,6 +577,9 @@ export async function handlePainelCfgBtn(interaction) {
       break;
     case 'antilink':
       payload = buildAntiLinkConfigPayload(cfg);
+      break;
+    case 'bump':
+      payload = buildBumpConfigPayload(cfg);
       break;
     default:
       return interaction.reply({ content: '❌ Módulo desconhecido.', flags: 64 });
