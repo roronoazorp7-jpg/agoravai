@@ -459,7 +459,7 @@ export async function handleCardPackInteraction(interaction) {
 }
 
 export async function handleCardCollectionInteraction(interaction) {
-  const [action, token, value] = interaction.customId.split(':');
+  const [action, token, value, quantity] = interaction.customId.split(':');
   if (action === 'pokemon_dex_card') {
     const session = getDexSession(token, interaction.user.id, interaction.guildId);
     if (!session) return interaction.reply({ content: 'Esta Pokédex expirou. Use `/cartas colecao` novamente.', ephemeral: true });
@@ -470,7 +470,7 @@ export async function handleCardCollectionInteraction(interaction) {
       userId: interaction.user.id,
       guildId: interaction.guildId,
       card,
-      backCustomId: `pokemon_collection_back:${token}`,
+      backCustomId: `pokemon_collection_back:${session.token}`,
     }));
   }
   if (action === 'pokemon_dex_page') {
@@ -487,7 +487,7 @@ export async function handleCardCollectionInteraction(interaction) {
     if (session.userId !== interaction.user.id) return interaction.reply({ content: 'Esta vitrine pertence a outra pessoa.', ephemeral: true });
     session.collectionPage = session.page;
     session.page = 0;
-    return interaction.update(await buildShowcasePayload({ token, page: 0 }));
+    return interaction.update(await buildShowcasePayload({ token: session.token, page: 0 }));
   }
 
   if (action === 'pokemon_sell') {
@@ -499,7 +499,7 @@ export async function handleCardCollectionInteraction(interaction) {
     return interaction.update(await buildSellPayload({
       userId: session.userId,
       guildId: session.guildId,
-      token,
+      token: session.token,
       page: 0,
     }));
   }
@@ -534,7 +534,7 @@ export async function handleCardCollectionInteraction(interaction) {
     return interaction.update(await buildSellPayload({
       userId: session.userId,
       guildId: session.guildId,
-      token,
+      token: session.token,
       page: session.page,
     }));
   }
@@ -549,9 +549,9 @@ export async function handleCardCollectionInteraction(interaction) {
       userId: interaction.user.id,
       guildId: interaction.guildId,
       card,
-      backCustomId: `pokemon_sell_page:${token}:${session.page}`,
+      backCustomId: `pokemon_sell_page:${session.token}:${session.page}`,
       backLabel: 'Voltar à venda',
-      sessionToken: token,
+      sessionToken: session.token,
     }));
   }
 
@@ -560,21 +560,31 @@ export async function handleCardCollectionInteraction(interaction) {
     if (!session) return interaction.reply({ content: 'Esta vitrine expirou. Abra `/cartas colecao` novamente.', ephemeral: true });
     if (session.userId !== interaction.user.id) return interaction.reply({ content: 'Esta vitrine pertence a outra pessoa.', ephemeral: true });
     session.page = Number(value) || 0;
-    return interaction.update(await buildShowcasePayload({ token, page: session.page }));
+    return interaction.update(await buildShowcasePayload({ token: session.token, page: session.page }));
   }
 
   if (action === 'pokemon_card_sell') {
-    const card = getCard(token);
+    const hasSessionToken = quantity !== undefined;
+    const sessionToken = hasSessionToken ? token : null;
+    const cardKey = hasSessionToken ? value : token;
+    const sellQuantity = hasSessionToken ? quantity : value;
+    const session = sessionToken
+      ? getDexSession(sessionToken, interaction.user.id, interaction.guildId)
+      : null;
+    const card = getCard(cardKey);
     if (!card) return interaction.reply({ content: 'Carta não encontrada.', ephemeral: true });
     if (interaction.guildId == null) return interaction.reply({ content: 'A venda de cartas só funciona dentro de um servidor.', ephemeral: true });
-    const result = await sellCards(interaction.user.id, interaction.guildId, card.key, value);
+    const result = await sellCards(interaction.user.id, interaction.guildId, card.key, sellQuantity);
     if (!result.ok) return interaction.reply({ content: result.reason, ephemeral: true });
     return interaction.update(await buildCardDetailPayload({
       userId: interaction.user.id,
       guildId: interaction.guildId,
       card,
-      backCustomId: `pokemon_sell_page:${token}:0`,
-      backLabel: 'Voltar à venda',
+      backCustomId: session
+        ? `pokemon_sell_page:${session.token}:${session.page}`
+        : 'pokemon_collection_open',
+      backLabel: session ? 'Voltar à venda' : 'Voltar à coleção',
+      sessionToken: session?.token ?? null,
     })).then(async () => {
       await interaction.followUp({
         content: `Você vendeu **${result.sold}x ${card.name}** por **${result.value.toLocaleString('pt-BR')} coins**.`,
