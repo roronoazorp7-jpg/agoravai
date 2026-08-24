@@ -58,6 +58,7 @@ function getPackSession(token) {
 function createDexSession({ userId, guildId, page = 0 }) {
   const token = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
   dexSessions.set(token, {
+    token,
     userId,
     guildId,
     page,
