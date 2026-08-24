@@ -11,7 +11,7 @@ import {
   CARD_PACK_SIZE,
   rarityData,
   getCard,
-  pickCard,
+  pickPackCards,
 } from '../../utils/cardData.js';
 import { generateCardSheet } from '../../utils/cardVisuals.js';
 
@@ -39,7 +39,7 @@ function collectionText(rows) {
 
 async function openPacks(userId, guildId, count) {
   const total = CARD_PACK_PRICE * count;
-  const cards = Array.from({ length: CARD_PACK_SIZE * count }, pickCard);
+  const cards = Array.from({ length: count }, () => pickPackCards()).flat();
   return prisma.$transaction(async tx => {
     const eco = await getEco(userId, guildId, tx);
     if (totalCoins(eco) < total) return { ok: false, balance: totalCoins(eco), total };
@@ -79,7 +79,7 @@ export default {
     .setDescription('Colecione cartas originais de anime e fantasia')
     .addSubcommand(sub => sub
       .setName('abrir')
-      .setDescription(`Abra um pacote de ${CARD_PACK_SIZE} cartas por ${CARD_PACK_PRICE} coins`)
+      .setDescription(`Abra um pacote com ${CARD_PACK_SIZE} cartas por ${CARD_PACK_PRICE} coins`)
       .addIntegerOption(option => option
         .setName('pacotes')
         .setDescription('Quantidade de pacotes (máximo 3)')

@@ -1,33 +1,33 @@
 export const CARD_PACK_PRICE = 2500;
-export const CARD_PACK_SIZE = 3;
+export const CARD_PACK_SIZE = 2;
+export const CARD_REPEAT_CHANCE = 0.78;
 
 export const CARD_RARITIES = Object.freeze({
-  comum: { label: 'Comum', color: '#8290a8', weight: 55, duplicateValue: 250 },
-  rara: { label: 'Rara', color: '#46b8ff', weight: 28, duplicateValue: 600 },
-  epica: { label: 'Épica', color: '#b16cff', weight: 13, duplicateValue: 1400 },
-  lendaria: { label: 'Lendária', color: '#ffbd4a', weight: 4, duplicateValue: 3500 },
+  comum: { label: 'Comum', color: '#8290a8', weight: 44, duplicateValue: 250 },
+  rara: { label: 'Rara', color: '#46b8ff', weight: 32, duplicateValue: 600 },
+  epica: { label: 'Épica', color: '#b16cff', weight: 18, duplicateValue: 1400 },
+  lendaria: { label: 'Lendária', color: '#ffbd4a', weight: 6, duplicateValue: 3500 },
 });
 
 export const CARD_DEFS = Object.freeze([
-  { key: 'aiko-lua-partida', name: 'Aiko, Lua Partida', rarity: 'comum', element: 'Lua', symbol: '☾', description: 'Uma espadachim que protege aldeias sob eclipses.' },
-  { key: 'ren-vento-errante', name: 'Ren, Vento Errante', rarity: 'comum', element: 'Ar', symbol: '✦', description: 'Corre mais rápido que as folhas no alto da montanha.' },
-  { key: 'mio-jardim-estelar', name: 'Mio, Jardim Estelar', rarity: 'comum', element: 'Éter', symbol: '✿', description: 'Cultiva pequenas constelações em vasos de cristal.' },
-  { key: 'kael-forja-rubra', name: 'Kael, Forja Rubra', rarity: 'comum', element: 'Fogo', symbol: '♢', description: 'Um ferreiro jovem com chamas nas mãos.' },
-  { key: 'sora-guardia-mar', name: 'Sora, Guardiã do Mar', rarity: 'comum', element: 'Água', symbol: '≈', description: 'Escuta os segredos que dormem no fundo do oceano.' },
-  { key: 'yuna-feitico-azul', name: 'Yuna, Feitiço Azul', rarity: 'rara', element: 'Arcano', symbol: '◇', description: 'Cada palavra sua desenha um novo círculo mágico.' },
-  { key: 'taro-lobo-celeste', name: 'Taro, Lobo Celeste', rarity: 'rara', element: 'Luz', symbol: '☼', description: 'Uiva para estrelas que ninguém mais consegue ver.' },
-  { key: 'mei-oraculo-vidro', name: 'Mei, Oráculo de Vidro', rarity: 'rara', element: 'Destino', symbol: '◈', description: 'Enxerga futuros possíveis em gotas de chuva.' },
-  { key: 'rin-arqueira-nevoa', name: 'Rin, Arqueira da Névoa', rarity: 'rara', element: 'Névoa', symbol: '➶', description: 'Nunca erra um alvo que ainda não foi encontrado.' },
-  { key: 'hiro-coroa-trovao', name: 'Hiro, Coroa do Trovão', rarity: 'epica', element: 'Raio', symbol: '⚡', description: 'Um príncipe exilado que comanda tempestades.' },
-  { key: 'lumi-raposa-sete-caudas', name: 'Lumi, Raposa das Sete Caudas', rarity: 'epica', element: 'Ilusão', symbol: '✧', description: 'Seus truques confundem até os próprios sonhos.' },
-  { key: 'nox-cavaleiro-vazio', name: 'Nox, Cavaleiro do Vazio', rarity: 'epica', element: 'Sombra', symbol: '✠', description: 'Vigia a fronteira entre o mundo e o nada.' },
-  { key: 'eira-dragao-neve', name: 'Eira, Dragão da Neve', rarity: 'epica', element: 'Gelo', symbol: '❄', description: 'Seu sopro congela rios e preserva memórias.' },
-  { key: 'astra-deusa-aurora', name: 'Astra, Deusa da Aurora', rarity: 'lendaria', element: 'Aurora', symbol: '✹', description: 'A primeira luz de cada era nasce em seus olhos.' },
-  { key: 'zephiel-rei-sem-nome', name: 'Zephiel, Rei sem Nome', rarity: 'lendaria', element: 'Éter', symbol: '♛', description: 'Abandonou o trono para escrever seu próprio destino.' },
-  { key: 'seraphine-estrela-caida', name: 'Seraphine, Estrela Caída', rarity: 'lendaria', element: 'Cosmos', symbol: '✪', description: 'Uma viajante celestial que carrega um céu inteiro.' },
+  { key: 'mega-charizard-x-ex', name: 'Mega Charizard X ex', rarity: 'lendaria', element: 'Fogo', description: 'A força explosiva da mega evolução.' },
+  { key: 'mew-vmax', name: 'Mew VMAX', rarity: 'lendaria', element: 'Psíquico', description: 'Uma carta rara de fusão com poder ilimitado.' },
+  { key: 'pikachu-ex', name: 'Pikachu ex', rarity: 'epica', element: 'Raio', description: 'Energia elétrica concentrada em um ataque decisivo.' },
+  { key: 'eevee', name: 'Eevee', rarity: 'rara', element: 'Incolor', description: 'Um Pokémon adaptável pronto para qualquer evolução.' },
+  { key: 'pokemon-05', name: 'Pokémon 05', rarity: 'rara', element: 'Incolor', description: 'Uma carta especial da coleção Pokémon.' },
+  { key: 'pokemon-06', name: 'Pokémon 06', rarity: 'rara', element: 'Incolor', description: 'Uma carta especial da coleção Pokémon.' },
+  { key: 'pokemon-07', name: 'Pokémon 07', rarity: 'comum', element: 'Incolor', description: 'Uma carta da coleção Pokémon.' },
+  { key: 'pokemon-08', name: 'Pokémon 08', rarity: 'comum', element: 'Incolor', description: 'Uma carta da coleção Pokémon.' },
+  { key: 'pokemon-09', name: 'Pokémon 09', rarity: 'comum', element: 'Incolor', description: 'Uma carta da coleção Pokémon.' },
+  { key: 'pokemon-10', name: 'Pokémon 10', rarity: 'comum', element: 'Incolor', description: 'Uma carta da coleção Pokémon.' },
+  { key: 'pokemon-11', name: 'Pokémon 11', rarity: 'comum', element: 'Incolor', description: 'Uma carta da coleção Pokémon.' },
+  { key: 'pokemon-12', name: 'Pokémon 12', rarity: 'rara', element: 'Incolor', description: 'Uma carta especial da coleção Pokémon.' },
+  { key: 'pokemon-13', name: 'Pokémon 13', rarity: 'epica', element: 'Incolor', description: 'Uma carta holográfica da coleção Pokémon.' },
+  { key: 'pokemon-14', name: 'Pokémon 14', rarity: 'epica', element: 'Incolor', description: 'Uma carta holográfica da coleção Pokémon.' },
+  { key: 'pokemon-15', name: 'Pokémon 15', rarity: 'rara', element: 'Incolor', description: 'Uma carta especial da coleção Pokémon.' },
 ].map((card, index) => ({
   ...card,
-  artFile: `arcana-${String((index % 3) + 1).padStart(2, '0')}.jpg`,
+  artFile: `pokemon-${String(index + 1).padStart(2, '0')}.${index < 5 ? 'webp' : 'jpg'}`,
 })));
 
 export function getCard(key) {
@@ -47,6 +47,12 @@ export function pickCard() {
   }
   const pool = CARD_DEFS.filter(card => card.rarity === rarity);
   return pool[Math.floor(Math.random() * pool.length)];
+}
+
+export function pickPackCards() {
+  const first = pickCard();
+  const second = Math.random() < CARD_REPEAT_CHANCE ? first : pickCard();
+  return [first, second];
 }
 
 export function rarityData(rarity) {
