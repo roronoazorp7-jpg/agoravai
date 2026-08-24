@@ -25,7 +25,10 @@ export const CARD_DEFS = Object.freeze([
   { key: 'astra-deusa-aurora', name: 'Astra, Deusa da Aurora', rarity: 'lendaria', element: 'Aurora', symbol: '✹', description: 'A primeira luz de cada era nasce em seus olhos.' },
   { key: 'zephiel-rei-sem-nome', name: 'Zephiel, Rei sem Nome', rarity: 'lendaria', element: 'Éter', symbol: '♛', description: 'Abandonou o trono para escrever seu próprio destino.' },
   { key: 'seraphine-estrela-caida', name: 'Seraphine, Estrela Caída', rarity: 'lendaria', element: 'Cosmos', symbol: '✪', description: 'Uma viajante celestial que carrega um céu inteiro.' },
-]);
+].map((card, index) => ({
+  ...card,
+  artFile: `arcana-${String((index % 3) + 1).padStart(2, '0')}.jpg`,
+})));
 
 export function getCard(key) {
   return CARD_DEFS.find(card => card.key === key) ?? null;

@@ -1,4 +1,7 @@
 import { createCanvas } from '@napi-rs/canvas';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { loadImage } from '@napi-rs/canvas';
 import { rarityData } from './cardData.js';
 
 const CARD_W = 360;
@@ -14,7 +17,7 @@ function roundRect(ctx, x, y, w, h, radius) {
   ctx.closePath();
 }
 
-function drawCard(ctx, card, x, y, scale = 1) {
+function drawCard(ctx, card, image, x, y, scale = 1) {
   const rarity = rarityData(card.rarity);
   const w = CARD_W * scale;
   const h = CARD_H * scale;
@@ -31,6 +34,34 @@ function drawCard(ctx, card, x, y, scale = 1) {
   ctx.strokeStyle = rarity.color;
   ctx.lineWidth = 5 * scale;
   ctx.stroke();
+
+  const artX = 18 * scale;
+  const artY = 52 * scale;
+  const artW = w - 36 * scale;
+  const artH = 225 * scale;
+  ctx.save();
+  roundRect(ctx, artX, artY, artW, artH, 18 * scale);
+  ctx.clip();
+  const imageRatio = image.width / image.height;
+  const boxRatio = artW / artH;
+  let drawW = artW;
+  let drawH = artH;
+  let drawX = artX;
+  let drawY = artY;
+  if (imageRatio > boxRatio) {
+    drawW = artH * imageRatio;
+    drawX = artX - (drawW - artW) / 2;
+  } else {
+    drawH = artW / imageRatio;
+    drawY = artY - (drawH - artH) / 2;
+  }
+  ctx.drawImage(image, drawX, drawY, drawW, drawH);
+  const artShade = ctx.createLinearGradient(0, artY, 0, artY + artH);
+  artShade.addColorStop(0, 'rgba(8, 8, 20, 0.05)');
+  artShade.addColorStop(1, 'rgba(8, 8, 20, 0.72)');
+  ctx.fillStyle = artShade;
+  ctx.fillRect(artX, artY, artW, artH);
+  ctx.restore();
 
   ctx.globalAlpha = 0.18;
   ctx.strokeStyle = '#ffffff';
@@ -51,21 +82,14 @@ function drawCard(ctx, card, x, y, scale = 1) {
   ctx.fillText(card.element, w - 22 * scale, 34 * scale);
   ctx.textAlign = 'center';
 
-  ctx.fillStyle = rarity.color;
-  ctx.shadowColor = rarity.color;
-  ctx.shadowBlur = 28 * scale;
-  ctx.font = `${150 * scale}px Arial`;
-  ctx.fillText(card.symbol, w / 2, 240 * scale);
-  ctx.shadowBlur = 0;
-
   ctx.fillStyle = '#ffffff';
-  ctx.font = `bold ${22 * scale}px Arial`;
-  ctx.fillText(card.name, w / 2, 325 * scale);
+  ctx.font = `bold ${20 * scale}px Arial`;
+  ctx.fillText(card.name, w / 2, 320 * scale);
   ctx.fillStyle = '#d9d4f0';
-  ctx.font = `${15 * scale}px Arial`;
+  ctx.font = `${14 * scale}px Arial`;
   const words = card.description.split(' ');
   let line = '';
-  let lineY = 365 * scale;
+  let lineY = 356 * scale;
   for (const word of words) {
     const test = line ? `${line} ${word}` : word;
     if (ctx.measureText(test).width > w - 44 * scale && line) {
@@ -96,6 +120,16 @@ export async function generateCardSheet(cards) {
   background.addColorStop(1, '#20183b');
   ctx.fillStyle = background;
   ctx.fillRect(0, 0, width, height);
-  cards.forEach((card, index) => drawCard(ctx, card, gap + index * (CARD_W + gap), gap));
+  const images = await Promise.all(cards.map(async card => {
+    const file = path.join(process.cwd(), 'src/assets/cards', card.artFile);
+    return loadImage(await readFile(file));
+  }));
+  cards.forEach((card, index) => drawCard(
+    ctx,
+    card,
+    images[index],
+    gap + index * (CARD_W + gap),
+    gap,
+  ));
   return canvas.toBuffer('image/png');
 }
