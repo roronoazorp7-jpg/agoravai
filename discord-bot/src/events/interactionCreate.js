@@ -45,7 +45,7 @@ import { handlePetButton } from '../commands/general/pet.js';
 import { handleModerationButton } from '../commands/admin/moderacao.js';
 import { handleVipButton, handleVipConfigModal } from '../commands/loja/vip.js';
 import { handleFishingInteraction } from '../commands/economia/pescaria.js';
-import { handleCardPackInteraction } from '../commands/general/cartas.js';
+import { handleCardPackInteraction, handleCardCollectionInteraction } from '../commands/general/cartas.js';
 import { handleBJHit, handleBJStand, handleMinesCell, handleMinesCashout } from '../utils/gameHandlers.js';
 import { handleAjudaCatSel } from '../commands/general/ajuda.js';
 import { radioSessions, createRadioSession } from '../utils/radioManager.js';
@@ -550,6 +550,10 @@ export default {
 
       // ── STRING SELECT MENUS ────────────────────────────────────────────────
       if (interaction.isStringSelectMenu()) {
+        if (interaction.customId.startsWith('pokemon_dex_card:')) {
+          return handleCardCollectionInteraction(interaction);
+        }
+
         if (
           interaction.customId === 'fish_rod_select' ||
           interaction.customId === 'fish_sell_select' ||
@@ -1110,6 +1114,9 @@ export default {
         // ── PACK POKÉMON: abertura carta por carta ─────────────────────────
         if (customId.startsWith('pokemon_pack_')) {
           return handleCardPackInteraction(interaction);
+        }
+        if (customId.startsWith('pokemon_dex_') || customId.startsWith('pokemon_card_')) {
+          return handleCardCollectionInteraction(interaction);
         }
 
         // ── MODERAÇÃO: confirmações de ban, kick e mute ────────────────────

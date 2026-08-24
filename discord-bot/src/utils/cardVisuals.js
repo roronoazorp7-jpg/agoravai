@@ -44,8 +44,8 @@ export async function generateCardSheet(cards) {
   return canvas.toBuffer('image/png');
 }
 
-export async function generatePokedexSheet(cards, ownedKeys) {
-  const columns = 5;
+export async function generatePokedexSheet(cards, ownedKeys, options = {}) {
+  const columns = options.columns ?? 5;
   const gap = 18;
   const cardWidth = 220;
   const cardHeight = Math.round(CARD_H * (cardWidth / CARD_W));

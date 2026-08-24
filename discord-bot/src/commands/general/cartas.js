@@ -1,10 +1,10 @@
 import {
   SlashCommandBuilder,
   AttachmentBuilder,
-  EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  StringSelectMenuBuilder,
   ContainerBuilder,
   TextDisplayBuilder,
   MediaGalleryBuilder,
@@ -28,7 +28,9 @@ function packCount(value) {
 }
 
 const packSessions = new Map();
+const dexSessions = new Map();
 const SESSION_TTL = 10 * 60 * 1000;
+const DEX_PAGE_SIZE = 8;
 
 function createPackSession({ userId, guildId, count }) {
   const token = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
@@ -49,6 +51,27 @@ function getPackSession(token) {
     packSessions.delete(token);
     return null;
   }
+  return session;
+}
+
+function createDexSession({ userId, guildId, page = 0 }) {
+  const token = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+  dexSessions.set(token, {
+    userId,
+    guildId,
+    page,
+    expiresAt: Date.now() + SESSION_TTL,
+  });
+  return token;
+}
+
+function getDexSession(token) {
+  const session = dexSessions.get(token);
+  if (!session || session.expiresAt < Date.now()) {
+    dexSessions.delete(token);
+    return null;
+  }
+  session.expiresAt = Date.now() + SESSION_TTL;
   return session;
 }
 
@@ -129,14 +152,102 @@ async function getEco(userId, guildId, db = prisma) {
   });
 }
 
-function collectionText(rows) {
+async function buildDexPayload({ userId, guildId, token, page }) {
+  const rows = await prisma.cardCollection.findMany({ where: { userId } });
   const owned = new Map(rows.map(row => [row.cardKey, row.quantity]));
-  const lines = CARD_DEFS.map(card => {
-    const quantity = owned.get(card.key) ?? 0;
-    const rarity = rarityData(card.rarity);
-    return `${quantity ? '▣' : '▫'} **${card.name}** — ${rarity.label}${quantity ? ` ×${quantity}` : ''}`;
+  const totalPages = Math.max(1, Math.ceil(CARD_DEFS.length / DEX_PAGE_SIZE));
+  const safePage = Math.min(Math.max(page, 0), totalPages - 1);
+  const pageCards = CARD_DEFS.slice(safePage * DEX_PAGE_SIZE, (safePage + 1) * DEX_PAGE_SIZE);
+  const image = await generatePokedexSheet(pageCards, new Set(owned.keys()), { columns: 4 });
+  const selectRow = new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId(`pokemon_dex_card:${token}`)
+      .setPlaceholder('Escolha uma carta para ver e vender')
+      .addOptions(pageCards.map(card => ({
+        label: card.name.slice(0, 100),
+        description: `${rarityData(card.rarity).label}${owned.has(card.key) ? ` • possui ${owned.get(card.key)}x` : ' • não descoberta'}`,
+        value: card.key,
+      }))),
+  );
+  const navigationRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`pokemon_dex_page:${token}:${safePage - 1}`)
+      .setLabel('Página anterior')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(safePage === 0),
+    new ButtonBuilder()
+      .setCustomId(`pokemon_dex_page:${token}:${safePage + 1}`)
+      .setLabel('Próxima página')
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(safePage >= totalPages - 1),
+  );
+  return {
+    content:
+      `## Pokédex Pokémon\n` +
+      `**${owned.size}/${CARD_DEFS.length}** cartas descobertas • Página **${safePage + 1}/${totalPages}**\n` +
+      `Cartas bloqueadas aparecem esmaecidas. Use \`/cartas ver\` para abrir uma carta e vendê-la.`,
+    files: [new AttachmentBuilder(image, { name: 'pokedex-pokemon.png' })],
+    components: [selectRow, navigationRow],
+  };
+}
+
+async function sellCards(userId, guildId, cardKey, requestedQuantity = 1) {
+  if (!guildId) return { ok: false, reason: 'A venda de cartas só funciona dentro de um servidor.' };
+  const card = getCard(cardKey);
+  if (!card) return { ok: false, reason: 'Carta não encontrada.' };
+  const quantity = requestedQuantity === 'all'
+    ? Number.MAX_SAFE_INTEGER
+    : Math.max(1, Math.floor(Number(requestedQuantity) || 1));
+  return prisma.$transaction(async tx => {
+    const owned = await tx.cardCollection.findUnique({
+      where: { userId_cardKey: { userId, cardKey } },
+    });
+    if (!owned) return { ok: false, reason: 'Você não possui essa carta.' };
+    const sold = Math.min(owned.quantity, quantity);
+    const value = rarityData(card.rarity).duplicateValue * sold;
+    if (sold >= owned.quantity) {
+      await tx.cardCollection.delete({ where: { userId_cardKey: { userId, cardKey } } });
+    } else {
+      await tx.cardCollection.update({
+        where: { userId_cardKey: { userId, cardKey } },
+        data: { quantity: { decrement: sold } },
+      });
+    }
+    await tx.economy.upsert({
+      where: { userId_guildId: { userId, guildId } },
+      create: { userId, guildId, balance: value },
+      update: { balance: { increment: value } },
+    });
+    return { ok: true, sold, value, card };
   });
-  return lines.join('\n');
+}
+
+async function buildCardDetailPayload({ userId, guildId, card, token = null }) {
+  const owned = await prisma.cardCollection.findUnique({
+    where: { userId_cardKey: { userId, cardKey: card.key } },
+  });
+  const image = await generateCardSheet([card]);
+  const quantity = owned?.quantity ?? 0;
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`pokemon_card_sell:${card.key}:1`)
+      .setLabel(`Vender 1 • ${rarityData(card.rarity).duplicateValue.toLocaleString('pt-BR')} coins`)
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(quantity < 1),
+    new ButtonBuilder()
+      .setCustomId(`pokemon_card_sell:${card.key}:all`)
+      .setLabel('Vender todas')
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(quantity < 1),
+  );
+  return {
+    content:
+      `## ${card.name}\n` +
+      `${rarityData(card.rarity).label} • Você possui **${quantity}**\n` +
+      `Venda cada unidade por **${rarityData(card.rarity).duplicateValue.toLocaleString('pt-BR')} coins**.`,
+    files: [new AttachmentBuilder(image, { name: 'carta.png' })],
+    components: [row],
+  };
 }
 
 async function openPacks(userId, guildId, count) {
@@ -232,6 +343,47 @@ export async function handleCardPackInteraction(interaction) {
   }
 }
 
+export async function handleCardCollectionInteraction(interaction) {
+  const [action, token, value] = interaction.customId.split(':');
+  if (action === 'pokemon_dex_card') {
+    const session = getDexSession(token);
+    if (!session) return interaction.reply({ content: 'Esta Pokédex expirou. Use `/cartas colecao` novamente.', ephemeral: true });
+    if (session.userId !== interaction.user.id) return interaction.reply({ content: 'Esta Pokédex pertence a outra pessoa.', ephemeral: true });
+    const card = getCard(interaction.values[0]);
+    if (!card) return interaction.reply({ content: 'Carta não encontrada.', ephemeral: true });
+    return interaction.update(await buildCardDetailPayload({
+      userId: interaction.user.id,
+      guildId: interaction.guildId,
+      card,
+    }));
+  }
+  if (action === 'pokemon_dex_page') {
+    const session = getDexSession(token);
+    if (!session) return interaction.reply({ content: 'Esta Pokédex expirou. Use `/cartas colecao` novamente.', ephemeral: true });
+    if (session.userId !== interaction.user.id) return interaction.reply({ content: 'Esta Pokédex pertence a outra pessoa.', ephemeral: true });
+    session.page = Number(value) || 0;
+    return interaction.update(await buildDexPayload(session));
+  }
+
+  if (action === 'pokemon_card_sell') {
+    const card = getCard(token);
+    if (!card) return interaction.reply({ content: 'Carta não encontrada.', ephemeral: true });
+    if (interaction.guildId == null) return interaction.reply({ content: 'A venda de cartas só funciona dentro de um servidor.', ephemeral: true });
+    const result = await sellCards(interaction.user.id, interaction.guildId, card.key, value);
+    if (!result.ok) return interaction.reply({ content: result.reason, ephemeral: true });
+    return interaction.update(await buildCardDetailPayload({
+      userId: interaction.user.id,
+      guildId: interaction.guildId,
+      card,
+    })).then(async () => {
+      await interaction.followUp({
+        content: `Você vendeu **${result.sold}x ${card.name}** por **${result.value.toLocaleString('pt-BR')} coins**.`,
+        ephemeral: true,
+      });
+    });
+  }
+}
+
 export default {
   data: new SlashCommandBuilder()
     .setName('cartas')
@@ -256,7 +408,18 @@ export default {
       .addStringOption(option => option
         .setName('carta')
         .setDescription('Carta que deseja consultar')
-        .setRequired(true))),
+        .setRequired(true)))
+    .addSubcommand(sub => sub
+      .setName('vender')
+      .setDescription('Venda uma carta por coins')
+      .addStringOption(option => option
+        .setName('carta')
+        .setDescription('Chave da carta')
+        .setRequired(true))
+      .addIntegerOption(option => option
+        .setName('quantidade')
+        .setDescription('Quantidade para vender')
+        .setMinValue(1))),
   name: 'cartas',
   aliases: ['carta', 'cards'],
 
@@ -265,35 +428,47 @@ export default {
     await interaction.deferReply();
 
     if (sub === 'colecao') {
-      const rows = await prisma.cardCollection.findMany({ where: { userId: interaction.user.id } });
-      const ownedUnique = rows.length;
-      const embed = new EmbedBuilder()
-        .setColor(0x8e6cff)
-        .setTitle('Arcana — Sua coleção')
-        .setDescription(`**${ownedUnique}/${CARD_DEFS.length}** cartas descobertas\n\n${collectionText(rows)}`)
-        .setFooter({ text: 'Use /cartas abrir para comprar um pacote.' });
-      return interaction.editReply({ embeds: [embed] });
+      const token = createDexSession({ userId: interaction.user.id, guildId: interaction.guildId });
+      return interaction.editReply(await buildDexPayload({
+        userId: interaction.user.id,
+        guildId: interaction.guildId,
+        token,
+        page: 0,
+      }));
     }
 
     if (sub === 'pokedex') {
-      const rows = await prisma.cardCollection.findMany({ where: { userId: interaction.user.id } });
-      const ownedKeys = new Set(rows.map(row => row.cardKey));
-      const image = await generatePokedexSheet(CARD_DEFS, ownedKeys);
-      return interaction.editReply({
-        content: `## Pokédex Pokémon\n**${ownedKeys.size}/${CARD_DEFS.length}** cartas descobertas\n\nCartas bloqueadas aparecem esmaecidas com **?**.`,
-        files: [new AttachmentBuilder(image, { name: 'pokedex-pokemon.png' })],
-      });
+      const token = createDexSession({ userId: interaction.user.id, guildId: interaction.guildId });
+      return interaction.editReply(await buildDexPayload({
+        userId: interaction.user.id,
+        guildId: interaction.guildId,
+        token,
+        page: 0,
+      }));
     }
 
     if (sub === 'ver') {
       const card = getCard(interaction.options.getString('carta'));
-      const owned = await prisma.cardCollection.findUnique({
-        where: { userId_cardKey: { userId: interaction.user.id, cardKey: card.key } },
-      });
-      const image = await generateCardSheet([card]);
+      if (!card) return interaction.editReply({ content: 'Carta não encontrada. Use a chave da carta, como `pikachu-thunder-wave`.' });
+      return interaction.editReply(await buildCardDetailPayload({
+        userId: interaction.user.id,
+        guildId: interaction.guildId,
+        card,
+      }));
+    }
+
+    if (sub === 'vender') {
+      const card = getCard(interaction.options.getString('carta'));
+      if (!card) return interaction.editReply({ content: 'Carta não encontrada. Use a chave da carta, como `pikachu-thunder-wave`.' });
+      const result = await sellCards(
+        interaction.user.id,
+        interaction.guildId,
+        card.key,
+        interaction.options.getInteger('quantidade') ?? 'all',
+      );
+      if (!result.ok) return interaction.editReply({ content: result.reason });
       return interaction.editReply({
-        content: `${card.name} • ${rarityData(card.rarity).label}${owned ? ` • Você possui ${owned.quantity}` : ' • Ainda não descoberta'}`,
-        files: [new AttachmentBuilder(image, { name: 'carta.png' })],
+        content: `Você vendeu **${result.sold}x ${card.name}** por **${result.value.toLocaleString('pt-BR')} coins**.`,
       });
     }
 
@@ -305,31 +480,41 @@ export default {
   async executePrefix(message, args) {
     const sub = args[0]?.toLowerCase() ?? 'colecao';
     if (sub === 'colecao' || sub === 'collection') {
-      const rows = await prisma.cardCollection.findMany({ where: { userId: message.author.id } });
-      return message.reply({
-        embeds: [new EmbedBuilder()
-          .setColor(0x8e6cff)
-          .setTitle('Arcana — Sua coleção')
-          .setDescription(`**${rows.length}/${CARD_DEFS.length}** cartas descobertas\n\n${collectionText(rows)}`)],
-      });
+      const token = createDexSession({ userId: message.author.id, guildId: message.guildId });
+      return message.reply(await buildDexPayload({
+        userId: message.author.id,
+        guildId: message.guildId,
+        token,
+        page: 0,
+      }));
     }
     if (sub === 'pokedex' || sub === 'dex') {
-      const rows = await prisma.cardCollection.findMany({ where: { userId: message.author.id } });
-      const ownedKeys = new Set(rows.map(row => row.cardKey));
-      const image = await generatePokedexSheet(CARD_DEFS, ownedKeys);
-      return message.reply({
-        content: `## Pokédex Pokémon\n**${ownedKeys.size}/${CARD_DEFS.length}** cartas descobertas\n\nCartas bloqueadas aparecem esmaecidas com **?**.`,
-        files: [new AttachmentBuilder(image, { name: 'pokedex-pokemon.png' })],
-      });
+      const token = createDexSession({ userId: message.author.id, guildId: message.guildId });
+      return message.reply(await buildDexPayload({
+        userId: message.author.id,
+        guildId: message.guildId,
+        token,
+        page: 0,
+      }));
     }
     if (sub === 'abrir' || sub === 'open') {
       const count = packCount(args[1]);
       const token = createPackSession({ userId: message.author.id, guildId: message.guildId, count });
       return message.reply(await buildPackCoverPayload(token, count));
     }
+    if (sub === 'vender' || sub === 'sell') {
+      const card = getCard(args[1]);
+      if (!card) return message.reply('Carta não encontrada. Use a chave da carta, como `pikachu-thunder-wave`.');
+      const result = await sellCards(message.author.id, message.guildId, card.key, args[2] ?? 'all');
+      if (!result.ok) return message.reply(result.reason);
+      return message.reply(`Você vendeu **${result.sold}x ${card.name}** por **${result.value.toLocaleString('pt-BR')} coins**.`);
+    }
     const card = getCard(args[1]);
-    if (!card) return message.reply('Use `savage cartas abrir`, `savage cartas colecao` ou `savage cartas ver <chave>`. Veja as chaves disponíveis em `/cartas ver`.');
-    const image = await generateCardSheet([card]);
-    return message.reply({ content: `${card.name} • ${rarityData(card.rarity).label}`, files: [new AttachmentBuilder(image, { name: 'carta.png' })] });
+    if (!card) return message.reply('Use `savage cartas abrir`, `savage cartas colecao`, `savage cartas ver <chave>` ou `savage cartas vender <chave> [quantidade]`.');
+    return message.reply(await buildCardDetailPayload({
+      userId: message.author.id,
+      guildId: message.guildId,
+      card,
+    }));
   },
 };
