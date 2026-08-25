@@ -556,6 +556,7 @@ export default {
         if (
           interaction.customId.startsWith('battle_team_select:')
           || interaction.customId.startsWith('battle_move:')
+          || interaction.customId.startsWith('battle_switch:')
         ) {
           return handleBattleInteraction(interaction);
         }

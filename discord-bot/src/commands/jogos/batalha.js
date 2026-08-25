@@ -320,6 +320,31 @@ function availableSwitches(side) {
   return side.team.some((pokemon, index) => index !== side.active && pokemon.hp > 0);
 }
 
+function switchPayload(battle, sideId) {
+  const side = battle.players[sideId];
+  const options = side.team
+    .map((pokemon, index) => ({ pokemon, index }))
+    .filter(({ pokemon, index }) => index !== side.active && pokemon.hp > 0)
+    .map(({ pokemon, index }) => ({
+      label: pokemon.card.name.slice(0, 100),
+      description: `CP ${pokemon.cp} • HP ${pokemon.hp}/${pokemon.maxHp}`,
+      value: String(index),
+    }));
+
+  return {
+    content: 'Escolha o Pokémon que deseja colocar em campo:',
+    components: [
+      new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId(`battle_switch:${battle.id}`)
+          .setPlaceholder('Selecione um Pokémon')
+          .addOptions(options),
+      ),
+    ],
+    ephemeral: true,
+  };
+}
+
 function finishIfNeeded(battle, defenderId) {
   const defender = battle.players[defenderId];
   if (defender.team.every(pokemon => pokemon.hp <= 0)) {
@@ -551,6 +576,37 @@ export async function handleBattleInteraction(interaction) {
     return updateBattle(interaction, battle);
   }
 
+  if (action === 'battle_switch') {
+    const battle = battles.get(id);
+    if (!battle || battle.finished) return interaction.reply({ content: 'Esta batalha já terminou.', ephemeral: true });
+    if (battle.testMode
+      ? battle.controllerId !== interaction.user.id
+      : !battle.players[interaction.user.id]) {
+      return interaction.reply({ content: 'Você não participa desta batalha.', ephemeral: true });
+    }
+    if (!battle.testMode && battle.turn !== interaction.user.id) {
+      return interaction.reply({ content: 'Aguarde a vez do adversário.', ephemeral: true });
+    }
+
+    const actingSideId = battle.testMode ? battle.turn : interaction.user.id;
+    const side = battle.players[actingSideId];
+    const selectedIndex = Number(interaction.values?.[0]);
+    const selected = side.team[selectedIndex];
+    if (!selected || selectedIndex === side.active || selected.hp <= 0) {
+      return interaction.reply({ content: 'Esse Pokémon não pode ser selecionado.', ephemeral: true });
+    }
+
+    side.active = selectedIndex;
+    const defenderId = otherPlayer(battle, actingSideId);
+    battle.turn = defenderId;
+    battle.log = `${side.name} colocou **${selected.card.name}** em campo.`;
+    await interaction.deferUpdate();
+    if (battle.message?.edit) {
+      await battle.message.edit(await battlePayload(battle));
+    }
+    return interaction.editReply({ content: `**${selected.card.name}** agora está em campo.`, components: [] });
+  }
+
   if (action === 'battle_action') {
     const battle = battles.get(id);
     if (!battle || battle.finished) return interaction.reply({ content: 'Esta batalha já terminou.', ephemeral: true });
@@ -566,6 +622,7 @@ export async function handleBattleInteraction(interaction) {
     const current = activePokemon(battle, actingSideId);
     const defenderId = otherPlayer(battle, actingSideId);
     const defender = activePokemon(battle, defenderId);
+    battle.message = interaction.message;
     if (value === 'surrender') {
       battle.finished = true;
       battle.winner = defenderId;
@@ -576,10 +633,7 @@ export async function handleBattleInteraction(interaction) {
       if (!availableSwitches(battle.players[actingSideId])) {
         return interaction.reply({ content: 'Você não tem outro Pokémon saudável para trocar.', ephemeral: true });
       }
-      battle.players[actingSideId].active = battle.players[actingSideId].team.findIndex(
-        (pokemon, index) => index !== battle.players[actingSideId].active && pokemon.hp > 0,
-      );
-      battle.log = `${battle.players[actingSideId].name} fez uma troca rápida!`;
+      return interaction.reply(switchPayload(battle, actingSideId));
      }
     battle.turn = defenderId;
      return updateBattle(interaction, battle);
