@@ -1,7 +1,11 @@
 import { createCanvas, loadImage } from '@napi-rs/canvas';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { CARD_DEFS } from './cardData.js';
 import { generateCardSheet } from './cardVisuals.js';
 
+const ARENA_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '../assets/cards/battle-arena-bg.jpg');
 const WIDTH = 1280;
 const HEIGHT = 760;
 
@@ -89,12 +93,22 @@ function drawCard(ctx, pokemon, image, x, y, accent, label, flipped = false) {
 export async function generateBattleBoard(first, second, turnName = '') {
   const canvas = createCanvas(WIDTH, HEIGHT);
   const ctx = canvas.getContext('2d');
-  const background = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT);
-  background.addColorStop(0, '#172554');
-  background.addColorStop(0.48, '#0f172a');
-  background.addColorStop(0.52, '#1e293b');
-  background.addColorStop(1, '#4c0519');
-  ctx.fillStyle = background;
+  const [arenaImage, firstImage, secondImage] = await Promise.all([
+    loadImage(await readFile(ARENA_FILE)),
+    loadCard(first),
+    loadCard(second),
+  ]);
+  const scale = Math.max(WIDTH / arenaImage.width, HEIGHT / arenaImage.height);
+  const arenaWidth = arenaImage.width * scale;
+  const arenaHeight = arenaImage.height * scale;
+  ctx.drawImage(
+    arenaImage,
+    (WIDTH - arenaWidth) / 2,
+    (HEIGHT - arenaHeight) / 2,
+    arenaWidth,
+    arenaHeight,
+  );
+  ctx.fillStyle = 'rgba(5, 15, 35, .28)';
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
   ctx.fillStyle = 'rgba(255,255,255,.035)';
@@ -113,7 +127,6 @@ export async function generateBattleBoard(first, second, turnName = '') {
   ctx.fillText(turnName ? `VEZ DE ${turnName.toUpperCase()}` : 'BATALHA ATIVA', WIDTH - 40, 49);
   ctx.textAlign = 'left';
 
-  const [firstImage, secondImage] = await Promise.all([loadCard(first), loadCard(second)]);
   drawCard(ctx, first, firstImage, 74, 128, '#38bdf8', 'Treinador 1');
   drawCard(ctx, second, secondImage, WIDTH - 404, 128, '#fb7185', 'Treinador 2');
 
