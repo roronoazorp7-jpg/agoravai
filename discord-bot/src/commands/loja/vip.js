@@ -543,9 +543,6 @@ export default {
         .addUserOption(option =>
           option.setName('membro').setDescription('Membro que receberá o VIP').setRequired(true),
         )
-        .addRoleOption(option =>
-          option.setName('cargo').setDescription('Cargo opcional que também dará acesso ao VIP'),
-        )
         .addIntegerOption(option =>
           option
             .setName('tempo')
@@ -565,7 +562,10 @@ export default {
               { name: 'Dias', value: 'dias' },
               { name: 'Meses (30 dias)', value: 'meses' },
             ),
-        ),
+        )
+        .addRoleOption(option =>
+          option.setName('cargo').setDescription('Cargo opcional que também dará acesso ao VIP'),
+        )
     ),
 
   async execute(interaction) {
