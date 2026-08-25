@@ -360,6 +360,21 @@ function initializeBattle(id, challenger, opponent, challengerTeam, opponentTeam
   };
 }
 
+function initializeTestBattle(user, team) {
+  const testOpponent = { id: `battle-test:${user.id}`, name: 'Modo teste' };
+  const battle = initializeBattle(
+    token(),
+    { id: user.id, name: user.name },
+    testOpponent,
+    team,
+    team,
+  );
+  battle.testMode = true;
+  battle.controllerId = user.id;
+  battle.log = 'Modo de teste ativo. Você controla os dois lados.';
+  return battle;
+}
+
 async function startTeamSetup(interaction, userId, guildId, edit) {
   const cards = await getOwnedCards(userId);
   if (cards.length < TEAM_SIZE) {
@@ -371,6 +386,23 @@ async function startTeamSetup(interaction, userId, guildId, edit) {
   const current = await getTeam(userId, guildId);
   const sessionId = createTeamSession(userId, guildId, cards, current.map(card => card.key));
   return edit(buildTeamPayload(getTeamSession(sessionId)));
+}
+
+async function startTestBattle(interaction, userId, guildId, reply) {
+  const team = await getTeam(userId, guildId);
+  if (team.length !== TEAM_SIZE) {
+    return reply({
+      content: 'Monte seu time primeiro usando `/batalha montar`. O modo teste usa as três cartas equipadas.',
+      ephemeral: true,
+    });
+  }
+  const actor = interaction.user ?? interaction.author;
+  const battle = initializeTestBattle({
+    id: userId,
+    name: interaction.member?.displayName ?? actor.username,
+  }, team);
+  battles.set(battle.id, battle);
+  return reply(await battlePayload(battle));
 }
 
 async function challengeMember(interaction, target, reply) {
@@ -480,11 +512,18 @@ export async function handleBattleInteraction(interaction) {
   if (action === 'battle_move') {
     const battle = battles.get(id);
     if (!battle || battle.finished) return interaction.reply({ content: 'Esta batalha já terminou.', ephemeral: true });
-    if (!battle.players[interaction.user.id]) return interaction.reply({ content: 'Você não participa desta batalha.', ephemeral: true });
-    if (battle.turn !== interaction.user.id) return interaction.reply({ content: 'Aguarde a vez do adversário.', ephemeral: true });
+    if (battle.testMode
+      ? battle.controllerId !== interaction.user.id
+      : !battle.players[interaction.user.id]) {
+      return interaction.reply({ content: 'Você não participa desta batalha.', ephemeral: true });
+    }
+    if (!battle.testMode && battle.turn !== interaction.user.id) {
+      return interaction.reply({ content: 'Aguarde a vez do adversário.', ephemeral: true });
+    }
 
-    const current = activePokemon(battle, interaction.user.id);
-    const defenderId = otherPlayer(battle, interaction.user.id);
+    const actingSideId = battle.testMode ? battle.turn : interaction.user.id;
+    const current = activePokemon(battle, actingSideId);
+    const defenderId = otherPlayer(battle, actingSideId);
     const defender = activePokemon(battle, defenderId);
     const moveIndex = Number(interaction.values?.[0]);
     const move = movesFor(current)[moveIndex];
@@ -515,10 +554,17 @@ export async function handleBattleInteraction(interaction) {
   if (action === 'battle_action') {
     const battle = battles.get(id);
     if (!battle || battle.finished) return interaction.reply({ content: 'Esta batalha já terminou.', ephemeral: true });
-    if (!battle.players[interaction.user.id]) return interaction.reply({ content: 'Você não participa desta batalha.', ephemeral: true });
-    if (battle.turn !== interaction.user.id) return interaction.reply({ content: 'Aguarde a vez do adversário.', ephemeral: true });
-    const current = activePokemon(battle, interaction.user.id);
-    const defenderId = otherPlayer(battle, interaction.user.id);
+    if (battle.testMode
+      ? battle.controllerId !== interaction.user.id
+      : !battle.players[interaction.user.id]) {
+      return interaction.reply({ content: 'Você não participa desta batalha.', ephemeral: true });
+    }
+    const actingSideId = battle.testMode ? battle.turn : interaction.user.id;
+    if (!battle.testMode && battle.turn !== interaction.user.id) {
+      return interaction.reply({ content: 'Aguarde a vez do adversário.', ephemeral: true });
+    }
+    const current = activePokemon(battle, actingSideId);
+    const defenderId = otherPlayer(battle, actingSideId);
     const defender = activePokemon(battle, defenderId);
     if (value === 'surrender') {
       battle.finished = true;
@@ -527,13 +573,13 @@ export async function handleBattleInteraction(interaction) {
        return updateBattle(interaction, battle);
     }
     if (value === 'switch') {
-      if (!availableSwitches(battle.players[interaction.user.id])) {
+      if (!availableSwitches(battle.players[actingSideId])) {
         return interaction.reply({ content: 'Você não tem outro Pokémon saudável para trocar.', ephemeral: true });
       }
-      battle.players[interaction.user.id].active = battle.players[interaction.user.id].team.findIndex(
-        (pokemon, index) => index !== battle.players[interaction.user.id].active && pokemon.hp > 0,
+      battle.players[actingSideId].active = battle.players[actingSideId].team.findIndex(
+        (pokemon, index) => index !== battle.players[actingSideId].active && pokemon.hp > 0,
       );
-      battle.log = `${battle.players[interaction.user.id].name} fez uma troca rápida!`;
+      battle.log = `${battle.players[actingSideId].name} fez uma troca rápida!`;
      }
     battle.turn = defenderId;
      return updateBattle(interaction, battle);
@@ -548,7 +594,10 @@ const battleCommand = {
     .addSubcommand(sub => sub
       .setName('desafiar')
       .setDescription('Desafie um membro para uma batalha')
-      .addUserOption(option => option.setName('membro').setDescription('Membro que você quer desafiar').setRequired(true))),
+      .addUserOption(option => option.setName('membro').setDescription('Membro que você quer desafiar').setRequired(true)))
+    .addSubcommand(sub => sub
+      .setName('teste')
+      .setDescription('Teste a batalha controlando os dois lados')),
   name: 'batalha',
   aliases: ['battle', 'pvp'],
 
@@ -558,6 +607,10 @@ const battleCommand = {
     if (sub === 'montar') {
       await interaction.deferReply({ ephemeral: true });
       return startTeamSetup(interaction, interaction.user.id, interaction.guildId, opts => interaction.editReply(opts));
+    }
+    if (sub === 'teste') {
+      await interaction.deferReply();
+      return startTestBattle(interaction, interaction.user.id, interaction.guildId, opts => interaction.editReply(opts));
     }
     await interaction.deferReply();
     return challengeMember(
@@ -574,9 +627,12 @@ const battleCommand = {
       return startTeamSetup(message, message.author.id, message.guildId, opts => message.reply(opts));
     }
     if (sub === 'desafiar' || sub === 'challenge') {
+      if (args[1]?.toLowerCase() === 'teste') {
+        return startTestBattle(message, message.author.id, message.guildId, opts => message.reply(opts));
+      }
       return challengeMember(message, message.mentions.users.first(), opts => message.reply(opts));
     }
-    return message.reply('Use `savage batalha montar` ou `savage batalha desafiar @membro`.');
+    return message.reply('Use `savage batalha montar`, `savage batalha desafiar @membro` ou `savage batalha desafiar teste`.');
   },
 };
 
