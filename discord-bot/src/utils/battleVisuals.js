@@ -6,6 +6,7 @@ import { CARD_DEFS } from './cardData.js';
 import { generateCardSheet } from './cardVisuals.js';
 
 const ARENA_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '../assets/cards/battle-arena-bg.jpg');
+const HEALTH_BAR_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '../assets/cards/battle-health-bar.jpg');
 const WIDTH = 1280;
 const HEIGHT = 760;
 
@@ -29,16 +30,33 @@ function fitImage(ctx, image, x, y, width, height, radius = 18) {
   ctx.restore();
 }
 
-function bar(ctx, x, y, width, value, max, color) {
-  roundedRect(ctx, x, y, width, 22, 11);
-  ctx.fillStyle = '#0b1220';
-  ctx.fill();
-  const fill = Math.max(0, Math.min(1, value / max)) * width;
-  if (fill > 0) {
-    roundedRect(ctx, x, y, fill, 22, 11);
-    ctx.fillStyle = color;
-    ctx.fill();
+function healthBar(ctx, texture, x, y, width, value, max) {
+  const height = 34;
+  const ratio = Math.max(0, Math.min(1, value / Math.max(1, max)));
+
+  // Usa a moldura dourada da referência e redesenha somente o interior,
+  // permitindo que a quantidade vermelha acompanhe o HP real da batalha.
+  ctx.drawImage(texture, 0, 38, texture.width, 112, x, y, width, height);
+  ctx.save();
+  roundedRect(ctx, x + 23, y + 8, width - 46, height - 16, 9);
+  ctx.clip();
+  const empty = ctx.createLinearGradient(x, y, x, y + height);
+  empty.addColorStop(0, '#4b5563');
+  empty.addColorStop(0.5, '#1f2937');
+  empty.addColorStop(1, '#111827');
+  ctx.fillStyle = empty;
+  ctx.fillRect(x + 18, y + 5, width - 36, height - 10);
+  if (ratio > 0) {
+    const fill = ctx.createLinearGradient(x, y, x, y + height);
+    fill.addColorStop(0, '#ff6b4a');
+    fill.addColorStop(0.45, '#ef2f16');
+    fill.addColorStop(1, '#a30f08');
+    ctx.fillStyle = fill;
+    ctx.fillRect(x + 18, y + 5, (width - 36) * ratio, height - 10);
+    ctx.fillStyle = 'rgba(255, 255, 255, .24)';
+    ctx.fillRect(x + 18, y + 7, (width - 36) * ratio, 3);
   }
+  ctx.restore();
 }
 
 async function loadCard(card) {
@@ -48,7 +66,7 @@ async function loadCard(card) {
   return loadImage(await generateCardSheet([sourceCard]));
 }
 
-function drawCard(ctx, pokemon, image, x, y, accent, label, flipped = false) {
+function drawCard(ctx, pokemon, image, x, y, accent, label, flipped = false, healthBarImage) {
   const width = 330;
   const height = 462;
   const frameX = x - 14;
@@ -81,20 +99,18 @@ function drawCard(ctx, pokemon, image, x, y, accent, label, flipped = false) {
   ctx.fillStyle = '#cbd5e1';
   ctx.font = '16px sans-serif';
   ctx.fillText(`${pokemon.card.element}  •  CP ${pokemon.cp}`, x, y + height + 64);
-  bar(ctx, x, y + height + 78, width, pokemon.hp, pokemon.maxHp, accent);
-  ctx.fillStyle = '#f8fafc';
-  ctx.font = 'bold 14px sans-serif';
-  ctx.fillText(`HP ${Math.max(0, pokemon.hp)}/${pokemon.maxHp}`, x, y + height + 116);
+  healthBar(ctx, healthBarImage, x, y + height + 72, width, pokemon.hp, pokemon.maxHp);
   ctx.fillStyle = '#94a3b8';
   ctx.font = '14px sans-serif';
-  ctx.fillText(`Energia ${pokemon.energy}/100`, x + 195, y + height + 116);
+  ctx.fillText(`Energia ${pokemon.energy}/100`, x + 195, y + height + 118);
 }
 
 export async function generateBattleBoard(first, second, turnName = '') {
   const canvas = createCanvas(WIDTH, HEIGHT);
   const ctx = canvas.getContext('2d');
-  const [arenaImage, firstImage, secondImage] = await Promise.all([
+  const [arenaImage, healthBarImage, firstImage, secondImage] = await Promise.all([
     loadImage(await readFile(ARENA_FILE)),
+    loadImage(await readFile(HEALTH_BAR_FILE)),
     loadCard(first),
     loadCard(second),
   ]);
@@ -127,8 +143,8 @@ export async function generateBattleBoard(first, second, turnName = '') {
   ctx.fillText(turnName ? `VEZ DE ${turnName.toUpperCase()}` : 'BATALHA ATIVA', WIDTH - 40, 49);
   ctx.textAlign = 'left';
 
-  drawCard(ctx, first, firstImage, 74, 128, '#38bdf8', 'Treinador 1');
-  drawCard(ctx, second, secondImage, WIDTH - 404, 128, '#fb7185', 'Treinador 2');
+  drawCard(ctx, first, firstImage, 74, 128, '#38bdf8', 'Treinador 1', false, healthBarImage);
+  drawCard(ctx, second, secondImage, WIDTH - 404, 128, '#fb7185', 'Treinador 2', false, healthBarImage);
 
   const centerX = WIDTH / 2;
   const centerY = 360;
