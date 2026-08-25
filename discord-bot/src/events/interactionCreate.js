@@ -47,6 +47,7 @@ import { handleVipButton, handleVipConfigModal } from '../commands/loja/vip.js';
 import { handleFishingInteraction } from '../commands/economia/pescaria.js';
 import { handleCardPackInteraction, handleCardCollectionInteraction } from '../commands/general/cartas.js';
 import { handleBattleInteraction } from '../commands/jogos/batalha.js';
+import { isCommandBlocked, COMMAND_BLOCK_COMMAND } from '../utils/commandBlock.js';
 import { handleBJHit, handleBJStand, handleMinesCell, handleMinesCashout } from '../utils/gameHandlers.js';
 import { handleAjudaCatSel } from '../commands/general/ajuda.js';
 import { radioSessions, createRadioSession } from '../utils/radioManager.js';
@@ -461,6 +462,10 @@ export default {
       if (interaction.isChatInputCommand()) {
         const cmd = client.commands.get(interaction.commandName);
         if (!cmd) return;
+        if (interaction.commandName !== COMMAND_BLOCK_COMMAND) {
+          const blocked = await isCommandBlocked(interaction, interaction.commandName);
+          if (blocked) return interaction.reply({ content: blocked.message, ephemeral: true });
+        }
         return await cmd.execute(interaction, client);
       }
 

@@ -63,6 +63,19 @@ model Ticket {
   createdAt DateTime @default(now())
 }
 
+model CommandBlockRule {
+  id           String   @id @default(cuid())
+  guildId      String
+  commandName  String
+  scopeType    String
+  scopeId      String
+  isException  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@unique([guildId, commandName, scopeType, scopeId, isException])
+  @@index([guildId, commandName])
+}
+
 model GuildConfig {
   id      String @id @default(cuid())
   guildId String @unique
