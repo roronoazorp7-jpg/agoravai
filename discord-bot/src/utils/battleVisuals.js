@@ -1,12 +1,7 @@
 import { createCanvas, loadImage } from '@napi-rs/canvas';
-import { readFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { CARD_DEFS } from './cardData.js';
+import { generateCardSheet } from './cardVisuals.js';
 
-const CARDS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '../assets/cards');
-const FALLBACK_ART = 'pokemon-pack-cover.jpg';
 const WIDTH = 1280;
 const HEIGHT = 760;
 
@@ -16,15 +11,17 @@ function roundedRect(ctx, x, y, width, height, radius) {
 }
 
 function fitImage(ctx, image, x, y, width, height, radius = 18) {
-  const scale = Math.max(width / image.width, height / image.height);
-  const drawWidth = image.width * scale;
-  const drawHeight = image.height * scale;
-  const drawX = x + (width - drawWidth) / 2;
-  const drawY = y + (height - drawHeight) / 2;
   ctx.save();
   roundedRect(ctx, x, y, width, height, radius);
   ctx.clip();
-  ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+  // generateCardSheet coloca a carta em (24, 24), no tamanho original
+  // de 358x500. Recortamos somente essa carta para preservar a frente
+  // exatamente como ela aparece no pack e na Pokédex.
+  const sourceX = image.width >= 406 && image.height >= 548 ? 24 : 0;
+  const sourceY = sourceX;
+  const sourceWidth = image.width >= 406 && image.height >= 548 ? 358 : image.width;
+  const sourceHeight = image.width >= 406 && image.height >= 548 ? 500 : image.height;
+  ctx.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, x, y, width, height);
   ctx.restore();
 }
 
@@ -41,25 +38,10 @@ function bar(ctx, x, y, width, value, max, color) {
 }
 
 async function loadCard(card) {
-  const canonical = CARD_DEFS.find(entry => entry.key === card.key);
-  const artFile = card.artFile || canonical?.artFile || FALLBACK_ART;
-  const directories = [
-    CARDS_DIR,
-    path.join(process.cwd(), 'discord-bot/src/assets/cards'),
-    path.join(process.cwd(), 'src/assets/cards'),
-    path.join(process.cwd(), 'assets/cards'),
-  ];
-  const candidates = directories
-    .map(directory => path.join(directory, artFile))
-    .filter(file => existsSync(file));
-  const fallback = directories
-    .map(directory => path.join(directory, FALLBACK_ART))
-    .find(file => existsSync(file));
-  const file = candidates[0] || fallback;
-  if (!file) {
-    throw new Error(`Arte não encontrada para a carta ${card.key}`);
-  }
-  return loadImage(await readFile(file));
+  const source = card.card || card;
+  const canonical = CARD_DEFS.find(entry => entry.key === source.key);
+  const sourceCard = canonical || source;
+  return loadImage(await generateCardSheet([sourceCard]));
 }
 
 function drawCard(ctx, pokemon, image, x, y, accent, label, flipped = false) {
