@@ -307,7 +307,7 @@ async function battlePayload(battle, extra = '') {
       extra || battle.log,
     ].join('\n'),
     components: [controls, utilityControls],
-    ...(image ? { files: [new AttachmentBuilder(image, { name: `battle-${battle.id}.png` })] } : {}),
+     ...(image ? { files: [new AttachmentBuilder(image, { name: `battle-${battle.id}-${Date.now()}.png` })] } : {}),
   };
 }
 
