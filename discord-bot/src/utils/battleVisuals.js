@@ -1,5 +1,6 @@
 import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CARD_DEFS } from './cardData.js';
@@ -42,11 +43,23 @@ function bar(ctx, x, y, width, value, max, color) {
 async function loadCard(card) {
   const canonical = CARD_DEFS.find(entry => entry.key === card.key);
   const artFile = card.artFile || canonical?.artFile || FALLBACK_ART;
-  try {
-    return loadImage(await readFile(path.join(CARDS_DIR, artFile)));
-  } catch {
-    return loadImage(await readFile(path.join(CARDS_DIR, FALLBACK_ART)));
+  const directories = [
+    CARDS_DIR,
+    path.join(process.cwd(), 'discord-bot/src/assets/cards'),
+    path.join(process.cwd(), 'src/assets/cards'),
+    path.join(process.cwd(), 'assets/cards'),
+  ];
+  const candidates = directories
+    .map(directory => path.join(directory, artFile))
+    .filter(file => existsSync(file));
+  const fallback = directories
+    .map(directory => path.join(directory, FALLBACK_ART))
+    .find(file => existsSync(file));
+  const file = candidates[0] || fallback;
+  if (!file) {
+    throw new Error(`Arte não encontrada para a carta ${card.key}`);
   }
+  return loadImage(await readFile(file));
 }
 
 function drawCard(ctx, pokemon, image, x, y, accent, label, flipped = false) {
