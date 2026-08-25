@@ -4,11 +4,12 @@ export const DISBOARD_BOT_ID = '302050872383242240';
 const BUMP_INTERVAL_MS = 2 * 60 * 60 * 1000;
 
 function messageText(message) {
-  const embedText = message.embeds
+  const embedText = (message.embeds ?? [])
     .flatMap(embed => [
       embed.title,
       embed.description,
       ...(embed.fields ?? []).flatMap(field => [field.name, field.value]),
+      embed.footer?.text,
     ])
     .filter(Boolean)
     .join(' ');
@@ -17,7 +18,14 @@ function messageText(message) {
 
 export function isDisboardBumpConfirmation(message) {
   if (!message.guildId || message.author?.id !== DISBOARD_BOT_ID) return false;
-  return /\b(?:bump realizado|server bumped|bumped|bump(?:ed)? com sucesso)\b/i.test(messageText(message));
+  const text = messageText(message)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  // O DISBOARD varia o texto entre versões/idiomas. Não use apenas "bumped":
+  // a mensagem de cooldown também contém essa palavra e agendaria lembretes
+  // incorretamente.
+  return /\b(?:bump\s+done|bump\s+(?:realizado|concluido)|server\s+(?:has\s+been\s+)?bumped|bumped\s+successfully|bump(?:ed)?\s+com\s+sucesso)\b/i.test(text);
 }
 
 export async function handleDisboardBump(message) {
