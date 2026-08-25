@@ -553,7 +553,10 @@ export default {
 
       // ── STRING SELECT MENUS ────────────────────────────────────────────────
       if (interaction.isStringSelectMenu()) {
-        if (interaction.customId.startsWith('battle_team_select:')) {
+        if (
+          interaction.customId.startsWith('battle_team_select:')
+          || interaction.customId.startsWith('battle_move:')
+        ) {
           return handleBattleInteraction(interaction);
         }
         if (interaction.customId.startsWith('pokemon_dex_card:')) {

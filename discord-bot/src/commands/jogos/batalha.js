@@ -311,6 +311,11 @@ async function battlePayload(battle, extra = '') {
   };
 }
 
+async function updateBattle(interaction, battle, extra = '') {
+  await interaction.deferUpdate();
+  return interaction.editReply(await battlePayload(battle, extra));
+}
+
 function availableSwitches(side) {
   return side.team.some((pokemon, index) => index !== side.active && pokemon.hp > 0);
 }
@@ -469,7 +474,7 @@ export async function handleBattleInteraction(interaction) {
       challenge.opponentTeam,
     );
     battles.set(battle.id, battle);
-     return interaction.update(await battlePayload(battle));
+     return updateBattle(interaction, battle);
   }
 
   if (action === 'battle_move') {
@@ -502,9 +507,9 @@ export async function handleBattleInteraction(interaction) {
 
     const advantageText = typeMultiplier > 1 ? ' Foi super eficaz!' : typeMultiplier < 1 ? ' Não foi muito eficaz...' : '';
     battle.log = `${current.card.name} usou **${moveName}** e causou **${damage} de dano**.${advantageText}`;
-    if (finishIfNeeded(battle, defenderId)) return interaction.update(await battlePayload(battle));
+    if (finishIfNeeded(battle, defenderId)) return updateBattle(interaction, battle);
     battle.turn = defenderId;
-    return interaction.update(await battlePayload(battle));
+    return updateBattle(interaction, battle);
   }
 
   if (action === 'battle_action') {
@@ -519,7 +524,7 @@ export async function handleBattleInteraction(interaction) {
       battle.finished = true;
       battle.winner = defenderId;
       battle.log = `${battle.players[interaction.user.id].name} desistiu.`;
-       return interaction.update(await battlePayload(battle));
+       return updateBattle(interaction, battle);
     }
     if (value === 'switch') {
       if (!availableSwitches(battle.players[interaction.user.id])) {
@@ -531,7 +536,7 @@ export async function handleBattleInteraction(interaction) {
       battle.log = `${battle.players[interaction.user.id].name} fez uma troca rápida!`;
      }
     battle.turn = defenderId;
-     return interaction.update(await battlePayload(battle));
+     return updateBattle(interaction, battle);
   }
 }
 

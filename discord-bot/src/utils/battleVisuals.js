@@ -2,6 +2,7 @@ import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CARD_DEFS } from './cardData.js';
 
 const CARDS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '../assets/cards');
 const FALLBACK_ART = 'pokemon-pack-cover.jpg';
@@ -39,7 +40,8 @@ function bar(ctx, x, y, width, value, max, color) {
 }
 
 async function loadCard(card) {
-  const artFile = card.artFile || FALLBACK_ART;
+  const canonical = CARD_DEFS.find(entry => entry.key === card.key);
+  const artFile = card.artFile || canonical?.artFile || FALLBACK_ART;
   try {
     return loadImage(await readFile(path.join(CARDS_DIR, artFile)));
   } catch {
