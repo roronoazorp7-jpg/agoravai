@@ -186,47 +186,47 @@ function renderBar(value, max, size = 12) {
 
 const MOVES = Object.freeze({
   Fogo: [
-    ['Brasa Rápida', 18, 20],
+    ['Brasa Rápida', 18, 0],
     ['Presas Flamejantes', 31, 45],
     ['Explosão Solar', 45, 70],
   ],
   Água: [
-    ['Jato d’Água', 18, 20],
+    ['Jato d’Água', 18, 0],
     ['Onda de Espuma', 30, 45],
     ['Hidrocanhão', 44, 70],
   ],
   Planta: [
-    ['Folha Navalha', 18, 20],
+    ['Folha Navalha', 18, 0],
     ['Chicote de Vinha', 30, 45],
     ['Raio Solar', 43, 70],
   ],
   Raio: [
-    ['Faísca', 18, 20],
+    ['Faísca', 18, 0],
     ['Eletrochoque', 31, 45],
     ['Trovão', 45, 70],
   ],
   Psíquico: [
-    ['Confusão', 18, 20],
+    ['Confusão', 18, 0],
     ['Pulso Psíquico', 30, 45],
     ['Psíquico', 44, 70],
   ],
   Sombrio: [
-    ['Mordida', 18, 20],
+    ['Mordida', 18, 0],
     ['Jogo Sujo', 30, 45],
     ['Pulso Sombrio', 44, 70],
   ],
   Luta: [
-    ['Golpe Rápido', 18, 20],
+    ['Golpe Rápido', 18, 0],
     ['Corpo a Corpo', 31, 45],
     ['Força Bruta', 44, 70],
   ],
   Metal: [
-    ['Garra de Metal', 18, 20],
+    ['Garra de Metal', 18, 0],
     ['Cabeça de Ferro', 30, 45],
     ['Canhão de Flash', 43, 70],
   ],
   Incolor: [
-    ['Investida', 18, 20],
+    ['Investida', 18, 0],
     ['Ataque Rápido', 29, 45],
     ['Hiper Voz', 42, 70],
   ],
@@ -277,9 +277,9 @@ async function battlePayload(battle, extra = '') {
     .setPlaceholder(`Escolha um golpe de ${current.card.name}`)
     .addOptions(moves.map(([name, power, cost], index) => ({
       label: name,
-      description: `${power} poder • ${cost === 20 ? 'rápido' : `custa ${cost} energia`}`,
+      description: `${power} poder • ${cost === 0 ? 'sem custo de energia' : `custa ${cost} energia`}`,
       value: String(index),
-      emoji: cost === 20 ? '⚡' : '💥',
+      emoji: cost === 0 ? '⚡' : '💥',
     })));
   const controls = new ActionRowBuilder().addComponents(
     moveMenu,
@@ -542,7 +542,7 @@ export async function handleBattleInteraction(interaction) {
     const cpMultiplier = 0.9 + (current.cp / 2000) * 0.1;
     const damage = Math.max(8, Math.round(power * cpMultiplier * typeMultiplier * rarityMultiplier));
     defender.hp -= damage;
-    current.energy = Math.min(100, current.energy - energyCost + (energyCost === 20 ? 32 : 8));
+    current.energy = Math.min(100, current.energy - energyCost + (energyCost === 0 ? 35 : 8));
 
     const advantageText = typeMultiplier > 1 ? ' Foi super eficaz!' : typeMultiplier < 1 ? ' Não foi muito eficaz...' : '';
     battle.log = `${current.card.name} usou **${moveName}** e causou **${damage} de dano**.${advantageText}`;
