@@ -235,6 +235,8 @@ model Economy {
   xp           Int       @default(0)
   level        Int       @default(1)
   lastDaily    DateTime?
+  lastWeekly   DateTime?
+  lastMonthly  DateTime?
   lastWork     DateTime?
   lastRob      DateTime?
   dailyStreak  Int       @default(0)

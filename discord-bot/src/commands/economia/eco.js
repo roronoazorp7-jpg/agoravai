@@ -59,8 +59,12 @@ function trabalhoPayload(text) {
 // ─── Eco helpers ──────────────────────────────────────────────────────────────
 
 const DAILY_AMOUNT  = () => Math.floor(Math.random() * 501) + 500;
+const WEEKLY_AMOUNT = () => Math.floor(Math.random() * 3001) + 3000;
+const MONTHLY_AMOUNT = () => Math.floor(Math.random() * 15001) + 15000;
 const WORK_AMOUNT   = () => Math.floor(Math.random() * 401) + 100;
 const DAILY_CD      = 24 * 60 * 60 * 1000;
+const WEEKLY_CD     = 7 * 24 * 60 * 60 * 1000;
+const MONTHLY_CD    = 30 * 24 * 60 * 60 * 1000;
 const WORK_CD       = 60 * 60 * 1000;
 const ROB_CD        = 60 * 60 * 1000;
 const DEFAULT_ROBBERY_WEAPON = 'faca';
@@ -99,6 +103,39 @@ async function getEco(userId, guildId, db = prisma) {
     create: { userId, guildId },
     update: {},
   });
+}
+
+async function claimPeriodicReward({
+  userId,
+  guildId,
+  isAdmin,
+  reply,
+  field,
+  cooldown,
+  amountFactory,
+  label,
+  nextLabel,
+}) {
+  const eco = await getEco(userId, guildId);
+  const now = Date.now();
+  const last = eco[field]?.getTime() ?? 0;
+  const diff = now - last;
+
+  if (!isAdmin && diff < cooldown) {
+    return reply(v2Err(`${label} indisponível. Volte em **${msToHuman(cooldown - diff)}**!`));
+  }
+
+  const amount = amountFactory();
+  await prisma.economy.update({
+    where: { userId_guildId: { userId, guildId } },
+    data: { balance: { increment: amount }, [field]: new Date(now) },
+  });
+
+  return reply(v2Rich(
+    `## ✨ ${CAL()} ${label} resgatado\n` +
+    `${COIN()} **+${amount.toLocaleString('pt-BR')}**\n\n` +
+    `${CLK()} Próximo em **${nextLabel}**`,
+  ));
 }
 
 class RobberyError extends Error {
@@ -350,6 +387,79 @@ const cmdDaily = {
   },
 };
 
+// ─── /semanal e /mensal ───────────────────────────────────────────────────────
+const cmdSemanal = {
+  data: new SlashCommandBuilder()
+    .setName('semanal')
+    .setDescription('💰 Colete sua recompensa semanal'),
+  name: 'semanal',
+  aliases: ['weekly', 'week'],
+
+  async execute(interaction) {
+    return claimPeriodicReward({
+      userId: interaction.user.id,
+      guildId: interaction.guildId,
+      isAdmin: interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ?? false,
+      reply: payload => interaction.reply(payload),
+      field: 'lastWeekly',
+      cooldown: WEEKLY_CD,
+      amountFactory: WEEKLY_AMOUNT,
+      label: 'Semanal',
+      nextLabel: '7 dias',
+    });
+  },
+
+  async executePrefix(message) {
+    return claimPeriodicReward({
+      userId: message.author.id,
+      guildId: message.guildId,
+      isAdmin: message.member?.permissions?.has(PermissionFlagsBits.Administrator) ?? false,
+      reply: payload => message.reply(payload),
+      field: 'lastWeekly',
+      cooldown: WEEKLY_CD,
+      amountFactory: WEEKLY_AMOUNT,
+      label: 'Semanal',
+      nextLabel: '7 dias',
+    });
+  },
+};
+
+const cmdMensal = {
+  data: new SlashCommandBuilder()
+    .setName('mensal')
+    .setDescription('💰 Colete sua recompensa mensal'),
+  name: 'mensal',
+  aliases: ['monthly', 'month'],
+
+  async execute(interaction) {
+    return claimPeriodicReward({
+      userId: interaction.user.id,
+      guildId: interaction.guildId,
+      isAdmin: interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ?? false,
+      reply: payload => interaction.reply(payload),
+      field: 'lastMonthly',
+      cooldown: MONTHLY_CD,
+      amountFactory: MONTHLY_AMOUNT,
+      label: 'Mensal',
+      nextLabel: '30 dias',
+    });
+  },
+
+  async executePrefix(message) {
+    return claimPeriodicReward({
+      userId: message.author.id,
+      guildId: message.guildId,
+      isAdmin: message.member?.permissions?.has(PermissionFlagsBits.Administrator) ?? false,
+      reply: payload => message.reply(payload),
+      field: 'lastMonthly',
+      cooldown: MONTHLY_CD,
+      amountFactory: MONTHLY_AMOUNT,
+      label: 'Mensal',
+      nextLabel: '30 dias',
+    });
+  },
+};
+
 // ─── /trabalho ────────────────────────────────────────────────────────────────
 const cmdTrabalho = {
   data: new SlashCommandBuilder()
@@ -598,4 +708,15 @@ const cmdSacar = {
   },
 };
 
-export default [cmdSaldo, cmdDaily, cmdTrabalho, cmdRoubar, cmdPagar, cmdTop, cmdDepositar, cmdSacar];
+export default [
+  cmdSaldo,
+  cmdDaily,
+  cmdSemanal,
+  cmdMensal,
+  cmdTrabalho,
+  cmdRoubar,
+  cmdPagar,
+  cmdTop,
+  cmdDepositar,
+  cmdSacar,
+];

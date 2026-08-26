@@ -235,7 +235,7 @@ function buildTicketServerContext(message, cfg) {
       ? `Parcerias: sistema ativo no canal <#${cfg.partnerChannel}>${cfg.partnerResponsibleRole ? `, para membros com o cargo <@&${cfg.partnerResponsibleRole}>` : ''}. Para registrar, envie um convite Discord nesse canal e, se houver representante, mencione-o. O bot publica a parceria automaticamente.`
       : 'Parcerias: sistema atualmente desativado ou sem canal configurado.',
     'Ajuda: use `/ajuda` para abrir a central de comandos. Comandos de texto usam os prefixos `savage ` ou `s `.',
-    'Economia: `/eco saldo`, `/eco daily`, `/eco trabalho`, `/eco pagar`, `/eco depositar`, `/eco sacar`, `/eco top` e `/eco roubar` quando permitido.',
+    'Economia: `/eco saldo`, `/eco daily`, `/eco semanal`, `/eco mensal`, `/eco trabalho`, `/eco pagar`, `/eco depositar`, `/eco sacar`, `/eco top` e `/eco roubar` quando permitido.',
     'Loja e perfil: `/loja painel` mostra a loja; `/perfil` mostra o perfil; `/bio` altera a bio; `/pet` gerencia o pet.',
     'Pesca: `/pescar` inicia uma pescaria; `/pesca loja` abre varas e iscas; `/pesca pontos` escolhe o local; `/pesca colecao` mostra o livro; `/pesca missoes` traz a missão diária; `/pesca inventario` mostra capturas; `/pesca vender` vende peixes por coins. Há cooldown de 1 minuto entre pescarias.',
     'Jogos: `/jogo` abre os jogos e apostas disponíveis.',
