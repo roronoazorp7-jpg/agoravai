@@ -45,7 +45,7 @@ import { handlePetButton } from '../commands/general/pet.js';
 import { handleModerationButton } from '../commands/admin/moderacao.js';
 import { handleVipButton, handleVipConfigModal } from '../commands/loja/vip.js';
 import { handleFishingInteraction } from '../commands/economia/pescaria.js';
-import { handleCardPackInteraction, handleCardCollectionInteraction } from '../commands/general/cartas.js';
+import { handleCardPackInteraction, handleFutPackInteraction, handleCardCollectionInteraction } from '../commands/general/cartas.js';
 import { handleBattleInteraction } from '../commands/jogos/batalha.js';
 import { isCommandBlocked, COMMAND_BLOCK_COMMAND } from '../utils/commandBlock.js';
 import { handleBJHit, handleBJStand, handleMinesCell, handleMinesCashout } from '../utils/gameHandlers.js';
@@ -1136,6 +1136,9 @@ export default {
         // ── PACK POKÉMON: abertura carta por carta ─────────────────────────
         if (customId.startsWith('pokemon_pack_')) {
           return handleCardPackInteraction(interaction);
+        }
+        if (customId.startsWith('fut_pack_')) {
+          return handleFutPackInteraction(interaction);
         }
         if (customId.startsWith('battle_')) {
           return handleBattleInteraction(interaction);

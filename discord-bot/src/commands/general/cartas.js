@@ -11,6 +11,7 @@ import {
   MediaGalleryItemBuilder,
   MessageFlags,
 } from 'discord.js';
+import { fileURLToPath } from 'node:url';
 import prisma from '../../database/client.js';
 import { spendCoins, totalCoins } from '../../utils/economyFunds.js';
 import {
@@ -33,6 +34,19 @@ const activeDexSessions = new Map();
 const SESSION_TTL = 10 * 60 * 1000;
 const DEX_PAGE_SIZE = 8;
 const SELL_PAGE_SIZE = 25;
+const FUT_TEST_CARDS = Object.freeze([
+  {
+    name: 'Carta FUT de teste #1',
+    path: fileURLToPath(new URL('../../assets/cards/fut-test-01.gif', import.meta.url)),
+    filename: 'fut-carta-1.gif',
+  },
+  {
+    name: 'Carta FUT de teste #2',
+    path: fileURLToPath(new URL('../../assets/cards/fut-test-02.gif', import.meta.url)),
+    filename: 'fut-carta-2.gif',
+  },
+]);
+const futPackSessions = new Map();
 
 function createPackSession({ userId, guildId, count }) {
   const token = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
@@ -54,6 +68,96 @@ function getPackSession(token) {
     return null;
   }
   return session;
+}
+
+function createFutPackSession({ userId, guildId }) {
+  const token = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+  futPackSessions.set(token, {
+    userId,
+    guildId,
+    index: 0,
+    expiresAt: Date.now() + SESSION_TTL,
+  });
+  return token;
+}
+
+function getFutPackSession(token) {
+  const session = futPackSessions.get(token);
+  if (!session || session.expiresAt < Date.now()) {
+    futPackSessions.delete(token);
+    return null;
+  }
+  session.expiresAt = Date.now() + SESSION_TTL;
+  return session;
+}
+
+function buildFutPackCoverPayload(token) {
+  const container = new ContainerBuilder()
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `## Abrir FUT\n\n` +
+        `Pacote teste gratuito com **2 cartas de futebol em GIF**.\n` +
+        `Os GIFs serão revelados um por vez, exatamente como enviados.`,
+      ),
+    );
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`fut_pack_open:${token}`)
+      .setLabel('Abrir FUT')
+      .setStyle(ButtonStyle.Primary),
+  );
+  return { components: [container, row], flags: MessageFlags.IsComponentsV2 };
+}
+
+function buildFutCardPayload(session) {
+  const card = FUT_TEST_CARDS[session.index];
+  const isLast = session.index >= FUT_TEST_CARDS.length - 1;
+  const container = new ContainerBuilder()
+    .addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(
+        new MediaGalleryItemBuilder().setURL(`attachment://${card.filename}`),
+      ),
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `## Carta FUT ${session.index + 1} de ${FUT_TEST_CARDS.length}\n\n` +
+        `**${card.name}**\n` +
+        `GIF original do pacote de teste.`,
+      ),
+    );
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(isLast ? `fut_pack_finish:${session.token}` : `fut_pack_next:${session.token}`)
+      .setLabel(isLast ? 'Ver pacote completo' : 'Próxima carta')
+      .setStyle(ButtonStyle.Primary),
+  );
+  return {
+    components: [container, row],
+    files: [new AttachmentBuilder(card.path, { name: card.filename })],
+    flags: MessageFlags.IsComponentsV2,
+  };
+}
+
+function buildFutPackFinishedPayload() {
+  const container = new ContainerBuilder()
+    .addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(
+        ...FUT_TEST_CARDS.map(card =>
+          new MediaGalleryItemBuilder().setURL(`attachment://${card.filename}`),
+        ),
+      ),
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `## Abrir FUT concluído\n\n` +
+        `Você revelou as **${FUT_TEST_CARDS.length} cartas** do pacote teste.`,
+      ),
+    );
+  return {
+    components: [container],
+    files: FUT_TEST_CARDS.map(card => new AttachmentBuilder(card.path, { name: card.filename })),
+    flags: MessageFlags.IsComponentsV2,
+  };
 }
 
 function createDexSession({ userId, guildId, page = 0 }) {
@@ -458,6 +562,38 @@ export async function handleCardPackInteraction(interaction) {
   }
 }
 
+export async function handleFutPackInteraction(interaction) {
+  const [action, token] = interaction.customId.split(':');
+  const session = getFutPackSession(token);
+  if (!session) {
+    return interaction.reply({
+      content: 'Este pacote FUT expirou. Use `/cartas abrir-fut` para começar outro.',
+      ephemeral: true,
+    });
+  }
+  if (session.userId !== interaction.user.id) {
+    return interaction.reply({ content: 'Este pacote pertence a outra pessoa.', ephemeral: true });
+  }
+
+  if (action === 'fut_pack_open') {
+    session.index = 0;
+    return interaction.update(buildFutCardPayload({ ...session, token }));
+  }
+
+  if (action === 'fut_pack_next') {
+    if (session.index >= FUT_TEST_CARDS.length - 1) {
+      return interaction.reply({ content: 'Você já revelou todas as cartas deste pacote.', ephemeral: true });
+    }
+    session.index += 1;
+    return interaction.update(buildFutCardPayload({ ...session, token }));
+  }
+
+  if (action === 'fut_pack_finish') {
+    futPackSessions.delete(token);
+    return interaction.update(buildFutPackFinishedPayload());
+  }
+}
+
 export async function handleCardCollectionInteraction(interaction) {
   const [action, token, value, quantity] = interaction.customId.split(':');
   if (action === 'pokemon_dex_card') {
@@ -607,6 +743,9 @@ export default {
         .setMinValue(1)
         .setMaxValue(3)))
     .addSubcommand(sub => sub
+      .setName('abrir-fut')
+      .setDescription('Abra o pacote teste FUT com 2 cartas GIF'))
+    .addSubcommand(sub => sub
       .setName('colecao')
       .setDescription('Veja suas cartas e seu progresso'))
     .addSubcommand(sub => sub
@@ -655,6 +794,11 @@ export default {
         token,
         page: 0,
       }));
+    }
+
+    if (sub === 'abrir-fut') {
+      const token = createFutPackSession({ userId: interaction.user.id, guildId: interaction.guildId });
+      return interaction.editReply(buildFutPackCoverPayload(token));
     }
 
     if (sub === 'ver') {
@@ -706,6 +850,10 @@ export default {
         token,
         page: 0,
       }));
+    }
+    if (sub === 'abrir-fut' || (sub === 'abrir' && args[1]?.toLowerCase() === 'fut')) {
+      const token = createFutPackSession({ userId: message.author.id, guildId: message.guildId });
+      return message.reply(buildFutPackCoverPayload(token));
     }
     if (sub === 'abrir' || sub === 'open') {
       const count = packCount(args[1]);
