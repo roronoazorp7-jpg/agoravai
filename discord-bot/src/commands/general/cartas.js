@@ -36,14 +36,28 @@ const DEX_PAGE_SIZE = 8;
 const SELL_PAGE_SIZE = 25;
 const FUT_TEST_CARDS = Object.freeze([
   {
+    name: 'Paulo Dybala • 96 CF',
+    path: fileURLToPath(new URL('../../assets/cards/fut-test-01.jpg', import.meta.url)),
+    filename: 'fut-carta-1.jpg',
+    type: 'imagem',
+  },
+  {
+    name: 'Marcus Rashford • 95 MI',
+    path: fileURLToPath(new URL('../../assets/cards/fut-test-02.jpg', import.meta.url)),
+    filename: 'fut-carta-2.jpg',
+    type: 'imagem',
+  },
+  {
     name: 'Carta FUT de teste #1',
     path: fileURLToPath(new URL('../../assets/cards/fut-test-01.gif', import.meta.url)),
-    filename: 'fut-carta-1.gif',
+    filename: 'fut-carta-3.gif',
+    type: 'GIF',
   },
   {
     name: 'Carta FUT de teste #2',
     path: fileURLToPath(new URL('../../assets/cards/fut-test-02.gif', import.meta.url)),
-    filename: 'fut-carta-2.gif',
+    filename: 'fut-carta-4.gif',
+    type: 'GIF',
   },
 ]);
 const futPackSessions = new Map();
@@ -96,8 +110,8 @@ function buildFutPackCoverPayload(token) {
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
         `## Abrir FUT\n\n` +
-        `Pacote teste gratuito com **2 cartas de futebol em GIF**.\n` +
-        `Os GIFs serão revelados um por vez, exatamente como enviados.`,
+        `Pacote teste gratuito com **4 cartas de futebol**: 2 cartas e 2 GIFs.\n` +
+        `Tudo será revelado um por vez, exatamente como enviado.`,
       ),
     );
   const row = new ActionRowBuilder().addComponents(
@@ -122,7 +136,7 @@ function buildFutCardPayload(session) {
       new TextDisplayBuilder().setContent(
         `## Carta FUT ${session.index + 1} de ${FUT_TEST_CARDS.length}\n\n` +
         `**${card.name}**\n` +
-        `GIF original do pacote de teste.`,
+        `${card.type === 'GIF' ? 'GIF original' : 'Imagem original'} do pacote de teste.`,
       ),
     );
   const row = new ActionRowBuilder().addComponents(
@@ -744,7 +758,7 @@ export default {
         .setMaxValue(3)))
     .addSubcommand(sub => sub
       .setName('abrir-fut')
-      .setDescription('Abra o pacote teste FUT com 2 cartas GIF'))
+      .setDescription('Abra o pacote teste FUT com 4 cartas'))
     .addSubcommand(sub => sub
       .setName('colecao')
       .setDescription('Veja suas cartas e seu progresso'))
