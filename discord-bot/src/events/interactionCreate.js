@@ -2607,10 +2607,14 @@ export default {
           );
           if (!toUser) return interaction.reply({ ...v2Simple('❌ Usuário não encontrado.'), ephemeral: true });
 
-          // Usa deferUpdate para editar a mensagem original no lugar (como a Neko)
+          // O clique é de uso único: mantém a interação original visível,
+          // mas remove os controles antes de publicar a retribuição em outra mensagem.
           await interaction.deferUpdate();
-          const payload = await buildInteractionEmbed(type, from, toUser, true);
-          return interaction.editReply(payload);
+          await interaction.editReply({
+            components: interaction.message.components.filter(component => component.type !== 1),
+          });
+          const payload = await buildInteractionEmbed(type, from, toUser, true, false);
+          return interaction.followUp(payload);
         }
 
         // ── INTERAÇÕES: Rejeitar ─────────────────────────────────────────

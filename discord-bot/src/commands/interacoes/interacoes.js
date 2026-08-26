@@ -239,7 +239,7 @@ function mentionUser(user) {
   return id ? `<@${id}>` : `@${user?.displayName ?? user?.username ?? 'Alguém'}`;
 }
 
-function buildGfPayload(fromUser, toUser, gifUrl, streak) {
+function buildGfPayload(fromUser, toUser, gifUrl, streak, includeButton = true) {
   const fromMention = mentionUser(fromUser);
   const toMention = mentionUser(toUser);
   const text =
@@ -250,6 +250,9 @@ function buildGfPayload(fromUser, toUser, gifUrl, streak) {
     `**Sequência**\n` +
     `A cada 10x seguidas esse par ganha bônus extra de XP social.`;
 
+  const container = v2Rich({ text, imageUrl: gifUrl });
+  if (!includeButton) return v2Payload(container);
+
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`int_r_gf_${fromUser?.id ?? fromUser?.user?.id}_${toUser?.id ?? toUser?.user?.id}`)
@@ -257,13 +260,16 @@ function buildGfPayload(fromUser, toUser, gifUrl, streak) {
       .setStyle(ButtonStyle.Secondary),
   );
 
-  return v2Payload(
-    v2Rich({ text, imageUrl: gifUrl }),
-    row,
-  );
+  return v2Payload(container, row);
 }
 
-export async function buildInteractionEmbed(type, fromUser, toUser, isRetribution = false) {
+export async function buildInteractionEmbed(
+  type,
+  fromUser,
+  toUser,
+  isRetribution = false,
+  includeButton = !isRetribution,
+) {
   const action   = ACTIONS[type];
   const fromName = fromUser.displayName ?? fromUser.username ?? 'Alguém';
   const toName   = toUser.displayName   ?? toUser.username   ?? 'Alguém';
@@ -277,7 +283,13 @@ export async function buildInteractionEmbed(type, fromUser, toUser, isRetributio
   ]);
 
   if (type === 'gf') {
-    return buildGfPayload(fromUser, toUser, gifData.url, Math.max(1, mutualCount + 1));
+    return buildGfPayload(
+      fromUser,
+      toUser,
+      gifData.url,
+      Math.max(1, mutualCount + 1),
+      includeButton,
+    );
   }
 
   let description;
@@ -296,6 +308,10 @@ export async function buildInteractionEmbed(type, fromUser, toUser, isRetributio
   const text = gifData.anime
     ? `${description}\n\n*Anime: ${gifData.anime}*`
     : description;
+
+  if (!includeButton) {
+    return v2Payload(v2Rich({ text, imageUrl: gifData.url }));
+  }
 
   // Botões: voltar (só o alvo pode clicar) + Rejeitar
   const row = new ActionRowBuilder().addComponents(
