@@ -17,10 +17,8 @@ import prisma from '../database/client.js';
 import { likesMap, threadsMap, postDataMap } from '../utils/instaState.js';
 import { buildPartnershipPost } from '../utils/partnershipPanels.js';
 import {
-  askAI,
   askAdminCommand,
   askTicketAI,
-  generateAIImage,
   isAIConfigured,
   isGroqConfigured,
 } from '../utils/aiManager.js';
@@ -30,50 +28,6 @@ import { DISBOARD_BOT_ID, handleDisboardBump } from '../utils/bumpReminder.js';
 import { isCommandBlocked, COMMAND_BLOCK_COMMAND } from '../utils/commandBlock.js';
 
 const PREFIXES = ['savage ', 's '];
-
-const IMAGE_INTENT_REGEX = /\b(imagem|foto|desenh\w*|ilustra[çc][ãa]o|wallpaper|logo|arte)\b/i;
-
-async function handleAIMention(message, client, cfg = null) {
-  if (!isAIConfigured()) {
-    await message.reply('🤖 A IA ainda não está configurada neste bot. Peça a um administrador para configurar a variável GROQ_API_KEY no Railway.').catch(() => {});
-    return;
-  }
-
-  const prompt = message.content
-    .replace(new RegExp(`<@!?${client.user.id}>`, 'g'), '')
-    .trim();
-
-  if (!prompt) {
-    await message.reply('👋 Fala! Me marca e diz o que você quer que eu faça (ex: "@bot me conte uma piada" ou "@bot desenhe um gato astronauta").').catch(() => {});
-    return;
-  }
-
-  await message.channel.sendTyping().catch(() => {});
-
-  try {
-    if (IMAGE_INTENT_REGEX.test(prompt)) {
-      const buffer = await generateAIImage({ prompt });
-      const { AttachmentBuilder } = await import('discord.js');
-      const file = new AttachmentBuilder(buffer, { name: 'ia-imagem.png' });
-      await message.reply({ content: `🖼️ **Prompt:** ${prompt}`, files: [file] });
-    } else {
-      const resposta = await askAI({
-        guildId: message.guildId,
-        userId: message.author.id,
-        prompt,
-        serverName: message.guild?.name,
-        serverContext: message.guildId ? buildTicketServerContext(message, cfg ?? {}) : null,
-      });
-      const chunks = resposta.match(/[\s\S]{1,1990}/g) ?? [resposta];
-      for (const chunk of chunks) {
-        await message.reply(chunk);
-      }
-    }
-  } catch (err) {
-    console.error('[IA MENÇÃO]', err);
-    await message.reply('❌ Não consegui responder agora. Tente novamente em instantes.').catch(() => {});
-  }
-}
 
 function getMentionPrompt(message, client) {
   return message.content
@@ -350,13 +304,9 @@ export default {
       if (botMentioned && await handleAdminAIMention(message, client)) return;
 
       // ── ATENDIMENTO AUTOMÁTICO NOS TICKETS ────────────────────────────────
-      if (await handleTicketAI(message, cfg)) return;
-
-      // ── IA POR MENÇÃO EM QUALQUER CANAL ────────────────────────────────────
-      if (botMentioned) {
-        await handleAIMention(message, client, cfg);
-        return;
-      }
+      // Menções ao bot não acionam a IA. O atendimento automático de tickets
+      // continua disponível apenas para mensagens sem uma menção direta.
+      if (!botMentioned && await handleTicketAI(message, cfg)) return;
 
       // ── PARCERIAS AUTO-DETECT ──────────────────────────────────────────────
       if (cfg?.partnerEnabled && cfg?.partnerChannel && message.channelId === cfg.partnerChannel) {
@@ -625,12 +575,6 @@ export default {
 
         return;
       }
-    }
-
-    // Menções em mensagens diretas também recebem resposta.
-    if (!message.guildId && message.mentions.has(client.user)) {
-      await handleAIMention(message, client);
-      return;
     }
 
     // ── PREFIX COMMANDS ──────────────────────────────────────────────────────

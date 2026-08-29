@@ -3,8 +3,10 @@ export const CARD_PACK_SIZE = 2;
 export const CARD_REPEAT_CHANCE = 0.45;
 
 export const CARD_RARITIES = Object.freeze({
-  comum: { label: 'Comum', color: '#8290a8', weight: 69, duplicateValue: 250 },
+  comum: { label: 'Comum', color: '#8290a8', weight: 64, duplicateValue: 250 },
   incomum: { label: 'Incomum', color: '#46b8ff', weight: 30, duplicateValue: 600 },
+  epica: { label: 'Épica', color: '#b45cff', weight: 4, duplicateValue: 1800 },
+  lendaria: { label: 'Lendária', color: '#ffb52e', weight: 1, duplicateValue: 3000 },
   mitica: { label: 'Mítica', color: '#ff4fd8', weight: 1, duplicateValue: 3500 },
 });
 
@@ -61,6 +63,16 @@ export const CARD_DEFS = Object.freeze([
   { key: 'ekans', name: 'Ekans', rarity: 'comum', element: 'Sombrio', description: 'Rasteja silenciosamente e surpreende suas presas.' },
   { key: 'shellder', name: 'Shellder', rarity: 'comum', element: 'Água', description: 'Sua concha resistente protege um Pokémon persistente.' },
   { key: 'sceptile', name: 'Sceptile', rarity: 'incomum', element: 'Planta', description: 'As folhas em sua cauda cortam o ar com velocidade.' },
+  { key: 'latias-ex', name: 'Latias ex', rarity: 'lendaria', element: 'Psíquico', description: 'A lendária Latias atravessa os céus com velocidade e precisão.' },
+  { key: 'deoxys-ex', name: 'Deoxys ex', rarity: 'lendaria', element: 'Psíquico', description: 'Uma força extraterrestre que conecta todos os Pokémon da Equipe Plasma.' },
+  { key: 'zekrom-ex', name: 'Zekrom ex', rarity: 'lendaria', element: 'Raio', description: 'O dragão negro libera uma explosão elétrica capaz de virar a batalha.' },
+  { key: 'cauda-brado-ex', name: 'Cauda Brado ex', rarity: 'epica', element: 'Psíquico', description: 'Um rugido ancestral que confunde o adversário e quebra seu ritmo.' },
+  { key: 'mimikyu-ex', name: 'Mimikyu ex', rarity: 'epica', element: 'Psíquico', description: 'Sob seu disfarce assustador, Mimikyu prepara um truque impossível de prever.' },
+  { key: 'gardevoir-ex', name: 'Gardevoir ex', rarity: 'epica', element: 'Psíquico', description: 'Sua energia psíquica protege aliados e desfere um golpe devastador.' },
+  { key: 'salamence-ex', name: 'Salamence ex', rarity: 'epica', element: 'Dragão', description: 'As asas de Salamence transformam sua fúria em uma rajada destruidora.' },
+  { key: 'mega-froslass-ex', name: 'Mega Froslass ex', rarity: 'lendaria', element: 'Água', description: 'A mega evolução de Froslass congela o campo com uma beleza assustadora.' },
+  { key: 'mega-ampharos-ex', name: 'Mega Ampharos ex', rarity: 'epica', element: 'Raio', description: 'Mega Ampharos canaliza relâmpagos para paralisar e dominar o combate.' },
+  { key: 'mega-blaziken-ex', name: 'Mega Blaziken ex', rarity: 'lendaria', element: 'Fogo', description: 'A chama de Mega Blaziken explode em golpes velozes e imparáveis.' },
 ].map((card, index) => ({
   ...card,
   artFile: `pokemon-${String(index + 1).padStart(2, '0')}.${index < 5 ? 'webp' : 'jpg'}`,
