@@ -340,12 +340,56 @@ function fishingUpdateError(text) {
   return v2(`${FISH_COMMON()}  ${text}`);
 }
 
+function buildFishingRecoveryComponents(userId) {
+  return [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`fish_recover:${userId}`)
+        .setLabel('Liberar linha')
+        .setEmoji('🔄')
+        .setStyle(ButtonStyle.Secondary),
+    ),
+  ];
+}
+
+function fishingRecoveryError(text, userId) {
+  return v2(
+    `${FISH_COMMON()}  ${text}\n\nSe a mensagem anterior sumiu ou não responde, use o botão abaixo para liberar a linha e pescar novamente.`,
+    {
+      ephemeral: true,
+      components: buildFishingRecoveryComponents(userId),
+    },
+  );
+}
+
 async function getFishingProfile(userId, guildId, db = prisma) {
   return db.fishingProfile.upsert({
     where: { userId_guildId: { userId, guildId } },
     create: { userId, guildId },
     update: {},
   });
+}
+
+async function releaseFishingEncounter(userId, guildId) {
+  const released = await prisma.fishingProfile.updateMany({
+    where: {
+      userId,
+      guildId,
+      OR: [
+        { sharkBattleHp: { gt: 0 } },
+        { legendaryBattleUserId: { not: null } },
+      ],
+    },
+    data: {
+      sharkBattleHp: 0,
+      sharkBattleReward: 0,
+      legendaryBattleUserId: null,
+      legendaryBattleRound: 0,
+      legendaryBattleChoice: null,
+      legendaryBattleExpiresAt: null,
+    },
+  });
+  return released.count > 0;
 }
 
 function msToHuman(ms) {
@@ -885,6 +929,21 @@ export async function handleFishingInteraction(interaction) {
   const { customId } = interaction;
   const userId = interaction.user.id;
   const guildId = interaction.guildId;
+
+  if (customId.startsWith('fish_recover:')) {
+    const ownerId = customId.split(':')[1];
+    if (ownerId !== userId) {
+      return interaction.reply(fishingError('Somente o membro que fisgou o peixe pode liberar esta linha.'));
+    }
+
+    const released = await releaseFishingEncounter(userId, guildId);
+    return interaction.update(v2(
+      released
+        ? '## 🎣 Linha liberada!\nO encontro que ficou preso foi encerrado. Você já pode usar **/pescar** novamente.'
+        : '## 🎣 Linha já estava livre!\nVocê já pode usar **/pescar** novamente.',
+      { ephemeral: true },
+    ));
+  }
 
   if (customId.startsWith('fish_ability:')) {
     return handleFishAbility(interaction);
@@ -1538,10 +1597,10 @@ async function executeFishing(userId, guildId, isAdmin, reply, requestedSpotKey 
   } catch (error) {
     if (error?.message === 'cooldown') return reply(fishingError(`A maré ainda não virou. Aguarde **${msToHuman(error.remaining)}** para pescar novamente.`));
     if (error?.message === 'shark_battle') {
-      return reply(fishingError('O tubarão raivoso ainda está na sua linha. Use o botão de ataque para derrotá-lo antes de pescar novamente.'));
+      return reply(fishingRecoveryError('O tubarão raivoso ainda está na sua linha. Use o botão de ataque para derrotá-lo ou libere a linha se a mensagem anterior sumiu.', userId));
     }
     if (error?.message === 'legendary_battle') {
-      return reply(fishingError('A carpa lendária ainda está na sua linha. Use os botões da tentativa especial antes de pescar novamente.'));
+      return reply(fishingRecoveryError('A carpa lendária ainda está na sua linha. Use os botões da tentativa especial ou libere a linha se a mensagem anterior sumiu.', userId));
     }
     console.error('[PESCA]', error);
     return reply(fishingError('A linha arrebentou. Tente novamente em instantes.'));
