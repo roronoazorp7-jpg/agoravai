@@ -354,6 +354,10 @@ components:
           type: ["string", "null"]
         ticketQuestion3:
           type: ["string", "null"]
+        ticketPanelMessageId:
+          type: ["string", "null"]
+        ticketPanelChannelId:
+          type: ["string", "null"]
         instaChannel:
           type: ["string", "null"]
         instaColor:

@@ -94,6 +94,7 @@ interface DiscordGuild {
   id: string;
   name: string;
   icon: string | null;
+  approximate_member_count?: number;
 }
 
 interface DiscordUser {
@@ -114,7 +115,7 @@ interface DiscordChannel {
 async function fetchDiscordGuild(guildId: string): Promise<DiscordGuild | null> {
   if (!BOT_TOKEN) return null;
   try {
-    const res = await fetch(`${DISCORD_API}/guilds/${guildId}`, {
+    const res = await fetch(`${DISCORD_API}/guilds/${guildId}?with_counts=true`, {
       headers: { Authorization: `Bot ${BOT_TOKEN}` },
     });
     if (!res.ok) return null;
@@ -197,6 +198,7 @@ router.get("/guilds", async (req, res) => {
           partnerEnabled: g.partnerEnabled,
           hasTicketChannel: !!g.ticketChannel,
           hasShop: !!g.lojaTitle,
+          memberCount: discord?.approximate_member_count ?? null,
           discordName: discord?.name ?? null,
           discordIcon: discord ? guildIconUrl(g.guildId, discord.icon) : null,
         };

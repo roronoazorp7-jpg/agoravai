@@ -14,25 +14,32 @@ import { Switch as ToggleSwitch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import {
   AlertCircle,
+  Activity,
   ArrowUpRight,
   BarChart3,
+  Bot,
   Check,
   ChevronDown,
+  ChevronRight,
   CircleHelp,
   Compass,
   Database,
   ExternalLink,
+  Hash,
   LayoutDashboard,
   LifeBuoy,
   Loader2,
+  LockKeyhole,
   Menu,
   MessageSquare,
   MonitorCog,
   PanelTop,
+  Paintbrush,
   RefreshCw,
   Save,
   Settings2,
   ShieldCheck,
+  Sparkles,
   Store,
   Users,
   X,
@@ -145,76 +152,78 @@ function AppShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const displayName = identity?.globalName || identity?.username || 'Discord operator';
   return (
-    <div className="noise min-h-[100dvh] bg-background text-foreground">
-      <aside className={`fixed inset-y-0 left-0 z-40 flex w-[268px] flex-col border-r border-sidebar-border bg-sidebar px-4 py-5 text-sidebar-foreground transition-transform md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+    <div className="noise app-surface min-h-[100dvh] text-foreground">
+      <aside className={`fixed inset-y-0 left-0 z-40 flex w-[280px] flex-col border-r border-sidebar-border bg-sidebar px-4 py-5 text-sidebar-foreground transition-transform md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center justify-between px-3">
-          <Link href="/overview" className="flex items-center gap-3" data-testid="link-brand">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
-              <Zap className="size-[18px]" strokeWidth={2.5} />
+          <Link href="/overview" className="group flex items-center gap-3" data-testid="link-brand">
+            <span className="sidebar-brand-mark flex size-11 items-center justify-center rounded-[15px] bg-sidebar-primary text-sidebar-primary-foreground">
+              <Zap className="size-[21px] transition-transform group-hover:rotate-12" strokeWidth={2.7} />
             </span>
             <span>
-              <span className="block font-display text-[15px] font-bold tracking-tight text-sidebar-foreground">AgoraVai</span>
-              <span className="font-mono text-[9px] uppercase tracking-[.18em] text-sidebar-foreground/45">control room</span>
+              <span className="block font-display text-[20px] font-extrabold tracking-tight text-sidebar-foreground">AgoraVai</span>
+              <span className="font-mono text-[9px] uppercase tracking-[.18em] text-sidebar-foreground/45">your server sidekick</span>
             </span>
           </Link>
-          <button className="rounded-md p-1 text-sidebar-foreground/60 hover:bg-sidebar-accent md:hidden" onClick={() => setMobileOpen(false)} data-testid="button-close-menu">
+          <button className="rounded-lg p-2 text-sidebar-foreground/60 hover:bg-sidebar-accent md:hidden" onClick={() => setMobileOpen(false)} data-testid="button-close-menu" aria-label="Close navigation">
             <X className="size-4" />
           </button>
         </div>
-        <div className="mt-8 px-2">
-          <p className="mb-2 px-2 font-mono text-[10px] font-medium uppercase tracking-[.16em] text-sidebar-foreground/40">Workspace</p>
+        <div className="relative mt-8 rounded-2xl border border-sidebar-border bg-sidebar-accent/70 p-3">
+          <span className="doodle-star right-3 top-2 text-sidebar-primary">✦</span>
+          <p className="mb-2 px-1 font-mono text-[10px] font-medium uppercase tracking-[.16em] text-sidebar-foreground/45">Active playground</p>
           <div className="relative">
             <select
               value={selectedGuild?.guildId ?? ''}
               onChange={(event) => setSelectedId(event.target.value)}
-              className="w-full appearance-none rounded-lg border border-sidebar-border bg-sidebar-accent py-2.5 pl-3 pr-8 text-left text-xs font-semibold text-sidebar-accent-foreground outline-none ring-sidebar-primary focus:ring-2"
+              className="w-full appearance-none rounded-xl border border-sidebar-border bg-sidebar/70 py-3 pl-3 pr-8 text-left text-xs font-bold text-sidebar-accent-foreground outline-none ring-sidebar-primary focus:ring-2"
               data-testid="select-sidebar-server"
             >
               {guilds.length === 0 && <option value="">No server connected</option>}
               {guilds.map((guild) => <option key={guild.guildId} value={guild.guildId}>{guild.discordName || 'Unnamed server'}</option>)}
             </select>
-            <ChevronDown className="pointer-events-none absolute right-2.5 top-3 size-3.5 text-sidebar-foreground/50" />
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-3.5 size-3.5 text-sidebar-foreground/50" />
           </div>
         </div>
         <nav className="mt-7 space-y-1" aria-label="Primary navigation">
-          <p className="mb-2 px-3 font-mono text-[10px] font-medium uppercase tracking-[.16em] text-sidebar-foreground/40">Manage</p>
+          <p className="mb-2 px-3 font-mono text-[10px] font-medium uppercase tracking-[.16em] text-sidebar-foreground/40">Run the community</p>
           {navItems.map((item) => {
             const active = location === item.href;
             const Icon = item.icon;
-            return <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)} className={`nav-link flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-semibold ${active ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm' : 'text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid={`link-nav-${item.label.toLowerCase().replaceAll(' ', '-')}`}>
-              <Icon className="size-[17px]" strokeWidth={active ? 2.4 : 1.8} /><span>{item.label}</span>
-              {item.href === '/tickets' && selectedGuild?.hasTicketChannel && <span className={`ml-auto size-1.5 rounded-full ${active ? 'bg-sidebar-primary-foreground' : 'bg-sidebar-primary'}`} />}
+            return <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)} className={`nav-link flex items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-bold ${active ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-active={active} data-testid={`link-nav-${item.label.toLowerCase().replaceAll(' ', '-')}`}>
+              <span className={`flex size-8 items-center justify-center rounded-lg ${active ? 'bg-sidebar-primary-foreground/15' : 'bg-sidebar-accent'}`}><Icon className="size-[17px]" strokeWidth={active ? 2.5 : 1.9} /></span><span>{item.label}</span>
+              {item.href === '/tickets' && selectedGuild?.hasTicketChannel && <span className={`ml-auto size-2 rounded-full ${active ? 'bg-sidebar-primary-foreground' : 'bg-sidebar-primary'}`} />}
+              {active && <ChevronRight className="ml-auto size-4" />}
             </Link>;
           })}
         </nav>
         <div className="mt-auto space-y-3">
-          <Link href="/settings" className={`nav-link flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-semibold ${location === '/settings' ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid="link-nav-settings">
-            <MonitorCog className="size-[17px]" /><span>Settings</span>
+          <Link href="/settings" className={`nav-link flex items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-bold ${location === '/settings' ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-active={location === '/settings'} data-testid="link-nav-settings">
+            <span className="flex size-8 items-center justify-center rounded-lg bg-sidebar-accent"><MonitorCog className="size-[17px]" /></span><span>Settings</span>
           </Link>
           <Separator className="bg-sidebar-border" />
-          <div className="flex items-center gap-3 rounded-xl bg-sidebar-accent/70 p-3">
-            {identityLoading ? <Skeleton className="size-8 rounded-full bg-sidebar-foreground/10" /> : <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sidebar-primary/20 font-display text-xs font-bold text-sidebar-primary">{displayName.slice(0, 2).toUpperCase()}</span>}
+          <div className="flex items-center gap-3 rounded-2xl border border-sidebar-border bg-sidebar-accent/70 p-3">
+            {identityLoading ? <Skeleton className="size-9 rounded-xl bg-sidebar-foreground/10" /> : <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-sidebar-primary font-display text-sm font-extrabold text-sidebar-primary-foreground">{displayName.slice(0, 2).toUpperCase()}</span>}
             <div className="min-w-0">
-              <p className="truncate text-xs font-semibold text-sidebar-accent-foreground" data-testid="text-sidebar-identity">{displayName}</p>
+              <p className="truncate text-xs font-extrabold text-sidebar-accent-foreground" data-testid="text-sidebar-identity">{displayName}</p>
               <p className="truncate font-mono text-[10px] text-sidebar-foreground/45">{identity?.email || 'Discord connected'}</p>
             </div>
-            <span className="ml-auto size-1.5 shrink-0 rounded-full bg-sidebar-primary" />
+            <span className="ml-auto size-2 shrink-0 rounded-full bg-chart-5" />
           </div>
         </div>
       </aside>
       {mobileOpen && <button className="fixed inset-0 z-30 bg-foreground/30 md:hidden" onClick={() => setMobileOpen(false)} aria-label="Close menu" data-testid="button-mobile-overlay" />}
       <main className="min-h-[100dvh] md:pl-[268px]">
-        <header className="sticky top-0 z-20 flex h-[68px] items-center justify-between border-b border-border/80 bg-background/90 px-5 backdrop-blur-xl md:px-9">
+        <header className="sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-border/80 bg-background/85 px-5 backdrop-blur-xl md:px-10">
           <div className="flex items-center gap-3">
-            <button className="rounded-lg border border-border p-2 md:hidden" onClick={() => setMobileOpen(true)} data-testid="button-open-menu"><Menu className="size-4" /></button>
-            <div className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex"><span className="font-mono uppercase tracking-[.12em]">AgoraVai</span><span className="text-border">/</span><span className="font-semibold text-foreground">{selectedGuild?.discordName || 'Select a server'}</span></div>
+            <button className="rounded-xl border-2 border-border bg-card p-2 md:hidden" onClick={() => setMobileOpen(true)} data-testid="button-open-menu" aria-label="Open navigation"><Menu className="size-4" /></button>
+            <div className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex"><span className="font-display text-base font-extrabold text-foreground">Howdy, operator</span><span className="text-border">/</span><span className="font-semibold text-foreground">{selectedGuild?.discordName || 'Select a server'}</span></div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="hidden items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 sm:flex"><span className="status-dot size-1.5 rounded-full bg-accent" /><span className="font-mono text-[10px] uppercase tracking-[.11em] text-muted-foreground">Bot online</span></div>
-            <Link href="/settings" className="flex size-8 items-center justify-center rounded-full border border-border bg-card text-muted-foreground hover:text-foreground" data-testid="link-header-settings"><Settings2 className="size-4" /></Link>
+            <div className="hidden items-center gap-2 rounded-full border-2 border-border bg-card px-3 py-1.5 sm:flex"><span className="status-dot size-2 rounded-full bg-chart-5" /><span className="font-mono text-[10px] font-medium uppercase tracking-[.11em] text-muted-foreground">Bot is online</span></div>
+            <Link href="/settings" className="flex size-10 items-center justify-center rounded-xl border-2 border-border bg-card text-muted-foreground hover:-translate-y-0.5 hover:text-foreground" data-testid="link-header-settings" aria-label="Open settings"><Settings2 className="size-4" /></Link>
           </div>
         </header>
-        <div className="mx-auto max-w-[1440px] px-5 py-7 md:px-9 md:py-9">{children}</div>
+        <div className="mx-auto max-w-[1440px] px-5 py-7 md:px-10 md:py-10">{children}</div>
       </main>
     </div>
   );
@@ -363,9 +372,52 @@ function TicketsPage() {
   const savePanel = () => updateConfig.mutate({ guildId, data: { ticketChannel: draft.channel || null, ticketCategory: draft.category || null, ticketTitle: draft.title, ticketText: draft.text, ticketBtnLabel: draft.button, ticketOpenText: draft.openText || null } }, { onSuccess: (saved) => { client.setQueryData(getGetGuildConfigQueryKey(guildId), saved); void client.invalidateQueries({ queryKey: getListGuildsQueryKey() }); toast({ title: 'Panel settings saved', description: 'Your next Discord panel will use this copy.' }); }, onError: () => toast({ title: 'Could not save panel', description: 'Check the fields and try again.', variant: 'destructive' }) });
   const runPanelAction = (kind: 'send' | 'update') => {
     const mutation = kind === 'send' ? sendPanel : updatePanel;
-    mutation.mutate({ guildId }, { onSuccess: (result) => toast({ title: kind === 'send' ? 'Panel sent to Discord' : 'Panel updated in Discord', description: result.messageId ? `Message ID ${result.messageId}` : 'Discord confirmed the panel action.' }), onError: () => toast({ title: 'Discord action failed', description: 'The panel could not be changed. Confirm the channel and try again.', variant: 'destructive' }) });
+    const publish = () => mutation.mutate(
+      { guildId },
+      {
+        onSuccess: (result) => {
+          void client.invalidateQueries({ queryKey: getGetGuildConfigQueryKey(guildId) });
+          void client.invalidateQueries({ queryKey: getListGuildsQueryKey() });
+          toast({
+            title: kind === 'send' ? 'Panel sent to Discord' : 'Panel updated in Discord',
+            description: result.messageId ? `Message ID ${result.messageId}` : 'Discord confirmed the panel action.',
+          });
+        },
+        onError: () => toast({
+          title: 'Discord action failed',
+          description: 'The panel could not be changed. Confirm the channel and try again.',
+          variant: 'destructive',
+        }),
+      },
+    );
+
+    // Persist the current draft first so publishing never sends stale database copy.
+    updateConfig.mutate(
+      {
+        guildId,
+        data: {
+          ticketChannel: draft.channel || null,
+          ticketCategory: draft.category || null,
+          ticketTitle: draft.title,
+          ticketText: draft.text,
+          ticketBtnLabel: draft.button,
+          ticketOpenText: draft.openText || null,
+        },
+      },
+      {
+        onSuccess: (saved) => {
+          client.setQueryData(getGetGuildConfigQueryKey(guildId), saved);
+          publish();
+        },
+        onError: () => toast({
+          title: 'Could not save panel',
+          description: 'Save the panel settings before publishing it.',
+          variant: 'destructive',
+        }),
+      },
+    );
   };
-  return <ConnectionGate><PageHeading eyebrow="Ticket operations" title="Ticket panel" description="Design the hand-off members see, then publish it directly into a Discord channel." action={<div className="flex gap-2"><Button variant="outline" onClick={() => runPanelAction('update')} disabled={updatePanel.isPending || !selectedGuild?.hasTicketChannel} data-testid="button-update-ticket-panel">{updatePanel.isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : <RefreshCw className="mr-2 size-4" />}Update existing</Button><Button onClick={() => runPanelAction('send')} disabled={sendPanel.isPending || updateConfig.isPending} data-testid="button-send-ticket-panel">{sendPanel.isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : <ExternalLink className="mr-2 size-4" />}Send to Discord</Button></div>} />
+  return <ConnectionGate><PageHeading eyebrow="Ticket operations" title="Ticket panel" description="Design the hand-off members see, then publish it directly into a Discord channel." action={<div className="flex gap-2"><Button variant="outline" onClick={() => runPanelAction('update')} disabled={updatePanel.isPending || updateConfig.isPending || !config?.ticketPanelMessageId} data-testid="button-update-ticket-panel">{updatePanel.isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : <RefreshCw className="mr-2 size-4" />}Update existing</Button><Button onClick={() => runPanelAction('send')} disabled={sendPanel.isPending || updateConfig.isPending} data-testid="button-send-ticket-panel">{sendPanel.isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : <ExternalLink className="mr-2 size-4" />}Send to Discord</Button></div>} />
     {configQuery.isLoading ? <LoadingGrid /> : configQuery.error ? <ErrorState onRetry={() => void configQuery.refetch()} /> : <div className="grid gap-5 xl:grid-cols-[1fr_380px]"><Card><CardHeader><p className="font-mono text-[10px] uppercase tracking-[.15em] text-primary">Message setup</p><CardTitle className="font-display text-xl">Where should tickets land?</CardTitle><p className="text-sm leading-6 text-muted-foreground">Channel IDs are selected from the channels AgoraVai can currently see.</p></CardHeader><CardContent className="space-y-5"><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="ticket-channel" className="text-xs font-semibold">Ticket channel</Label><select id="ticket-channel" value={draft.channel} onChange={(e) => updateDraft('channel', e.target.value)} className="h-10 w-full rounded-md border border-input bg-background/70 px-3 text-sm outline-none focus:ring-2 focus:ring-ring" data-testid="select-ticket-channel"><option value="">Choose a channel</option>{(channelsQuery.data ?? []).map((channel) => <option key={channel.id} value={channel.id}>#{channel.name}</option>)}</select>{channelsQuery.error && <p className="text-xs text-destructive">Channels unavailable. You can paste an ID in Configuration.</p>}</div><TextField name="ticket-category" label="Category ID" value={draft.category} onChange={(v) => updateDraft('category', v)} /></div><TextField name="ticket-title" label="Panel title" value={draft.title} onChange={(v) => updateDraft('title', v)} /><TextField name="ticket-text" label="Panel message" value={draft.text} onChange={(v) => updateDraft('text', v)} multiline /><div className="grid gap-4 sm:grid-cols-2"><TextField name="ticket-button-label" label="Button label" value={draft.button} onChange={(v) => updateDraft('button', v)} /><TextField name="ticket-open-text" label="Opening message" value={draft.openText} onChange={(v) => updateDraft('openText', v)} /></div><div className="flex justify-end border-t border-border/70 pt-5"><Button onClick={savePanel} disabled={updateConfig.isPending} data-testid="button-save-ticket-panel">{updateConfig.isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Save className="mr-2 size-4" />}Save panel settings</Button></div></CardContent></Card><TicketPreview title={draft.title} text={draft.text} button={draft.button} channel={draft.channel} /></div>}</ConnectionGate>;
 }
 

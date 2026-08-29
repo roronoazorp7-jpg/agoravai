@@ -90,6 +90,10 @@ export interface GuildConfig {
   /** @nullable */
   ticketQuestion3?: string | null;
   /** @nullable */
+  ticketPanelMessageId?: string | null;
+  /** @nullable */
+  ticketPanelChannelId?: string | null;
+  /** @nullable */
   instaChannel?: string | null;
   /** @nullable */
   instaColor?: string | null;
