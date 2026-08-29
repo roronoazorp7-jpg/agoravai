@@ -20,7 +20,9 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  DiscordIdentity,
   ErrorResponse,
+  GuildChannel,
   GuildConfig,
   GuildConfigUpdate,
   GuildStats,
@@ -119,6 +121,83 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
 
 
+export const getGetDiscordIdentityUrl = () => {
+
+
+
+
+  return `/api/me`
+}
+
+/**
+ * @summary Get the connected Discord identity
+ */
+export const getDiscordIdentity = async ( options?: RequestInit): Promise<DiscordIdentity> => {
+
+  return customFetch<DiscordIdentity>(getGetDiscordIdentityUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDiscordIdentityQueryKey = () => {
+    return [
+    `/api/me`
+    ] as const;
+    }
+
+
+export const getGetDiscordIdentityQueryOptions = <TData = Awaited<ReturnType<typeof getDiscordIdentity>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDiscordIdentity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDiscordIdentityQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDiscordIdentity>>> = ({ signal }) => getDiscordIdentity({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDiscordIdentity>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDiscordIdentityQueryResult = NonNullable<Awaited<ReturnType<typeof getDiscordIdentity>>>
+export type GetDiscordIdentityQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get the connected Discord identity
+ */
+
+export function useGetDiscordIdentity<TData = Awaited<ReturnType<typeof getDiscordIdentity>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDiscordIdentity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDiscordIdentityQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getListGuildsUrl = () => {
 
 
@@ -128,7 +207,7 @@ export const getListGuildsUrl = () => {
 }
 
 /**
- * @summary List all guilds with configs
+ * @summary List configured guilds where the connected Discord user is an administrator
  */
 export const listGuilds = async ( options?: RequestInit): Promise<GuildSummary[]> => {
 
@@ -152,7 +231,7 @@ export const getListGuildsQueryKey = () => {
     }
 
 
-export const getListGuildsQueryOptions = <TData = Awaited<ReturnType<typeof listGuilds>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listGuilds>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListGuildsQueryOptions = <TData = Awaited<ReturnType<typeof listGuilds>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listGuilds>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -171,19 +250,96 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type ListGuildsQueryResult = NonNullable<Awaited<ReturnType<typeof listGuilds>>>
-export type ListGuildsQueryError = ErrorType<unknown>
+export type ListGuildsQueryError = ErrorType<ErrorResponse>
 
 
 /**
- * @summary List all guilds with configs
+ * @summary List configured guilds where the connected Discord user is an administrator
  */
 
-export function useListGuilds<TData = Awaited<ReturnType<typeof listGuilds>>, TError = ErrorType<unknown>>(
+export function useListGuilds<TData = Awaited<ReturnType<typeof listGuilds>>, TError = ErrorType<ErrorResponse>>(
   options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listGuilds>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListGuildsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListGuildChannelsUrl = (guildId: string,) => {
+
+
+
+
+  return `/api/guilds/${guildId}/channels`
+}
+
+/**
+ * @summary List text channels available to the bot
+ */
+export const listGuildChannels = async (guildId: string, options?: RequestInit): Promise<GuildChannel[]> => {
+
+  return customFetch<GuildChannel[]>(getListGuildChannelsUrl(guildId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListGuildChannelsQueryKey = (guildId: string,) => {
+    return [
+    `/api/guilds/${guildId}/channels`
+    ] as const;
+    }
+
+
+export const getListGuildChannelsQueryOptions = <TData = Awaited<ReturnType<typeof listGuildChannels>>, TError = ErrorType<ErrorResponse>>(guildId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listGuildChannels>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListGuildChannelsQueryKey(guildId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listGuildChannels>>> = ({ signal }) => listGuildChannels(guildId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(guildId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listGuildChannels>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListGuildChannelsQueryResult = NonNullable<Awaited<ReturnType<typeof listGuildChannels>>>
+export type ListGuildChannelsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List text channels available to the bot
+ */
+
+export function useListGuildChannels<TData = Awaited<ReturnType<typeof listGuildChannels>>, TError = ErrorType<ErrorResponse>>(
+ guildId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listGuildChannels>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListGuildChannelsQueryOptions(guildId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -96,6 +96,21 @@ interface DiscordGuild {
   icon: string | null;
 }
 
+interface DiscordUser {
+  id: string;
+  username: string;
+  global_name?: string | null;
+  email?: string | null;
+  avatar?: string | null;
+}
+
+interface DiscordChannel {
+  id: string;
+  name: string;
+  type: number;
+  position: number;
+}
+
 async function fetchDiscordGuild(guildId: string): Promise<DiscordGuild | null> {
   if (!BOT_TOKEN) return null;
   try {
@@ -109,11 +124,64 @@ async function fetchDiscordGuild(guildId: string): Promise<DiscordGuild | null> 
   }
 }
 
+async function fetchDiscordUser(): Promise<DiscordUser | null> {
+  if (!BOT_TOKEN) return null;
+  try {
+    const res = await fetch(`${DISCORD_API}/users/@me`, {
+      headers: { Authorization: `Bot ${BOT_TOKEN}` },
+    });
+    if (!res.ok) return null;
+    return await res.json() as DiscordUser;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchDiscordChannels(guildId: string): Promise<DiscordChannel[] | null> {
+  if (!BOT_TOKEN) return null;
+  try {
+    const res = await fetch(`${DISCORD_API}/guilds/${guildId}/channels`, {
+      headers: { Authorization: `Bot ${BOT_TOKEN}` },
+    });
+    if (!res.ok) return null;
+    return await res.json() as DiscordChannel[];
+  } catch {
+    return null;
+  }
+}
+
 function guildIconUrl(guildId: string, icon: string | null): string | null {
   if (!icon) return null;
   const ext = icon.startsWith("a_") ? "gif" : "webp";
   return `https://cdn.discordapp.com/icons/${guildId}/${icon}.${ext}?size=64`;
 }
+
+function userAvatarUrl(userId: string, avatar: string | null | undefined): string | null {
+  if (!avatar) return null;
+  const ext = avatar.startsWith("a_") ? "gif" : "webp";
+  return `https://cdn.discordapp.com/avatars/${userId}/${avatar}.${ext}?size=128`;
+}
+
+router.get("/me", async (req, res) => {
+  if (!BOT_TOKEN) {
+    res.status(401).json({ error: "Discord connection is not available" });
+    return;
+  }
+
+  const user = await fetchDiscordUser();
+  if (!user) {
+    res.status(401).json({ error: "Discord connection is not available" });
+    return;
+  }
+
+  res.json({
+    id: user.id,
+    username: user.username,
+    globalName: user.global_name ?? null,
+    email: user.email ?? null,
+    avatar: userAvatarUrl(user.id, user.avatar),
+  });
+});
 
 router.get("/guilds", async (req, res) => {
   try {
@@ -138,6 +206,46 @@ router.get("/guilds", async (req, res) => {
     res.json(enriched);
   } catch (err) {
     req.log.error({ err }, "Failed to list guilds");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/guilds/:guildId/channels", async (req, res) => {
+  const { guildId } = req.params;
+  if (!isValidGuildId(guildId)) {
+    res.status(400).json({ error: "Invalid guild ID" });
+    return;
+  }
+  if (!BOT_TOKEN) {
+    res.status(503).json({ error: "DISCORD_TOKEN not set" });
+    return;
+  }
+
+  try {
+    const [config] = await db
+      .select({ guildId: guildConfigTable.guildId })
+      .from(guildConfigTable)
+      .where(eq(guildConfigTable.guildId, guildId));
+
+    if (!config) {
+      res.status(404).json({ error: "Guild config not found" });
+      return;
+    }
+
+    const channels = await fetchDiscordChannels(guildId);
+    if (!channels) {
+      res.status(502).json({ error: "Could not load Discord channels" });
+      return;
+    }
+
+    res.json(
+      channels
+        .filter((channel) => channel.type === 0)
+        .sort((a, b) => a.position - b.position)
+        .map(({ id, name, type, position }) => ({ id, name, type, position })),
+    );
+  } catch (err) {
+    req.log.error({ err }, "Failed to list guild channels");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -185,9 +293,35 @@ router.patch("/guilds/:guildId/config", async (req, res) => {
       return;
     }
 
+    const editableKeys = new Set([
+      "ticketChannel", "ticketCategory", "ticketColor", "ticketBanner", "ticketThumb",
+      "ticketFooter", "ticketTitle", "ticketText", "ticketPingRole", "ticketPingUser",
+      "ticketBtnLabel", "ticketBtnEmoji", "ticketBtnStyle", "ticketOpenText",
+      "ticketUseSeparator", "ticketBannerPosition", "ticketOnlyBanner", "ticketUseMenu",
+      "ticketQuestion1", "ticketQuestion2", "ticketQuestion3",
+      "instaChannel", "instaColor", "instaEmoji", "instaHandle",
+      "tellonymChannel", "tellonymColor", "tellonymBanner", "tellonymThumb",
+      "tellonymFooter", "tellonymTitle", "tellonymText", "tellonymBtnLabel", "tellonymBtnEmoji",
+      "lojaTitle", "lojaText", "lojaBanner", "lojaThumb", "lojaColor", "lojaConversao",
+      "lojaUseDivider", "shopEmojiComprar", "shopEmojiVitrine", "shopEmojiConverter",
+      "shopEmojiSaldo", "shopEmojiGift",
+      "welcomeEnabled", "welcomeChannel", "welcomeColor", "welcomeBanner", "welcomeThumb",
+      "welcomeFooter", "welcomeTitle", "welcomeText", "welcomeRoles", "welcomeChannels",
+      "welcomeUseDivider", "welcomeBannerPosition", "welcomeShowTitle", "welcomeShowAvatar",
+      "welcomeDeleteAfter",
+      "partnerEnabled", "partnerChannel", "partnerResponsibleRole", "partnerPingRole",
+      "partnerRole", "partnerNotifyDm", "partnerMessage", "partnerImage", "partnerThumbnail",
+      "partnerFooter", "partnerColor", "partnerRemoveOnLeave",
+      "botIconUrl", "botBannerUrl", "botBio", "aiChannelId",
+    ]);
+    const updates = Object.fromEntries(
+      Object.entries(req.body as Record<string, unknown>)
+        .filter(([key]) => editableKeys.has(key)),
+    );
+
     const [updated] = await db
       .update(guildConfigTable)
-      .set({ ...req.body, updatedAt: new Date() })
+      .set(updates)
       .where(eq(guildConfigTable.guildId, guildId))
       .returning();
 

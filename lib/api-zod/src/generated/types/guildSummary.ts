@@ -13,6 +13,10 @@ export interface GuildSummary {
   partnerEnabled: boolean;
   hasTicketChannel: boolean;
   hasShop: boolean;
+  isOwner: boolean;
+  permissions: number;
+  /** @nullable */
+  memberCount?: number | null;
   /** @nullable */
   discordName?: string | null;
   /** @nullable */

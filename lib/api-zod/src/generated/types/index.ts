@@ -6,7 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './discordIdentity';
 export * from './errorResponse';
+export * from './guildChannel';
 export * from './guildConfig';
 export * from './guildConfigUpdate';
 export * from './guildStats';

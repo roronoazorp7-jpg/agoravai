@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "AgoraVai Admin"
+description = "Painel administrativo do AgoraVai para gerenciar servidores Discord, módulos do bot, configurações de painéis e estatísticas da comunidade."
+version = "1.0.0"
+id = "artifacts/agoravai-dashboard"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25697
+
+[services.development]
+run = "pnpm --filter @workspace/agoravai-dashboard run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/agoravai-dashboard", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/agoravai-dashboard/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25697"
+BASE_PATH = "/"

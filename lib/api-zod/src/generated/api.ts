@@ -18,7 +18,19 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
- * @summary List all guilds with configs
+ * @summary Get the connected Discord identity
+ */
+export const GetDiscordIdentityResponse = zod.object({
+  "id": zod.string(),
+  "username": zod.string(),
+  "globalName": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "avatar": zod.string().nullish()
+})
+
+
+/**
+ * @summary List configured guilds where the connected Discord user is an administrator
  */
 export const ListGuildsResponseItem = zod.object({
   "id": zod.string(),
@@ -27,10 +39,29 @@ export const ListGuildsResponseItem = zod.object({
   "partnerEnabled": zod.boolean(),
   "hasTicketChannel": zod.boolean(),
   "hasShop": zod.boolean(),
+  "isOwner": zod.boolean(),
+  "permissions": zod.number(),
+  "memberCount": zod.number().nullish(),
   "discordName": zod.string().nullish(),
   "discordIcon": zod.string().nullish()
 })
 export const ListGuildsResponse = zod.array(ListGuildsResponseItem)
+
+
+/**
+ * @summary List text channels available to the bot
+ */
+export const ListGuildChannelsParams = zod.object({
+  "guildId": zod.coerce.string()
+})
+
+export const ListGuildChannelsResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "type": zod.number(),
+  "position": zod.number()
+})
+export const ListGuildChannelsResponse = zod.array(ListGuildChannelsResponseItem)
 
 
 /**

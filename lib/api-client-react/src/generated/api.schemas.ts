@@ -20,10 +20,32 @@ export interface GuildSummary {
   partnerEnabled: boolean;
   hasTicketChannel: boolean;
   hasShop: boolean;
+  isOwner: boolean;
+  permissions: number;
+  /** @nullable */
+  memberCount?: number | null;
   /** @nullable */
   discordName?: string | null;
   /** @nullable */
   discordIcon?: string | null;
+}
+
+export interface DiscordIdentity {
+  id: string;
+  username: string;
+  /** @nullable */
+  globalName?: string | null;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  avatar?: string | null;
+}
+
+export interface GuildChannel {
+  id: string;
+  name: string;
+  type: number;
+  position: number;
 }
 
 export interface GuildConfig {

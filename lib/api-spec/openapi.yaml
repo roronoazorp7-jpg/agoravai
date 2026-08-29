@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: account
+    description: Connected Discord account
   - name: guilds
     description: Guild configuration
 paths:
@@ -26,20 +28,70 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /me:
+    get:
+      operationId: getDiscordIdentity
+      tags: [account]
+      summary: Get the connected Discord identity
+      responses:
+        "200":
+          description: Connected Discord user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiscordIdentity"
+        "401":
+          description: Discord connection is not available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /guilds:
     get:
       operationId: listGuilds
       tags: [guilds]
-      summary: List all guilds with configs
+      summary: List configured guilds where the connected Discord user is an administrator
       responses:
         "200":
-          description: List of guild configs
+          description: Admin-accessible guilds with bot configuration summaries
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: "#/components/schemas/GuildSummary"
+        "401":
+          description: Discord connection is not available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /guilds/{guildId}/channels:
+    get:
+      operationId: listGuildChannels
+      tags: [guilds]
+      summary: List text channels available to the bot
+      parameters:
+        - name: guildId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Discord channels
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GuildChannel"
+        "403":
+          description: User is not an administrator of this guild
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /guilds/{guildId}/config:
     get:
       operationId: getGuildConfig
@@ -202,6 +254,12 @@ components:
           type: boolean
         hasShop:
           type: boolean
+        isOwner:
+          type: boolean
+        permissions:
+          type: integer
+        memberCount:
+          type: ["integer", "null"]
         discordName:
           type: ["string", "null"]
         discordIcon:
@@ -213,6 +271,40 @@ components:
         - partnerEnabled
         - hasTicketChannel
         - hasShop
+        - isOwner
+        - permissions
+    DiscordIdentity:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        globalName:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        avatar:
+          type: ["string", "null"]
+      required:
+        - id
+        - username
+    GuildChannel:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: integer
+        position:
+          type: integer
+      required:
+        - id
+        - name
+        - type
+        - position
     GuildConfig:
       type: object
       properties:
