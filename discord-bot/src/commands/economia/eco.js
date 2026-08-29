@@ -320,6 +320,12 @@ const cmdSaldo = {
   },
 
   async executePrefix(message, args) {
+    // Mantém `savage economia` como alias de saldo, mas permite usar o novo
+    // subcomando administrativo sem alterar os aliases existentes.
+    if (['operador', 'admin'].includes(args[0]?.toLowerCase())) {
+      const { default: operatorCommand } = await import('./operador.js');
+      return operatorCommand.executePrefix(message, args);
+    }
     const target    = message.mentions.users.first() ?? message.author;
     const eco       = await getEco(target.id, message.guildId);
     const member    = await message.guild.members.fetch(target.id).catch(() => null);

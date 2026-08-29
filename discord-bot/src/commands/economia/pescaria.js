@@ -205,7 +205,7 @@ const FISHING_CONDITIONS = Object.freeze([
   },
 ]);
 
-const FISHING_BAITS = Object.freeze([
+export const FISHING_BAITS = Object.freeze([
   {
     key: 'minhoca',
     name: 'Minhoca fresca',
