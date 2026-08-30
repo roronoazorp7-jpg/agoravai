@@ -247,6 +247,21 @@ model Economy {
   @@unique([userId, guildId])
 }
 
+model Business {
+  id              String   @id @default(cuid())
+  userId          String
+  guildId         String
+  businessKey     String
+  level           Int      @default(1)
+  lastCollectedAt DateTime @default(now())
+  totalEarned     Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, guildId, businessKey])
+  @@index([guildId, userId])
+}
+
 model CriminalRecord {
   id        String    @id @default(cuid())
   userId    String

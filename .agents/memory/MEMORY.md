@@ -17,3 +17,4 @@
 - [Pet Components V2](pet-components-v2.md) — fluxo de pets usa painéis V2 compartilhados, ações pet_action:* e mantém persistência atual.
 - [Reputação e XP](reputation-xp.md) — progressão vem de interações reais com o bot, com metas crescentes e barra compacta no perfil.
 - [Dashboard e schema](dashboard-schema-sync.md) — endpoints que retornam colunas novas exigem sincronização explícita do banco de desenvolvimento antes da validação visual.
+- [Empresas e renda passiva](business-economy.md) — ao alterar a taxa de uma empresa, liquide o lucro acumulado antes para evitar ganhos retroativos.

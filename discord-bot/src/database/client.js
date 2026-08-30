@@ -5,6 +5,31 @@ const prisma = new PrismaClient({
 });
 
 export async function ensureMarriageSchema() {
+  // Mantém a economia de empresas compatível com bancos existentes. A criação
+  // é aditiva e também é coberta pelo schema.prisma/db push no deploy.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "Business" (
+      "id" TEXT NOT NULL,
+      "userId" TEXT NOT NULL,
+      "guildId" TEXT NOT NULL,
+      "businessKey" TEXT NOT NULL,
+      "level" INTEGER NOT NULL DEFAULT 1,
+      "lastCollectedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "totalEarned" INTEGER NOT NULL DEFAULT 0,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "Business_pkey" PRIMARY KEY ("id")
+    )
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "Business_userId_guildId_businessKey_key"
+      ON "Business" ("userId", "guildId", "businessKey")
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "Business_guildId_userId_idx"
+      ON "Business" ("guildId", "userId")
+  `);
+
   // O schema do Prisma pode ser atualizado antes do banco do Railway.
   // Esta alteração é aditiva e mantém o painel funcionando durante o deploy.
   await prisma.$executeRawUnsafe(`

@@ -2,6 +2,7 @@ import { SlashCommandBuilder } from 'discord.js';
 import prisma from '../../database/client.js';
 import { FISH, FISHING_BAITS, RODS } from './pescaria.js';
 import { CARD_DEFS } from '../../utils/cardData.js';
+import { BUSINESS_MAX_LEVEL, getBusiness } from '../../utils/businessData.js';
 
 const BOT_OWNER_ID = '1538243891155705877';
 const MAX_INT = 2_147_483_647;
@@ -33,6 +34,7 @@ const RESOURCE_LABELS = {
   divida: 'coins de dívida criminal',
   prisoes: 'prisões na ficha criminal',
   crimes: 'crimes na ficha criminal',
+  empresa: 'empresa',
   peixe: 'peixes',
   isca: 'iscas',
   vara: 'vara de pesca equipada',
@@ -200,6 +202,36 @@ async function updateRod(tx, { userId, guildId, action, itemRef }) {
   return { ok: true, oldValue: current.rodKey, nextValue: nextKey };
 }
 
+async function updateBusiness(tx, { userId, guildId, action, itemRef, quantity }) {
+  const definition = getBusiness(itemRef);
+  if (!definition) return { ok: false, reason: 'invalidBusiness' };
+
+  const where = {
+    userId_guildId_businessKey: { userId, guildId, businessKey: itemRef },
+  };
+  const current = await tx.business.findUnique({ where });
+
+  if (action === 'remover') {
+    if (!current) return { ok: false, reason: 'missingBusiness' };
+    await tx.business.delete({ where });
+    return { ok: true, oldValue: current.level, nextValue: 0, item: definition };
+  }
+
+  const nextLevel = action === 'definir'
+    ? quantity
+    : (current?.level ?? 0) + quantity;
+  if (nextLevel > BUSINESS_MAX_LEVEL) return { ok: false, reason: 'maxLevel' };
+
+  if (current) {
+    await tx.business.update({ where, data: { level: nextLevel } });
+  } else {
+    await tx.business.create({
+      data: { userId, guildId, businessKey: itemRef, level: nextLevel },
+    });
+  }
+  return { ok: true, oldValue: current?.level ?? 0, nextValue: nextLevel, item: definition };
+}
+
 async function updatePurchase(tx, { userId, guildId, action, itemRef, quantity }) {
   const purchase = parsePurchaseRef(itemRef);
   if (!purchase) return { ok: false, reason: 'invalidPurchase' };
@@ -263,6 +295,9 @@ async function applyOperatorAction({ userId, guildId, action, resource, itemRef,
     if (resource === 'vara') {
       return updateRod(tx, { userId, guildId, action, itemRef });
     }
+    if (resource === 'empresa') {
+      return updateBusiness(tx, { userId, guildId, action, itemRef, quantity });
+    }
     if (resource === 'compra') {
       return updatePurchase(tx, { userId, guildId, action, itemRef, quantity });
     }
@@ -285,6 +320,9 @@ function invalidInput(resource, itemRef) {
   }
   if (resource === 'carta') {
     return `Essa carta não existe. Use a chave exibida no sistema de cartas, como \`${CARD_DEFS[0].key}\`.`;
+  }
+  if (resource === 'empresa') {
+    return 'Essa empresa não existe. Use `/empresa loja` para ver as chaves: `barraca`, `cafeteria`, `oficina`, `agencia` ou `startup`.';
   }
   return `O recurso \`${resource}\` não é válido.`;
 }
@@ -326,7 +364,10 @@ async function executeOperator({ actorId, target, member, guildId, action, resou
   }
 
   let item = null;
-  if (['peixe', 'isca', 'vara', 'carta'].includes(resource)) {
+  if (resource === 'empresa') {
+    item = getBusiness(itemRef?.trim().toLowerCase());
+    if (!item) return reply(errorText(invalidInput(resource)));
+  } else if (['peixe', 'isca', 'vara', 'carta'].includes(resource)) {
     if (resource === 'vara' && action === 'remover' && !itemRef) {
       item = { key: DEFAULT_ROD_KEY, name: 'Vara de bambu' };
     } else {
@@ -336,6 +377,9 @@ async function executeOperator({ actorId, target, member, guildId, action, resou
   }
   if (resource === 'compra' && !parsePurchaseRef(itemRef)) {
     return reply(errorText(invalidInput(resource, itemRef)));
+  }
+  if (resource === 'empresa' && !getBusiness(itemRef?.trim().toLowerCase())) {
+    return reply(errorText(invalidInput(resource)));
   }
 
   const result = await applyOperatorAction({
@@ -359,6 +403,15 @@ async function executeOperator({ actorId, target, member, guildId, action, resou
     }
     if (result.reason === 'missing') {
       return reply(errorText('Esse usuário não possui esse item comprado.'));
+    }
+    if (result.reason === 'missingBusiness') {
+      return reply(errorText('Esse usuário não possui essa empresa.'));
+    }
+    if (result.reason === 'invalidBusiness') {
+      return reply(errorText(invalidInput('empresa')));
+    }
+    if (result.reason === 'maxLevel') {
+      return reply(errorText(`A empresa não pode ultrapassar o nível ${BUSINESS_MAX_LEVEL}.`));
     }
     if (result.reason === 'invalidPurchase') {
       return reply(errorText(invalidInput('compra')));
@@ -418,6 +471,7 @@ const cmdEconomiaOperador = {
           { name: 'Dívida criminal', value: 'divida' },
           { name: 'Prisões', value: 'prisoes' },
           { name: 'Crimes', value: 'crimes' },
+          { name: 'Empresa', value: 'empresa' },
         ))
       .addIntegerOption(option => option
         .setName('quantidade')
