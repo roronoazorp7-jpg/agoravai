@@ -1,12 +1,14 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { AttachmentBuilder, SlashCommandBuilder } from 'discord.js';
+import { fileURLToPath } from 'node:url';
 import { buildUtilityV2 } from '../../utils/utilityV2.js';
+
+const SERVER_INFO_BANNER_PATH = fileURLToPath(new URL('../../assets/server-info-banner.gif', import.meta.url));
 
 function payload(guild) {
   const owner = guild.ownerId ? `<@${guild.ownerId}>` : 'Não identificado';
   const channels = guild.channels.cache;
   const textChannels = channels.filter(channel => channel.isTextBased()).size;
   const voiceChannels = channels.filter(channel => channel.isVoiceBased()).size;
-  const bannerUrl = guild.bannerURL?.({ extension: 'png', size: 1024, forceStatic: false });
   const iconUrl = guild.iconURL?.({ extension: 'png', size: 256, forceStatic: false });
 
   const text = [
@@ -20,7 +22,16 @@ function payload(guild) {
     `**ID:** \`${guild.id}\``,
   ].join('\n');
 
-  return buildUtilityV2({ text, thumbnailUrl: iconUrl, imageUrl: bannerUrl });
+  return {
+    ...buildUtilityV2({
+      text,
+      thumbnailUrl: iconUrl,
+      imageUrl: 'attachment://server-info-banner.gif',
+    }),
+    files: [
+      new AttachmentBuilder(SERVER_INFO_BANNER_PATH, { name: 'server-info-banner.gif' }),
+    ],
+  };
 }
 
 export default {

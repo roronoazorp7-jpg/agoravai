@@ -22,6 +22,8 @@ const CAL  = () => getEmoji('calendario');
 const STAR = () => getEmoji('4branco_estrela');
 const CLK  = () => getEmoji('relogio');
 const KNIFE = '<:05_angels:1507575385074831441>';
+const ROBBERY_BANNER_PATH = fileURLToPath(new URL('../../assets/roubo-banner.jpg', import.meta.url));
+const ARREST_BANNER_PATH = fileURLToPath(new URL('../../assets/prisao-banner.gif', import.meta.url));
 
 // ─── V2 helpers ───────────────────────────────────────────────────────────────
 
@@ -35,6 +37,27 @@ function v2Err(text) {
   const c = new ContainerBuilder()
     .addTextDisplayComponents(new TextDisplayBuilder().setContent(`❌  ${text}`));
   return { components: [c], flags: MessageFlags.IsComponentsV2, ephemeral: true };
+}
+
+function robberyPayload(text, arrested = false, ephemeral = false) {
+  const filename = arrested ? 'prisao-banner.gif' : 'roubo-banner.jpg';
+  const attachment = new AttachmentBuilder(
+    arrested ? ARREST_BANNER_PATH : ROBBERY_BANNER_PATH,
+    { name: filename },
+  );
+  const c = new ContainerBuilder()
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(text))
+    .addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(
+        new MediaGalleryItemBuilder().setURL(`attachment://${filename}`),
+      ),
+    );
+  return {
+    components: [c],
+    files: [attachment],
+    flags: MessageFlags.IsComponentsV2,
+    ...(ephemeral ? { ephemeral: true } : {}),
+  };
 }
 
 function trabalhoPayload(text) {
@@ -233,7 +256,11 @@ function robberyError(error) {
     if (error.code === 'cooldown')
       return v2Err(`${KNIFE} Você já está sendo procurado pela polícia! Espere **${msToHuman(error.remaining)}** para tentar outro roubo.`);
     if (error.code === 'fine')
-      return v2Err(`${KNIFE} Você está preso! Pague a multa de **${error.debt.toLocaleString('pt-BR')} ${COIN()}** com \`/ficha pagar\` antes de roubar novamente.`);
+      return robberyPayload(
+        `${KNIFE} Você está preso! Pague a multa de **${error.debt.toLocaleString('pt-BR')} ${COIN()}** com \`/ficha pagar\` antes de roubar novamente.`,
+        true,
+        true,
+      );
     if (error.code === 'no-money')
       return v2Err(`${KNIFE} Essa pessoa está lisa: não há dinheiro em mãos para roubar.`);
     if (error.code === 'too-little')
@@ -264,13 +291,14 @@ const cmdRoubar = {
     try {
       const result = await robUser(interaction.user.id, target.id, interaction.guildId);
       const scene = ROBBERY_MSGS[Math.floor(Math.random() * ROBBERY_MSGS.length)];
-      return interaction.reply(v2Rich(
+      return interaction.reply(robberyPayload(
         `## ${KNIFE} Roubo concluído!\n` +
         `${scene}\n\n` +
         `${interaction.user} surrupiou ${COIN()} **${result.stolen.toLocaleString('pt-BR')}** de ${target} usando **${result.weapon.name}**.\n` +
         `💸 A vítima ficou com ${COIN()} **${result.victimRemaining.toLocaleString('pt-BR')}**.\n\n` +
         `${result.arrested ? `🚔 A polícia chegou! Você foi preso e recebeu uma multa de **${result.fine.toLocaleString('pt-BR')} ${COIN()}**. Pague com \`/ficha pagar\` para voltar a roubar.\n\n` : ''}` +
-        `${CLK()} ${result.weapon.name} descansa por **1 hora** antes do próximo golpe.`
+        `${CLK()} ${result.weapon.name} descansa por **1 hora** antes do próximo golpe.`,
+        result.arrested,
       ));
     } catch (error) {
       return interaction.reply(robberyError(error));
@@ -286,13 +314,14 @@ const cmdRoubar = {
     try {
       const result = await robUser(message.author.id, target.id, message.guildId);
       const scene = ROBBERY_MSGS[Math.floor(Math.random() * ROBBERY_MSGS.length)];
-      return message.reply(v2Rich(
+      return message.reply(robberyPayload(
         `## ${KNIFE} Roubo concluído!\n` +
         `${scene}\n\n` +
         `${message.author} surrupiou ${COIN()} **${result.stolen.toLocaleString('pt-BR')}** de ${target} usando **${result.weapon.name}**.\n` +
         `💸 A vítima ficou com ${COIN()} **${result.victimRemaining.toLocaleString('pt-BR')}**.\n\n` +
         `${result.arrested ? `🚔 A polícia chegou! Você foi preso e recebeu uma multa de **${result.fine.toLocaleString('pt-BR')} ${COIN()}**. Pague com \`savage ficha pagar\` para voltar a roubar.\n\n` : ''}` +
-        `${CLK()} ${result.weapon.name} descansa por **1 hora** antes do próximo golpe.`
+        `${CLK()} ${result.weapon.name} descansa por **1 hora** antes do próximo golpe.`,
+        result.arrested,
       ));
     } catch (error) {
       return message.reply(robberyError(error));
