@@ -45,6 +45,7 @@ import { handlePetButton } from '../commands/general/pet.js';
 import { handleModerationButton } from '../commands/admin/moderacao.js';
 import { handleVipButton, handleVipConfigModal } from '../commands/loja/vip.js';
 import { handleFishingInteraction } from '../commands/economia/pescaria.js';
+import { handleBankInteraction } from '../utils/bankHandlers.js';
 import { handleCardPackInteraction, handleFutPackInteraction, handleCardCollectionInteraction } from '../commands/general/cartas.js';
 import { handleBattleInteraction } from '../commands/jogos/batalha.js';
 import { isCommandBlocked, COMMAND_BLOCK_COMMAND } from '../utils/commandBlock.js';
@@ -1132,6 +1133,10 @@ export default {
       // ── BUTTONS ────────────────────────────────────────────────────────────
       if (interaction.isButton()) {
         const { customId } = interaction;
+
+        if (customId.startsWith('bank_')) {
+          return handleBankInteraction(interaction);
+        }
 
         // ── PACK POKÉMON: abertura carta por carta ─────────────────────────
         if (customId.startsWith('pokemon_pack_')) {
@@ -3289,6 +3294,10 @@ export default {
 
       // ── MODALS ─────────────────────────────────────────────────────────────
       if (interaction.isModalSubmit()) {
+        if (interaction.customId.startsWith('bank_')) {
+          return handleBankInteraction(interaction);
+        }
+
         if (interaction.customId.startsWith('antilink_modal_')) {
           return handleAntiLinkCfgModal(interaction);
         }

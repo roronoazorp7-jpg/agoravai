@@ -5,6 +5,54 @@ const prisma = new PrismaClient({
 });
 
 export async function ensureMarriageSchema() {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "BankAccount" (
+      "id" TEXT NOT NULL,
+      "userId" TEXT NOT NULL,
+      "guildId" TEXT NOT NULL,
+      "passwordHash" TEXT NOT NULL,
+      "midasBalance" INTEGER NOT NULL DEFAULT 0,
+      "failedAttempts" INTEGER NOT NULL DEFAULT 0,
+      "lockedUntil" TIMESTAMP(3),
+      "lastAccessAt" TIMESTAMP(3),
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "BankAccount_pkey" PRIMARY KEY ("id")
+    )
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "BankAccount_userId_guildId_key"
+      ON "BankAccount" ("userId", "guildId")
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "BankAccount_guildId_userId_idx"
+      ON "BankAccount" ("guildId", "userId")
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "BankHolding" (
+      "id" TEXT NOT NULL,
+      "accountId" TEXT NOT NULL,
+      "userId" TEXT NOT NULL,
+      "guildId" TEXT NOT NULL,
+      "symbol" TEXT NOT NULL,
+      "quantity" INTEGER NOT NULL DEFAULT 0,
+      "averagePrice" INTEGER NOT NULL,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "BankHolding_pkey" PRIMARY KEY ("id"),
+      CONSTRAINT "BankHolding_accountId_fkey"
+        FOREIGN KEY ("accountId") REFERENCES "BankAccount" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    )
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "BankHolding_accountId_symbol_key"
+      ON "BankHolding" ("accountId", "symbol")
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "BankHolding_guildId_userId_idx"
+      ON "BankHolding" ("guildId", "userId")
+  `);
+
   // Mantém a economia de empresas compatível com bancos existentes. A criação
   // é aditiva e também é coberta pelo schema.prisma/db push no deploy.
   await prisma.$executeRawUnsafe(`
