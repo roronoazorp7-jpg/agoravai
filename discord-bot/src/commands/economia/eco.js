@@ -22,8 +22,8 @@ const CAL  = () => getEmoji('calendario');
 const STAR = () => getEmoji('4branco_estrela');
 const CLK  = () => getEmoji('relogio');
 const KNIFE = '<:05_angels:1507575385074831441>';
-const ROBBERY_BANNER_PATH = fileURLToPath(new URL('../../assets/roubo-banner.jpg', import.meta.url));
-const ARREST_BANNER_PATH = fileURLToPath(new URL('../../assets/prisao-banner.gif', import.meta.url));
+const ROBBERY_BANNER_PATH = fileURLToPath(new URL('../../../assets/roubo-banner.jpg', import.meta.url));
+const ARREST_BANNER_PATH = fileURLToPath(new URL('../../../assets/prisao-banner.gif', import.meta.url));
 
 // ─── V2 helpers ───────────────────────────────────────────────────────────────
 

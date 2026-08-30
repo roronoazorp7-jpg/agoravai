@@ -2,7 +2,7 @@ import { AttachmentBuilder, SlashCommandBuilder } from 'discord.js';
 import { fileURLToPath } from 'node:url';
 import { buildUtilityV2 } from '../../utils/utilityV2.js';
 
-const SERVER_INFO_BANNER_PATH = fileURLToPath(new URL('../../assets/server-info-banner.gif', import.meta.url));
+const SERVER_INFO_BANNER_PATH = fileURLToPath(new URL('../../../assets/server-info-banner.gif', import.meta.url));
 
 function payload(guild) {
   const owner = guild.ownerId ? `<@${guild.ownerId}>` : 'Não identificado';
