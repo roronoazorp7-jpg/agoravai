@@ -1,5 +1,6 @@
 export const MIDAS_SYMBOL = 'MDS';
 export const MIDAS_NAME = 'Midas Coin';
+export const MIDAS_BASE_PRICE = 100_000;
 export const BANK_SESSION_TTL = 10 * 60 * 1000;
 export const BANK_MAX_TRANSACTION = 1_000_000_000;
 export const BANK_MAX_PASSWORD_LENGTH = 32;
@@ -55,14 +56,32 @@ export function getStockPrice(stockOrSymbol, now = Date.now()) {
   const slot = Math.floor(now / (15 * 60 * 1000));
   const noise = (hashSlot(`${stock.symbol}:${slot}`) - 0.5) * stock.volatility;
   const wave = Math.sin(slot / 5 + stock.phase) * stock.volatility * 0.45;
-  return Math.max(1, Math.round(stock.basePrice * (1 + noise + wave)));
+  return Math.max(0.01, Number((stock.basePrice * (1 + noise + wave)).toFixed(4)));
 }
 
 export function formatMidas(value) {
-  return `${Number(value ?? 0).toLocaleString('pt-BR')} MDS`;
+  return `${Number(value ?? 0).toLocaleString('pt-BR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 4,
+  })} MDS`;
 }
 
 export function formatSignedMidas(value) {
   const amount = Number(value ?? 0);
   return `${amount >= 0 ? '+' : ''}${formatMidas(amount)}`;
+}
+
+export function formatSignedPercent(value) {
+  const amount = Number(value ?? 0);
+  return `${amount >= 0 ? '+' : ''}${amount.toFixed(2).replace('.', ',')}%`;
+}
+
+export function getMidasPrice(now = Date.now()) {
+  const marketIndex = BANK_STOCKS.reduce(
+    (sum, stock) => sum + (getStockPrice(stock, now) / stock.basePrice),
+    0,
+  ) / BANK_STOCKS.length;
+  const marketMovement = (marketIndex - 1) * 0.65;
+  const cycle = Math.sin(Math.floor(now / (15 * 60 * 1000)) / 9) * 0.025;
+  return Math.max(10_000, Math.round(MIDAS_BASE_PRICE * (1 + marketMovement + cycle)));
 }

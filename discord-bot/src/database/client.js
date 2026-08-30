@@ -11,7 +11,7 @@ export async function ensureMarriageSchema() {
       "userId" TEXT NOT NULL,
       "guildId" TEXT NOT NULL,
       "passwordHash" TEXT NOT NULL,
-      "midasBalance" INTEGER NOT NULL DEFAULT 0,
+      "midasBalance" NUMERIC(20,8) NOT NULL DEFAULT 0,
       "failedAttempts" INTEGER NOT NULL DEFAULT 0,
       "lockedUntil" TIMESTAMP(3),
       "lastAccessAt" TIMESTAMP(3),
@@ -36,7 +36,7 @@ export async function ensureMarriageSchema() {
       "guildId" TEXT NOT NULL,
       "symbol" TEXT NOT NULL,
       "quantity" INTEGER NOT NULL DEFAULT 0,
-      "averagePrice" INTEGER NOT NULL,
+      "averagePrice" NUMERIC(20,8) NOT NULL,
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT "BankHolding_pkey" PRIMARY KEY ("id"),
@@ -51,6 +51,30 @@ export async function ensureMarriageSchema() {
   await prisma.$executeRawUnsafe(`
     CREATE INDEX IF NOT EXISTS "BankHolding_guildId_userId_idx"
       ON "BankHolding" ("guildId", "userId")
+  `);
+  await prisma.$executeRawUnsafe(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'BankAccount'
+          AND column_name = 'midasBalance' AND data_type <> 'numeric'
+      ) THEN
+        ALTER TABLE "BankAccount"
+          ALTER COLUMN "midasBalance" TYPE NUMERIC(20,8)
+          USING "midasBalance"::numeric;
+      END IF;
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'BankHolding'
+          AND column_name = 'averagePrice' AND data_type <> 'numeric'
+      ) THEN
+        ALTER TABLE "BankHolding"
+          ALTER COLUMN "averagePrice" TYPE NUMERIC(20,8)
+          USING "averagePrice"::numeric;
+      END IF;
+    END
+    $$;
   `);
 
   // Mantém a economia de empresas compatível com bancos existentes. A criação

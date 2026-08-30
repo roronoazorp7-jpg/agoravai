@@ -19,10 +19,13 @@ import {
   BANK_MIN_PASSWORD_LENGTH,
   BANK_SESSION_TTL,
   BANK_STOCKS,
+  MIDAS_BASE_PRICE,
   MIDAS_NAME,
   MIDAS_SYMBOL,
   formatMidas,
   formatSignedMidas,
+  formatSignedPercent,
+  getMidasPrice,
   getStock,
   getStockPrice,
 } from './bankData.js';
@@ -77,6 +80,18 @@ function formatDate(date) {
   return date ? `<t:${Math.floor(new Date(date).getTime() / 1000)}:R>` : 'agora';
 }
 
+function formatCoins(value) {
+  return `${Math.round(Number(value ?? 0)).toLocaleString('pt-BR')} coins`;
+}
+
+function decimal(value) {
+  return Number(value ?? 0);
+}
+
+function prismaDecimal(value) {
+  return new Prisma.Decimal(Number(value).toFixed(8));
+}
+
 function bankFiles() {
   return [
     new AttachmentBuilder(BANK_CARD_PATH, { name: 'midas-bank-card.jpg' }),
@@ -123,6 +138,7 @@ export async function sendBankPanel({ guildId, reply }) {
     .setDescription(
       `Bem-vindo ao banco oficial do servidor.\n\n` +
       `Sua conta guarda **${MIDAS_NAME} (${MIDAS_SYMBOL})**, uma criptomoeda própria para investir em ações.\n` +
+      `A cotação inicial é **1 MDS = ${formatCoins(MIDAS_BASE_PRICE)}** e muda conforme o mercado se movimenta.\n` +
       `Deposite suas coins, compre ativos e acompanhe seu patrimônio com segurança.\n\n` +
       `🔐 Cada membro possui uma senha individual.\n` +
       `📈 O mercado tem cotações dinâmicas.\n` +
@@ -241,13 +257,15 @@ async function requireAccount(interaction) {
 
 function dashboardPayload(account, holdings) {
   const now = Date.now();
+  const midasPrice = getMidasPrice(now);
+  const midasVariation = ((midasPrice / MIDAS_BASE_PRICE) - 1) * 100;
   let portfolioValue = 0;
   let invested = 0;
   const lines = holdings.map(holding => {
     const stock = getStock(holding.symbol);
     const price = getStockPrice(stock, now);
     const currentValue = holding.quantity * price;
-    const costValue = holding.quantity * holding.averagePrice;
+    const costValue = holding.quantity * decimal(holding.averagePrice);
     portfolioValue += currentValue;
     invested += costValue;
     const profit = currentValue - costValue;
@@ -260,7 +278,9 @@ function dashboardPayload(account, holdings) {
       `Conta protegida por senha · sessão renovada a cada interação\n\n` +
       `💰 **Saldo disponível:** ${formatMidas(account.midasBalance)}\n` +
       `📈 **Carteira:** ${formatMidas(portfolioValue)}\n` +
-      `🏦 **Patrimônio total:** ${formatMidas(account.midasBalance + portfolioValue)}\n\n` +
+      `🏦 **Patrimônio total:** ${formatMidas(decimal(account.midasBalance) + portfolioValue)} ` +
+      `(${formatCoins((decimal(account.midasBalance) + portfolioValue) * midasPrice)})\n` +
+      `🪙 **Cotação:** 1 MDS = **${formatCoins(midasPrice)}**\n\n` +
       (holdings.length
         ? `### Seus investimentos\n${lines.join('\n\n')}\n\n`
         : `Você ainda não possui ações. Abra o mercado para começar a investir.\n\n`) +
@@ -294,6 +314,7 @@ async function showDashboard(interaction, account = null) {
 
 function marketPayload() {
   const now = Date.now();
+  const midasPrice = getMidasPrice(now);
   const rows = BANK_STOCKS.map(stock => {
     const price = getStockPrice(stock, now);
     return `${stock.emoji} **${stock.symbol} · ${stock.name}** — **${formatMidas(price)}**\n> ${stock.description}`;
@@ -308,6 +329,8 @@ function marketPayload() {
         .setTitle(`📈 Mercado Midas · ${MIDAS_SYMBOL}`)
         .setDescription(
           `Cotações atualizadas em janelas de 15 minutos.\n` +
+          `**1 ${MIDAS_SYMBOL} = ${formatCoins(midasPrice)}** ` +
+          `(${formatSignedPercent(midasVariation)} desde a base) · preço influenciado pelo mercado.\n` +
           `Todas as operações usam **${MIDAS_NAME}**.\n\n${rows}`,
         ),
     ],
@@ -342,16 +365,32 @@ function positiveAmount(raw, label) {
   return amount;
 }
 
+function positiveMidasAmount(raw) {
+  const normalized = String(raw ?? '').trim().replace(',', '.');
+  if (!/^\d+(?:\.\d{1,8})?$/.test(normalized)) {
+    throw new BankError('invalid-amount');
+  }
+  const amount = Number(normalized);
+  if (!Number.isSafeInteger(Math.round(amount * 100_000_000)) || amount <= 0 || amount > BANK_MAX_TRANSACTION) {
+    throw new BankError('invalid-amount');
+  }
+  return Number(amount.toFixed(8));
+}
+
 async function deposit(userId, guildId, amount) {
   return withTransaction(async tx => {
     const account = await getAccount(userId, guildId, tx);
     if (!account) throw new BankError('no-account');
     const spent = await spendCoins(tx, { userId, guildId, amount });
     if (!spent.ok) throw new BankError('funds', { available: spent.available, amount });
-    return tx.bankAccount.update({
+    const midasPrice = getMidasPrice();
+    const receivedMidas = Number((amount / midasPrice).toFixed(8));
+    if (receivedMidas <= 0) throw new BankError('invalid-amount');
+    const updated = await tx.bankAccount.update({
       where: { id: account.id },
-      data: { midasBalance: { increment: amount }, lastAccessAt: new Date() },
+      data: { midasBalance: { increment: prismaDecimal(receivedMidas) }, lastAccessAt: new Date() },
     });
+    return { account: updated, receivedMidas, midasPrice };
   });
 }
 
@@ -359,19 +398,22 @@ async function withdraw(userId, guildId, amount) {
   return withTransaction(async tx => {
     const account = await getAccount(userId, guildId, tx);
     if (!account) throw new BankError('no-account');
-    if (account.midasBalance < amount) {
-      throw new BankError('midas-funds', { available: account.midasBalance, amount });
+    if (decimal(account.midasBalance) < amount) {
+      throw new BankError('midas-funds', { available: decimal(account.midasBalance), amount });
     }
+    const midasPrice = getMidasPrice();
+    const coinAmount = Math.floor(amount * midasPrice);
+    if (coinAmount <= 0) throw new BankError('invalid-amount');
     const updated = await tx.bankAccount.update({
       where: { id: account.id },
-      data: { midasBalance: { decrement: amount }, lastAccessAt: new Date() },
+      data: { midasBalance: { decrement: prismaDecimal(amount) }, lastAccessAt: new Date() },
     });
     await tx.economy.upsert({
       where: { userId_guildId: { userId, guildId } },
-      create: { userId, guildId, balance: amount },
-      update: { balance: { increment: amount } },
+      create: { userId, guildId, balance: coinAmount },
+      update: { balance: { increment: coinAmount } },
     });
-    return updated;
+    return { account: updated, coinAmount, midasPrice };
   });
 }
 
@@ -379,7 +421,7 @@ async function trade(userId, guildId, action, symbol, quantity) {
   const stock = getStock(symbol);
   if (!stock) throw new BankError('invalid-stock');
   const price = getStockPrice(stock);
-  const total = price * quantity;
+  const total = Number((price * quantity).toFixed(8));
 
   return withTransaction(async tx => {
     const account = await getAccount(userId, guildId, tx);
@@ -389,16 +431,16 @@ async function trade(userId, guildId, action, symbol, quantity) {
     });
 
     if (action === 'buy') {
-      if (account.midasBalance < total) {
-        throw new BankError('midas-funds', { available: account.midasBalance, amount: total });
+      if (decimal(account.midasBalance) < total) {
+        throw new BankError('midas-funds', { available: decimal(account.midasBalance), amount: total });
       }
       const nextQuantity = (existing?.quantity ?? 0) + quantity;
       const nextAverage = Math.round(
-        (((existing?.quantity ?? 0) * (existing?.averagePrice ?? 0)) + total) / nextQuantity,
-      );
+        ((((existing?.quantity ?? 0) * decimal(existing?.averagePrice)) + total) / nextQuantity) * 100_000_000,
+      ) / 100_000_000;
       await tx.bankAccount.update({
         where: { id: account.id },
-        data: { midasBalance: { decrement: total }, lastAccessAt: new Date() },
+        data: { midasBalance: { decrement: prismaDecimal(total) }, lastAccessAt: new Date() },
       });
       await tx.bankHolding.upsert({
         where: holdingWhere(account.id, stock.symbol),
@@ -408,9 +450,9 @@ async function trade(userId, guildId, action, symbol, quantity) {
           guildId,
           symbol: stock.symbol,
           quantity,
-          averagePrice: price,
+          averagePrice: prismaDecimal(price),
         },
-        update: { quantity: nextQuantity, averagePrice: nextAverage },
+        update: { quantity: nextQuantity, averagePrice: prismaDecimal(nextAverage) },
       });
     } else {
       if (!existing || existing.quantity < quantity) {
@@ -418,7 +460,7 @@ async function trade(userId, guildId, action, symbol, quantity) {
       }
       await tx.bankAccount.update({
         where: { id: account.id },
-        data: { midasBalance: { increment: total }, lastAccessAt: new Date() },
+        data: { midasBalance: { increment: prismaDecimal(total) }, lastAccessAt: new Date() },
       });
       if (existing.quantity === quantity) {
         await tx.bankHolding.delete({ where: { id: existing.id } });
@@ -437,7 +479,7 @@ async function trade(userId, guildId, action, symbol, quantity) {
 function errorText(error) {
   if (error instanceof BankError) {
     if (error.code === 'invalid-amount') return 'Informe uma quantidade inteira positiva, dentro do limite permitido.';
-    if (error.code === 'funds') return `Você possui ${formatMidas(error.available)} em coins, mas precisa de ${formatMidas(error.amount)}.`;
+    if (error.code === 'funds') return `Você possui ${formatCoins(error.available)}, mas precisa de ${formatCoins(error.amount)}.`;
     if (error.code === 'midas-funds') return `Saldo MDS insuficiente. Disponível: ${formatMidas(error.available)} · necessário: ${formatMidas(error.amount)}.`;
     if (error.code === 'stock-funds') return `Você possui apenas **${error.available}** ações desse ativo.`;
     if (error.code === 'invalid-stock') return 'Esse ativo não está disponível no mercado.';
@@ -546,16 +588,18 @@ export async function handleBankInteraction(interaction) {
     if (customId === 'bank_deposit_modal' || customId === 'bank_withdraw_modal') {
       if (!await requireAccount(interaction)) return true;
       try {
-        const amount = positiveAmount(interaction.fields.getTextInputValue('bank_amount'), 'quantidade');
-        const account = customId === 'bank_deposit_modal'
+        const amount = customId === 'bank_deposit_modal'
+          ? positiveAmount(interaction.fields.getTextInputValue('bank_amount'), 'quantidade')
+          : positiveMidasAmount(interaction.fields.getTextInputValue('bank_amount'));
+        const result = customId === 'bank_deposit_modal'
           ? await deposit(interaction.user.id, interaction.guildId, amount)
           : await withdraw(interaction.user.id, interaction.guildId, amount);
         return interaction.reply({
           content: customId === 'bank_deposit_modal'
-            ? `✅ Depósito concluído. Você recebeu **${formatMidas(amount)}** na conta Midas.`
-            : `✅ Saque concluído. **${formatMidas(amount)}** voltou para sua carteira de coins.`,
+            ? `✅ Depósito concluído. Você depositou **${formatCoins(amount)}** e recebeu **${formatMidas(result.receivedMidas)}** (cotação: ${formatCoins(result.midasPrice)} por MDS).`
+            : `✅ Saque concluído. **${formatMidas(amount)}** voltou para sua carteira de coins: **${formatCoins(result.coinAmount)}**.`,
           ephemeral: true,
-          embeds: [bankBaseEmbed().setDescription(`Saldo Midas atual: **${formatMidas(account.midasBalance)}**`)],
+          embeds: [bankBaseEmbed().setDescription(`Saldo Midas atual: **${formatMidas(result.account.midasBalance)}**`)],
           files: [new AttachmentBuilder(BANK_COIN_PATH, { name: 'midas-coin.png' })],
         });
       } catch (error) {
