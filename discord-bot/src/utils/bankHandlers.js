@@ -27,8 +27,9 @@ import {
   getStockPrice,
 } from './bankData.js';
 
-const BANK_CARD_PATH = fileURLToPath(new URL('../assets/banco-card.jpg', import.meta.url));
-const BANK_COIN_PATH = fileURLToPath(new URL('../assets/banco-coin.png', import.meta.url));
+// Os assets do bot ficam na pasta assets/ na raiz do serviço (fora de src/).
+const BANK_CARD_PATH = fileURLToPath(new URL('../../assets/banco-card.jpg', import.meta.url));
+const BANK_COIN_PATH = fileURLToPath(new URL('../../assets/banco-coin.png', import.meta.url));
 const bankSessions = new Map();
 
 class BankError extends Error {
