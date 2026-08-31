@@ -13,12 +13,12 @@ import {
   StringSelectMenuOptionBuilder,
   TextDisplayBuilder,
   ThumbnailBuilder,
-  PermissionFlagsBits,
 } from 'discord.js';
 import prisma from '../../database/client.js';
 import { spendCoins } from '../../utils/economyFunds.js';
 import { getEmoji } from '../../utils/emojiManager.js';
 import { composeFishingArtwork, composeFishingScene } from '../../utils/fishingArtwork.js';
+import { hasConfiguredEconomyBypass } from '../../utils/economyPermissions.js';
 
 const COIN = () => getEmoji('futecoins');
 const FISH_COMMON = () => getEmoji('fish_common');
@@ -568,7 +568,7 @@ function chooseTreasure() {
   };
 }
 
-async function catchFish(userId, guildId, isAdmin = false, requestedSpotKey = null) {
+async function catchFish(userId, guildId, canBypassCooldown = false, requestedSpotKey = null) {
   return prisma.$transaction(async tx => {
     const profile = await getFishingProfile(userId, guildId, tx);
     const now = Date.now();
@@ -595,7 +595,7 @@ async function catchFish(userId, guildId, isAdmin = false, requestedSpotKey = nu
     }
     const elapsed = now - (profile.lastFishing?.getTime() ?? 0);
     const cooldown = Math.floor(FISH_CD * (condition.cooldownMultiplier ?? 1));
-    if (!isAdmin && elapsed < cooldown) {
+    if (!canBypassCooldown && elapsed < cooldown) {
       const error = new Error('cooldown');
       error.remaining = cooldown - elapsed;
       throw error;
@@ -1117,11 +1117,14 @@ export async function handleFishingInteraction(interaction) {
   }
 
   if (customId === 'fish_cast') {
-    const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ?? false;
+    const canBypassCooldown = await hasConfiguredEconomyBypass({
+      guildId,
+      member: interaction.member,
+    });
     return executeFishing(
       userId,
       guildId,
-      isAdmin,
+      canBypassCooldown,
       payload => interaction.update(payload),
       null,
       true,
@@ -1726,9 +1729,9 @@ async function handleFishAbility(interaction) {
   }
 }
 
-async function executeFishing(userId, guildId, isAdmin, reply, requestedSpotKey = null, panelMode = false) {
+async function executeFishing(userId, guildId, canBypassCooldown, reply, requestedSpotKey = null, panelMode = false) {
   try {
-    const result = await catchFish(userId, guildId, isAdmin, requestedSpotKey);
+    const result = await catchFish(userId, guildId, canBypassCooldown, requestedSpotKey);
     const { outcome, rod, spot, condition, bait } = result;
     const contextText =
       `${spot.emoji} Ponto: **${spot.name}** · ${condition.emoji} **${condition.name}**\n` +

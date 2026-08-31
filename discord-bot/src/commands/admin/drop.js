@@ -9,6 +9,7 @@ import {
 import prisma from '../../database/client.js';
 import { BANNERS, buildBannerUrl } from '../../utils/shopData.js';
 import { setPending } from '../../utils/dropSessions.js';
+import { configuredDropRoleIds } from '../../utils/economyPermissions.js';
 
 const DROP_ROLE_OPTIONS = ['cargo1', 'cargo2', 'cargo3', 'cargo4', 'cargo5'];
 const DROP_CONFIGURATOR_ID = '1527094211176828951';
@@ -49,13 +50,6 @@ function addLaunchOptions(subcommand) {
       opt.setName('imagem')
         .setDescription('URL de imagem para exibir no drop'),
     );
-}
-
-function configuredDropRoleIds(config) {
-  return String(config?.dropAllowedRoles ?? '')
-    .split(',')
-    .map(id => id.trim())
-    .filter(Boolean);
 }
 
 async function canLaunchDrop(interaction) {
@@ -108,7 +102,7 @@ async function configureDropRoles(interaction) {
       update: { dropAllowedRoles: null },
     });
     return interaction.reply({
-      content: '✅ Restrição de cargos removida. Agora quem tiver **Gerenciar Servidor** poderá lançar drops.',
+      content: '✅ Restrição de cargos removida. Agora quem tiver **Gerenciar Servidor** poderá lançar drops, mas todos continuarão respeitando os cooldowns da economia.',
       ephemeral: true,
     });
   }
@@ -136,7 +130,7 @@ async function configureDropRoles(interaction) {
   });
 
   return interaction.reply({
-    content: `✅ Apenas estes cargos poderão lançar drops: ${roleIds.map(roleId => `<@&${roleId}>`).join(', ')}.\nNenhum administrador fora desses cargos poderá usar o comando.`,
+    content: `✅ Cargos autorizados para drops: ${roleIds.map(roleId => `<@&${roleId}>`).join(', ')}.\nMembros com esses cargos também ficam sem cooldown nos comandos de economia e pesca.`,
     ephemeral: true,
   });
 }

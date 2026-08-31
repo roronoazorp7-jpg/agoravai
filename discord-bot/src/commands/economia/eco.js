@@ -9,7 +9,6 @@ import {
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
   MessageFlags,
-  PermissionFlagsBits,
 } from 'discord.js';
 import { fileURLToPath } from 'node:url';
 import prisma from '../../database/client.js';
@@ -18,6 +17,7 @@ import { getEmoji } from '../../utils/emojiManager.js';
 import { generateBalanceCard, generateTopCard } from '../../utils/economyCards.js';
 import { spendCoins, totalCoins } from '../../utils/economyFunds.js';
 import { ROBBERY_WEAPONS, getRobberyWeapon } from '../../utils/robberyData.js';
+import { hasConfiguredEconomyBypass } from '../../utils/economyPermissions.js';
 
 // ─── Emojis — resolvidos como application emojis (sem dependência de boost) ──
 const COIN = () => getEmoji('futecoins');
@@ -238,7 +238,7 @@ async function getEco(userId, guildId, db = prisma) {
 async function claimPeriodicReward({
   userId,
   guildId,
-  isAdmin,
+  member,
   reply,
   field,
   cooldown,
@@ -247,11 +247,12 @@ async function claimPeriodicReward({
   nextLabel,
 }) {
   const eco = await getEco(userId, guildId);
+  const canBypassCooldown = await hasConfiguredEconomyBypass({ guildId, member });
   const now = Date.now();
   const last = eco[field]?.getTime() ?? 0;
   const diff = now - last;
 
-  if (!isAdmin && diff < cooldown) {
+  if (!canBypassCooldown && diff < cooldown) {
     return reply(v2Err(`${label} indisponível. Volte em **${msToHuman(cooldown - diff)}**!`));
   }
 
@@ -284,7 +285,7 @@ const ROBBERY_MSGS = [
   'Você chegou tão silenciosamente que até o saldo pediu desculpas.',
 ];
 
-async function robUser(thiefId, victimId, guildId) {
+async function robUser(thiefId, victimId, guildId, canBypassCooldown = false) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       return await prisma.$transaction(async tx => {
@@ -308,7 +309,7 @@ async function robUser(thiefId, victimId, guildId) {
           .sort((a, b) => b.stealMultiplier - a.stealMultiplier)[0] ?? getRobberyWeapon(DEFAULT_ROBBERY_WEAPON);
         const elapsed = now - (thief.lastRob?.getTime() ?? 0);
 
-        if (elapsed < ROB_CD) {
+        if (!canBypassCooldown && elapsed < ROB_CD) {
           throw new RobberyError('cooldown', { remaining: ROB_CD - elapsed });
         }
         if (victim.balance <= 0) {
@@ -396,7 +397,11 @@ const cmdRoubar = {
     if (target.bot) return interaction.reply(v2Err(`${KNIFE} Bots não carregam carteira. A tentativa foi vergonhosa.`));
 
     try {
-      const result = await robUser(interaction.user.id, target.id, interaction.guildId);
+      const canBypassCooldown = await hasConfiguredEconomyBypass({
+        guildId: interaction.guildId,
+        member: interaction.member,
+      });
+      const result = await robUser(interaction.user.id, target.id, interaction.guildId, canBypassCooldown);
       const scene = ROBBERY_MSGS[Math.floor(Math.random() * ROBBERY_MSGS.length)];
       return interaction.reply(robberyPayload(
         `## ${KNIFE} Roubo concluído!\n` +
@@ -419,7 +424,11 @@ const cmdRoubar = {
     if (target.bot) return message.reply(v2Err(`${KNIFE} Bots não carregam carteira. A tentativa foi vergonhosa.`));
 
     try {
-      const result = await robUser(message.author.id, target.id, message.guildId);
+      const canBypassCooldown = await hasConfiguredEconomyBypass({
+        guildId: message.guildId,
+        member: message.member,
+      });
+      const result = await robUser(message.author.id, target.id, message.guildId, canBypassCooldown);
       const scene = ROBBERY_MSGS[Math.floor(Math.random() * ROBBERY_MSGS.length)];
       return message.reply(robberyPayload(
         `## ${KNIFE} Roubo concluído!\n` +
@@ -482,11 +491,14 @@ const cmdDaily = {
 
   async execute(interaction) {
     const eco     = await getEco(interaction.user.id, interaction.guildId);
-    const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ?? false;
+    const canBypassCooldown = await hasConfiguredEconomyBypass({
+      guildId: interaction.guildId,
+      member: interaction.member,
+    });
     const now     = Date.now();
     const last    = eco.lastDaily?.getTime() ?? 0;
     const diff    = now - last;
-    if (!isAdmin && diff < DAILY_CD)
+    if (!canBypassCooldown && diff < DAILY_CD)
       return interaction.reply({ ...v2Err(`Daily indisponível. Volte em **${msToHuman(DAILY_CD - diff)}**!`) });
     const streak = diff < 48 * 60 * 60 * 1000 ? (eco.dailyStreak ?? 0) + 1 : 1;
     const bonus  = Math.min(streak, 30) * 0.02;
@@ -506,11 +518,14 @@ const cmdDaily = {
 
   async executePrefix(message) {
     const eco     = await getEco(message.author.id, message.guildId);
-    const isAdmin = message.member?.permissions?.has(PermissionFlagsBits.Administrator) ?? false;
+    const canBypassCooldown = await hasConfiguredEconomyBypass({
+      guildId: message.guildId,
+      member: message.member,
+    });
     const now     = Date.now();
     const last    = eco.lastDaily?.getTime() ?? 0;
     const diff    = now - last;
-    if (!isAdmin && diff < DAILY_CD)
+    if (!canBypassCooldown && diff < DAILY_CD)
       return message.reply(v2Err(`Daily indisponível. Volte em **${msToHuman(DAILY_CD - diff)}**!`));
     const streak = diff < 48 * 60 * 60 * 1000 ? (eco.dailyStreak ?? 0) + 1 : 1;
     const bonus  = Math.min(streak, 30) * 0.02;
@@ -541,7 +556,7 @@ const cmdSemanal = {
     return claimPeriodicReward({
       userId: interaction.user.id,
       guildId: interaction.guildId,
-      isAdmin: interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ?? false,
+      member: interaction.member,
       reply: payload => interaction.reply(payload),
       field: 'lastWeekly',
       cooldown: WEEKLY_CD,
@@ -555,7 +570,7 @@ const cmdSemanal = {
     return claimPeriodicReward({
       userId: message.author.id,
       guildId: message.guildId,
-      isAdmin: message.member?.permissions?.has(PermissionFlagsBits.Administrator) ?? false,
+      member: message.member,
       reply: payload => message.reply(payload),
       field: 'lastWeekly',
       cooldown: WEEKLY_CD,
@@ -577,7 +592,7 @@ const cmdMensal = {
     return claimPeriodicReward({
       userId: interaction.user.id,
       guildId: interaction.guildId,
-      isAdmin: interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ?? false,
+      member: interaction.member,
       reply: payload => interaction.reply(payload),
       field: 'lastMonthly',
       cooldown: MONTHLY_CD,
@@ -591,7 +606,7 @@ const cmdMensal = {
     return claimPeriodicReward({
       userId: message.author.id,
       guildId: message.guildId,
-      isAdmin: message.member?.permissions?.has(PermissionFlagsBits.Administrator) ?? false,
+      member: message.member,
       reply: payload => message.reply(payload),
       field: 'lastMonthly',
       cooldown: MONTHLY_CD,
@@ -603,7 +618,7 @@ const cmdMensal = {
 };
 
 // ─── /trabalho ────────────────────────────────────────────────────────────────
-async function performWork({ userId, guildId, jobKey, isAdmin = false }) {
+async function performWork({ userId, guildId, jobKey, canBypassCooldown = false }) {
   return prisma.$transaction(async tx => {
     const eco = await getEco(userId, guildId, tx);
     const now = Date.now();
@@ -613,7 +628,7 @@ async function performWork({ userId, guildId, jobKey, isAdmin = false }) {
     const level = workLevelFromXp(workXp);
     const job = WORK_JOBS.find(item => item.key === jobKey);
 
-    if (!isAdmin && diff < WORK_CD) {
+    if (!canBypassCooldown && diff < WORK_CD) {
       return { ok: false, reason: 'cooldown', remaining: WORK_CD - diff };
     }
     if (!job || job.minLevel > level) {
@@ -676,7 +691,10 @@ export async function handleWorkInteraction(interaction) {
     userId: interaction.user.id,
     guildId: interaction.guildId,
     jobKey: interaction.values[0],
-    isAdmin: interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ?? false,
+    canBypassCooldown: await hasConfiguredEconomyBypass({
+      guildId: interaction.guildId,
+      member: interaction.member,
+    }),
   });
   if (!result.ok) return interaction.reply(workErrorPayload(result));
   return interaction.update(workResultPayload(result));
@@ -691,22 +709,28 @@ const cmdTrabalho = {
 
   async execute(interaction) {
     const eco     = await getEco(interaction.user.id, interaction.guildId);
-    const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ?? false;
+    const canBypassCooldown = await hasConfiguredEconomyBypass({
+      guildId: interaction.guildId,
+      member: interaction.member,
+    });
     const now     = Date.now();
     const last    = eco.lastWork?.getTime() ?? 0;
     const diff    = now - last;
-    if (!isAdmin && diff < WORK_CD)
+    if (!canBypassCooldown && diff < WORK_CD)
       return interaction.reply(v2Err(`Você está cansado! Descanse mais **${msToHuman(WORK_CD - diff)}** antes de trabalhar novamente.`));
     return interaction.reply(workMenuPayload(eco));
   },
 
   async executePrefix(message) {
     const eco     = await getEco(message.author.id, message.guildId);
-    const isAdmin = message.member?.permissions?.has(PermissionFlagsBits.Administrator) ?? false;
+    const canBypassCooldown = await hasConfiguredEconomyBypass({
+      guildId: message.guildId,
+      member: message.member,
+    });
     const now     = Date.now();
     const last    = eco.lastWork?.getTime() ?? 0;
     const diff    = now - last;
-    if (!isAdmin && diff < WORK_CD)
+    if (!canBypassCooldown && diff < WORK_CD)
       return message.reply(v2Err(`Você está cansado! Descanse mais **${msToHuman(WORK_CD - diff)}** antes de trabalhar novamente.`));
     return message.reply(workMenuPayload(eco));
   },
