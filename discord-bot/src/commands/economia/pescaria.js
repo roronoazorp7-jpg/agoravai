@@ -753,7 +753,7 @@ function buildFishingResultNavigation() {
       .setCustomId('fish_cast')
       .setLabel('Pescar novamente')
       .setEmoji('🎣')
-      .setStyle(ButtonStyle.Primary),
+      .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId('fish_panel')
       .setLabel('Voltar')
@@ -883,7 +883,7 @@ function buildDailyMissionPayload(profile, userId, guildId) {
     .setCustomId('fish_mission_claim')
     .setLabel(state.claimed ? 'Recompensa resgatada' : 'Resgatar recompensa')
     .setEmoji('🎁')
-    .setStyle(ButtonStyle.Success)
+    .setStyle(ButtonStyle.Secondary)
     .setDisabled(!completed || state.claimed);
   return v2(
     `## 🎯 Missão de pesca\n` +
@@ -900,7 +900,6 @@ export async function buildFishingPanelPayload(userId, guildId, notice = '') {
   const rod = ROD_BY_KEY.get(profile.rodKey) ?? RODS[0];
   const spot = getFishingSpot(profile.selectedSpotKey);
   const condition = getFishingCondition(guildId);
-  const market = getFishingMarket(guildId);
   const sellableRows = catches.filter(row => FISH_BY_KEY.get(row.fishKey)?.sellable !== false);
   const fishCount = sellableRows.reduce((sum, row) => sum + row.quantity, 0);
   const estimated = sellableRows.reduce((sum, row) => {
@@ -909,39 +908,28 @@ export async function buildFishingPanelPayload(userId, guildId, notice = '') {
   }, 0);
   const activeBait = items.find(item => item.itemKey === profile.activeBaitKey);
   const activeBaitData = activeBait ? getFishingBait(activeBait.itemKey) : null;
-  const marketEnds = msToHuman(marketTimeRemaining());
-  const hot = market.hot;
-  const cold = market.cold;
-
   const container = new ContainerBuilder()
-    .setAccentColor(0x147d92)
     .addTextDisplayComponents(new TextDisplayBuilder().setContent(
       `${notice ? `> ${notice}\n\n` : ''}` +
       `## 🎣 Midas Fishing\n` +
-      `${rodEmoji(rod)} Vara: **${rod.name}** · ${spot.emoji} Ponto: **${spot.name}**\n` +
-      `${condition.emoji} Maré: **${condition.name}** · ${activeBaitData ? `${activeBaitData.emoji} Isca: **${activeBaitData.name} × ${activeBait.quantity}**` : '🪱 Sem isca equipada'}\n\n` +
-      `### ${COIN()} Mercado da maré\n` +
-      `${hot ? `📈 Alta: **${hot.fish.name}** (${hot.movement >= 0 ? '+' : ''}${hot.movement}%)` : ''} · ` +
-      `${cold ? `📉 Baixa: **${cold.fish.name}** (${cold.movement}%)` : ''}\n` +
-      `Os preços mudam em **${marketEnds}**. Qualidade maior rende mais na venda.\n\n` +
-      `### Balde\n` +
-      `${FISH_COMMON()} Peixes: **${fishCount}** · ${COIN()} Valor atual: **${estimated.toLocaleString('pt-BR')}**\n` +
-      `${FISH_ROD()} Total pescado: **${profile.totalCaught.toLocaleString('pt-BR')}**\n\n` +
-      `Escolha uma ação abaixo para continuar sua expedição.`
+      `${rodEmoji(rod)} **${rod.name}** · ${spot.emoji} **${spot.name}**\n` +
+      `${condition.emoji} **${condition.name}** · ${activeBaitData ? `${activeBaitData.emoji} **${activeBaitData.name}**` : '🪱 **Sem isca**'}\n\n` +
+      `${FISH_COMMON()} **${fishCount}** peixes · ${COIN()} **${estimated.toLocaleString('pt-BR')}**\n\n` +
+      `Escolha uma ação.`
     ));
 
   const buttons = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('fish_cast').setLabel('Lançar linha').setEmoji('🎣').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('fish_market').setLabel('Mercado').setEmoji('📈').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('fish_cast').setLabel('Lançar linha').setEmoji('🎣').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('fish_market').setLabel('Mercado').setEmoji('📈').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('fish_inventory').setLabel('Inventário').setEmoji('🪣').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('fish_sell').setLabel('Vender peixes').setEmoji(FISH_COMMON()).setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('fish_sell').setLabel('Vender peixes').setEmoji(FISH_COMMON()).setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('fish_collection').setLabel('Coleção').setEmoji('📖').setStyle(ButtonStyle.Secondary),
   );
   const secondaryButtons = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('fish_buy').setLabel('Varas').setEmoji(FISH_ROD()).setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('fish_bait_shop').setLabel('Iscas').setEmoji('🪱').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('fish_buy').setLabel('Varas').setEmoji(FISH_ROD()).setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('fish_bait_shop').setLabel('Iscas').setEmoji('🪱').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('fish_spots').setLabel('Pontos').setEmoji('🧭').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('fish_missions').setLabel('Missão').setEmoji('🎯').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('fish_missions').setLabel('Missão').setEmoji('🎯').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('fish_panel').setLabel('Atualizar').setEmoji('🔄').setStyle(ButtonStyle.Secondary),
   );
   return { components: [container, buttons, secondaryButtons], flags: MessageFlags.IsComponentsV2 };
@@ -1010,7 +998,7 @@ function buildFishAbilityComponents(fish, userId) {
     .setCustomId(`fish_ability:${userId}:${fish.key}:${token}`)
     .setLabel(ability.label)
     .setEmoji(ability.emoji)
-    .setStyle(ButtonStyle.Primary);
+    .setStyle(ButtonStyle.Secondary);
 
   return [new ActionRowBuilder().addComponents(button)];
 }
@@ -1306,7 +1294,7 @@ function sharkBattlePayload({ hp, reward, defeated = false }) {
     .setCustomId('fish_shark_attack')
     .setLabel('Atacar o tubarão')
     .setEmoji(FISH_SHARK())
-    .setStyle(ButtonStyle.Danger)
+    .setStyle(ButtonStyle.Secondary)
     .setDisabled(defeated);
 
   if (defeated) {
@@ -1344,7 +1332,7 @@ function legendaryBattlePayload(round) {
     new ButtonBuilder()
       .setCustomId('fish_legendary_choice:center')
       .setLabel('Centro')
-      .setStyle(ButtonStyle.Primary)
+        .setStyle(ButtonStyle.Secondary)
       .setDisabled(round > LEGENDARY_ROUNDS),
     new ButtonBuilder()
       .setCustomId('fish_legendary_choice:right')
