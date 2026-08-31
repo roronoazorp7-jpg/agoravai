@@ -1,4 +1,4 @@
-export const CARD_PACK_PRICE = 2500;
+export const CARD_PACK_PRICE = 2000;
 export const CARD_PACK_SIZE = 2;
 export const CARD_REPEAT_CHANCE = 0.45;
 

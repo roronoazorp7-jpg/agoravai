@@ -44,17 +44,17 @@ function rodEmoji(rod) {
 }
 
 export const FISH = Object.freeze([
-  { key: 'peixe_comum', name: 'Peixe comum', emoji: FISH_COMMON, value: 14, chance: 48, rarity: 0, artwork: 'common', description: 'O peixe mais comum e fácil de conseguir.' },
-  { key: 'tubarao_comum', name: 'Tubarão comum', emoji: FISH_SHARK, value: 108, chance: 13, rarity: 1, artwork: 'shark', description: 'Um tubarão que vale muitas coins.' },
-  { key: 'carpa_lendaria', name: 'Carpa Solar lendária', emoji: FISH_LEGENDARY, value: 400, chance: 4, rarity: 2.2, artwork: 'legendary', description: 'Uma carpa dourada rara que pode aparecer por conta própria — e ainda exige duas escolhas certeiras.' },
-  { key: 'piranha_rubra', name: 'Piranha Rubra', emoji: () => '🐡', value: 94, chance: 6, rarity: 1.2, artwork: 'piranha', ability: 'piranha', description: 'Uma mordida nervosa que transforma respeito em coins.' },
-  { key: 'betta_fogo', name: 'Betta de Fogo', emoji: () => '🐠', value: 70, chance: 5, rarity: 1.1, artwork: 'betta', ability: 'betta', description: 'Dança com as nadadeiras e chama a sorte para perto.' },
-  { key: 'marlin_neon', name: 'Agulhão Neon', emoji: () => '🐟', value: 150, chance: 3.5, rarity: 2, artwork: 'marlin', ability: 'marlin', description: 'Um velocista do oceano que encurta a espera da próxima pescaria.' },
-  { key: 'lagosta_espinhosa', name: 'Lagosta Espinhosa', emoji: () => '🦞', value: 126, chance: 7, rarity: 1.4, artwork: 'lobster', ability: 'lobster', description: 'Uma pinça dourada que recompensa quem tem coragem de segurá-la.' },
-  { key: 'estrela_do_mar', name: 'Estrela do Mar', emoji: () => '⭐', value: 84, chance: 5.5, rarity: 1.2, artwork: 'starfish', ability: 'starfish', description: 'Faça um pedido: esta estrela pode abrir uma maré lendária.' },
-  { key: 'polvo_rosa', name: 'Polvo Rosa', emoji: () => '🐙', value: 184, chance: 4.5, rarity: 1.8, artwork: 'octopus', ability: 'octopus', description: 'Oito tentáculos, oito chances de encontrar uma isca especial.' },
-  { key: 'tartaruga_marinha', name: 'Tartaruga Marinha', emoji: () => '🐢', value: 216, chance: 3.5, rarity: 2, artwork: 'turtle', ability: 'turtle', description: 'Um casco antigo que ensina a esperar menos pela próxima maré.' },
-  { key: 'orca', name: 'Orca da Maré', emoji: () => '🐋', value: 500, chance: 1.5, rarity: 3, artwork: 'orca', ability: 'orca', description: 'Um chamado raro que traz tesouro e coins para o pescador.' },
+  { key: 'peixe_comum', name: 'Peixe comum', emoji: FISH_COMMON, value: 42, chance: 48, rarity: 0, artwork: 'common', description: 'O peixe mais comum e fácil de conseguir.' },
+  { key: 'tubarao_comum', name: 'Tubarão comum', emoji: FISH_SHARK, value: 324, chance: 13, rarity: 1, artwork: 'shark', description: 'Um tubarão que vale muitas coins.' },
+  { key: 'carpa_lendaria', name: 'Carpa Solar lendária', emoji: FISH_LEGENDARY, value: 1200, chance: 4, rarity: 2.2, artwork: 'legendary', description: 'Uma carpa dourada rara que pode aparecer por conta própria — e ainda exige duas escolhas certeiras.' },
+  { key: 'piranha_rubra', name: 'Piranha Rubra', emoji: () => '🐡', value: 282, chance: 6, rarity: 1.2, artwork: 'piranha', ability: 'piranha', description: 'Uma mordida nervosa que transforma respeito em coins.' },
+  { key: 'betta_fogo', name: 'Betta de Fogo', emoji: () => '🐠', value: 210, chance: 5, rarity: 1.1, artwork: 'betta', ability: 'betta', description: 'Dança com as nadadeiras e chama a sorte para perto.' },
+  { key: 'marlin_neon', name: 'Agulhão Neon', emoji: () => '🐟', value: 450, chance: 3.5, rarity: 2, artwork: 'marlin', ability: 'marlin', description: 'Um velocista do oceano que encurta a espera da próxima pescaria.' },
+  { key: 'lagosta_espinhosa', name: 'Lagosta Espinhosa', emoji: () => '🦞', value: 378, chance: 7, rarity: 1.4, artwork: 'lobster', ability: 'lobster', description: 'Uma pinça dourada que recompensa quem tem coragem de segurá-la.' },
+  { key: 'estrela_do_mar', name: 'Estrela do Mar', emoji: () => '⭐', value: 252, chance: 5.5, rarity: 1.2, artwork: 'starfish', ability: 'starfish', description: 'Faça um pedido: esta estrela pode abrir uma maré lendária.' },
+  { key: 'polvo_rosa', name: 'Polvo Rosa', emoji: () => '🐙', value: 552, chance: 4.5, rarity: 1.8, artwork: 'octopus', ability: 'octopus', description: 'Oito tentáculos, oito chances de encontrar uma isca especial.' },
+  { key: 'tartaruga_marinha', name: 'Tartaruga Marinha', emoji: () => '🐢', value: 648, chance: 3.5, rarity: 2, artwork: 'turtle', ability: 'turtle', description: 'Um casco antigo que ensina a esperar menos pela próxima maré.' },
+  { key: 'orca', name: 'Orca da Maré', emoji: () => '🐋', value: 1500, chance: 1.5, rarity: 3, artwork: 'orca', ability: 'orca', description: 'Um chamado raro que traz tesouro e coins para o pescador.' },
   { key: 'escama_lendaria', name: 'Escama lendária', emoji: FISH_LEGENDARY, value: 0, chance: 0, rarity: 0, sellable: false, description: 'Uma escama obtida ao derrotar o tubarão raivoso.' },
   // Mantém capturas antigas vendáveis e visíveis após a evolução do sistema.
   { key: 'sardinha', name: 'Sardinha', emoji: FISH_COMMON, value: 80, chance: 0, rarity: 0, artwork: 'common', legacy: true, description: 'Captura antiga.' },

@@ -240,6 +240,8 @@ model Economy {
   lastWork     DateTime?
   lastRob      DateTime?
   dailyStreak  Int       @default(0)
+  workLevel    Int       @default(1)
+  workXp       Int       @default(0)
   lastPetPlay  DateTime?
   lastPetFeed  DateTime?
   lastPetPet   DateTime?

@@ -45,6 +45,7 @@ import { handlePetButton } from '../commands/general/pet.js';
 import { handleModerationButton } from '../commands/admin/moderacao.js';
 import { handleVipButton, handleVipConfigModal } from '../commands/loja/vip.js';
 import { handleFishingInteraction } from '../commands/economia/pescaria.js';
+import { handleWorkInteraction } from '../commands/economia/eco.js';
 import { handleBankInteraction } from '../utils/bankHandlers.js';
 import { handleCardPackInteraction, handleFutPackInteraction, handleCardCollectionInteraction } from '../commands/general/cartas.js';
 import { handleBattleInteraction } from '../commands/jogos/batalha.js';
@@ -559,6 +560,9 @@ export default {
 
       // ── STRING SELECT MENUS ────────────────────────────────────────────────
       if (interaction.isStringSelectMenu()) {
+        if (interaction.customId.startsWith('work_select:')) {
+          return handleWorkInteraction(interaction);
+        }
         if (
           interaction.customId.startsWith('battle_team_select:')
           || interaction.customId.startsWith('battle_move:')

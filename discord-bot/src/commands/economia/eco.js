@@ -1,10 +1,13 @@
 import {
   SlashCommandBuilder,
   AttachmentBuilder,
+  ActionRowBuilder,
   ContainerBuilder,
   TextDisplayBuilder,
   MediaGalleryBuilder,
   MediaGalleryItemBuilder,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
   MessageFlags,
   PermissionFlagsBits,
 } from 'discord.js';
@@ -60,7 +63,7 @@ function robberyPayload(text, arrested = false, ephemeral = false) {
   };
 }
 
-function trabalhoPayload(text) {
+function trabalhoPayload(text, components = []) {
   const attachment = new AttachmentBuilder(
     fileURLToPath(new URL('../../assets/trabalho-banner.jpg', import.meta.url)),
     { name: 'trabalho-banner.jpg' },
@@ -73,7 +76,7 @@ function trabalhoPayload(text) {
       ),
     );
   return {
-    components: [c],
+    components: [c, ...components],
     files: [attachment],
     flags: MessageFlags.IsComponentsV2,
   };
@@ -81,35 +84,139 @@ function trabalhoPayload(text) {
 
 // ─── Eco helpers ──────────────────────────────────────────────────────────────
 
-const DAILY_AMOUNT  = () => Math.floor(Math.random() * 501) + 500;
+const DAILY_AMOUNT  = () => Math.floor(Math.random() * 1001) + 1000;
 const WEEKLY_AMOUNT = () => Math.floor(Math.random() * 3001) + 3000;
 const MONTHLY_AMOUNT = () => Math.floor(Math.random() * 15001) + 15000;
-const WORK_AMOUNT   = () => Math.floor(Math.random() * 401) + 100;
 const DAILY_CD      = 24 * 60 * 60 * 1000;
 const WEEKLY_CD     = 7 * 24 * 60 * 60 * 1000;
 const MONTHLY_CD    = 30 * 24 * 60 * 60 * 1000;
 const WORK_CD       = 60 * 60 * 1000;
+const WORK_LEVEL_MAX = 10;
+const WORK_XP_PER_LEVEL = 100;
 const ROB_CD        = 60 * 60 * 1000;
 const DEFAULT_ROBBERY_WEAPON = 'faca';
 const ROBBERY_FINE_MIN = 1500;
 
-const WORK_MSGS = [
-  'Você programou um bot de Discord',
-  'Você fez uma entrega de pizza',
-  'Você vendeu itens no marketplace',
-  'Você deu aulas particulares online',
-  'Você fez design para um cliente',
-  'Você trabalhou no mercado',
-  'Você fez transmissão ao vivo',
-  'Você vendeu fotos de stock',
-  'Você fez um freela de edição de vídeo',
-  'Você dirigiu para o aplicativo',
-  'Você fez suporte técnico remoto',
-  'Você vendeu doces na escola',
-  'Você fez traduções de texto',
-  'Você editou fotos para um cliente',
-  'Você gravou um podcast patrocinado',
-];
+export const WORK_JOBS = Object.freeze([
+  {
+    key: 'entregador',
+    name: 'Entregador de pizza',
+    emoji: '🍕',
+    minLevel: 1,
+    min: 450,
+    max: 700,
+    xp: 25,
+    description: 'Entrega pizzas quentes e desvia de cachorros.',
+  },
+  {
+    key: 'freelancer',
+    name: 'Freelancer digital',
+    emoji: '💻',
+    minLevel: 2,
+    min: 700,
+    max: 1050,
+    xp: 30,
+    description: 'Resolve bugs e cobra por hora de reunião.',
+  },
+  {
+    key: 'investidor',
+    name: 'Investidor Midas',
+    emoji: '📈',
+    minLevel: 4,
+    min: 1000,
+    max: 1550,
+    xp: 35,
+    description: 'Compra baixo e finge que sabia que ia subir.',
+  },
+  {
+    key: 'gerente',
+    name: 'Gerente de negócios',
+    emoji: '🏢',
+    minLevel: 6,
+    min: 1450,
+    max: 2200,
+    xp: 45,
+    description: 'Participa de reuniões que poderiam ser mensagens.',
+  },
+  {
+    key: 'magnata',
+    name: 'Magnata do servidor',
+    emoji: '👑',
+    minLevel: 8,
+    min: 2100,
+    max: 3200,
+    xp: 55,
+    description: 'Ganha dinheiro até quando está aparentemente parado.',
+  },
+]);
+
+const WORK_MESSAGES = Object.freeze({
+  entregador: [
+    'Você entregou uma pizza e recebeu gorjeta porque não comeu o recheio no caminho.',
+    'Você venceu o trânsito, três cachorros e uma rua sem saída.',
+  ],
+  freelancer: [
+    'Você resolveu um bug que ninguém sabia explicar e cobrou taxa de urgência.',
+    'Você entrou numa reunião que poderia ser uma mensagem e saiu com pagamento.',
+  ],
+  investidor: [
+    'Você analisou o mercado Midas e apostou antes da notícia sair.',
+    'Você comprou uma ação duvidosa e, por algum milagre, ela subiu.',
+  ],
+  gerente: [
+    'Você aprovou uma reunião sobre outra reunião e recebeu seu salário.',
+    'Você delegou tudo com confiança e chamou isso de liderança.',
+  ],
+  magnata: [
+    'Seu dinheiro trabalhou enquanto você olhava para o saldo.',
+    'Você assinou um contrato tão lucrativo que até o banco ficou desconfiado.',
+  ],
+});
+
+export function workLevelFromXp(workXp = 0) {
+  return Math.min(
+    WORK_LEVEL_MAX,
+    Math.floor(Math.max(0, Number(workXp) || 0) / WORK_XP_PER_LEVEL) + 1,
+  );
+}
+
+function workProgress(workXp, level) {
+  if (level >= WORK_LEVEL_MAX) return `${workXp} XP · nível máximo`;
+  return `${workXp % WORK_XP_PER_LEVEL}/${WORK_XP_PER_LEVEL} XP para o nível ${level + 1}`;
+}
+
+function randomBetween(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function workMenuPayload(eco) {
+  const workXp = Number(eco.workXp ?? 0);
+  const level = workLevelFromXp(workXp);
+  const availableJobs = WORK_JOBS.filter(job => job.minLevel <= level);
+  const nextJob = WORK_JOBS.find(job => job.minLevel > level);
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId(`work_select:${eco.userId}`)
+    .setPlaceholder('Escolha uma profissão');
+
+  menu.addOptions(
+    availableJobs.map(job => new StringSelectMenuOptionBuilder()
+      .setLabel(`${job.emoji} ${job.name}`)
+      .setValue(job.key)
+      .setDescription(`${job.min.toLocaleString('pt-BR')}-${job.max.toLocaleString('pt-BR')} coins · +${job.xp} XP`)),
+  );
+
+  const lockedText = nextJob
+    ? `\nPróxima profissão: **${nextJob.name}** no nível **${nextJob.minLevel}**.`
+    : '\nVocê desbloqueou todas as profissões!';
+  return trabalhoPayload(
+    `## 💼 Central de Trabalho\n\n` +
+    `**Nível trabalhista:** ${level}/${WORK_LEVEL_MAX}\n` +
+    `**Progresso:** ${workProgress(workXp, level)}\n\n` +
+    `${availableJobs.map(job => `${job.emoji} **${job.name}** — ${job.min.toLocaleString('pt-BR')}–${job.max.toLocaleString('pt-BR')} coins`).join('\n')}` +
+    `${lockedText}\n\nEscolha uma profissão para trabalhar:`,
+    [new ActionRowBuilder().addComponents(menu)],
+  );
+}
 
 function msToHuman(ms) {
   const h = Math.floor(ms / 3600000);
@@ -496,10 +603,89 @@ const cmdMensal = {
 };
 
 // ─── /trabalho ────────────────────────────────────────────────────────────────
+async function performWork({ userId, guildId, jobKey, isAdmin = false }) {
+  return prisma.$transaction(async tx => {
+    const eco = await getEco(userId, guildId, tx);
+    const now = Date.now();
+    const last = eco.lastWork?.getTime() ?? 0;
+    const diff = now - last;
+    const workXp = Number(eco.workXp ?? 0);
+    const level = workLevelFromXp(workXp);
+    const job = WORK_JOBS.find(item => item.key === jobKey);
+
+    if (!isAdmin && diff < WORK_CD) {
+      return { ok: false, reason: 'cooldown', remaining: WORK_CD - diff };
+    }
+    if (!job || job.minLevel > level) {
+      return { ok: false, reason: 'locked', job };
+    }
+
+    const amount = randomBetween(job.min, job.max);
+    const message = WORK_MESSAGES[job.key][Math.floor(Math.random() * WORK_MESSAGES[job.key].length)];
+    const nextXp = workXp + job.xp;
+    const nextLevel = workLevelFromXp(nextXp);
+    await tx.economy.update({
+      where: { userId_guildId: { userId, guildId } },
+      data: {
+        balance: { increment: amount },
+        lastWork: new Date(now),
+        workXp: nextXp,
+        workLevel: nextLevel,
+      },
+    });
+    return {
+      ok: true,
+      amount,
+      message,
+      job,
+      level,
+      nextLevel,
+      workXp: nextXp,
+    };
+  });
+}
+
+function workResultPayload(result) {
+  const levelUp = result.nextLevel > result.level
+    ? `\n🎉 Você subiu para o **nível trabalhista ${result.nextLevel}**!`
+    : '';
+  return trabalhoPayload(
+    `## 💼 Trabalho concluído!\n` +
+    `${result.job.emoji} **${result.message}**\n` +
+    `Você ganhou ${COIN()} **${result.amount.toLocaleString('pt-BR')}** como **${result.job.name}**.\n\n` +
+    `📊 Nível trabalhista: **${result.nextLevel}/${WORK_LEVEL_MAX}**\n` +
+    `✨ XP: **+${result.job.xp}** · ${workProgress(result.workXp, result.nextLevel)}${levelUp}\n\n` +
+    `${CLK()} Volte em **1 hora** para trabalhar novamente.`,
+  );
+}
+
+function workErrorPayload(result) {
+  if (result.reason === 'cooldown') {
+    return v2Err(`Você está cansado! Descanse mais **${msToHuman(result.remaining)}** antes de trabalhar novamente.`);
+  }
+  return v2Err(`Essa profissão ainda está bloqueada. Alcance o nível trabalhista **${result.job?.minLevel ?? 1}** para desbloqueá-la.`);
+}
+
+export async function handleWorkInteraction(interaction) {
+  const [, ownerId] = interaction.customId.split(':');
+  if (ownerId !== interaction.user.id) {
+    return interaction.reply(v2Err('Esse menu de trabalho pertence a outra pessoa.'));
+  }
+
+  const result = await performWork({
+    userId: interaction.user.id,
+    guildId: interaction.guildId,
+    jobKey: interaction.values[0],
+    isAdmin: interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ?? false,
+  });
+  if (!result.ok) return interaction.reply(workErrorPayload(result));
+  return interaction.update(workResultPayload(result));
+}
+
 const cmdTrabalho = {
   data: new SlashCommandBuilder()
     .setName('trabalho')
-    .setDescription('💼 Trabalhe para ganhar coins (1h cooldown)'),
+    .setDescription('💼 Escolha uma profissão e trabalhe (1h cooldown)'),
   name: 'trabalho',
   aliases: ['trab', 'work'],
 
@@ -510,18 +696,8 @@ const cmdTrabalho = {
     const last    = eco.lastWork?.getTime() ?? 0;
     const diff    = now - last;
     if (!isAdmin && diff < WORK_CD)
-      return interaction.reply({ ...v2Err(`Você está cansado! Descanse mais **${msToHuman(WORK_CD - diff)}** antes de trabalhar novamente.`) });
-    const amount = WORK_AMOUNT();
-    const msg    = WORK_MSGS[Math.floor(Math.random() * WORK_MSGS.length)];
-    await prisma.economy.update({
-      where: { userId_guildId: { userId: interaction.user.id, guildId: interaction.guildId } },
-      data:  { balance: { increment: amount }, lastWork: new Date() },
-    });
-    return interaction.reply(trabalhoPayload(
-      `## 💼 Trabalho Concluído!\n` +
-      `**${msg}** e ganhou ${COIN()} **${amount.toLocaleString('pt-BR')}**!\n\n` +
-      `${CLK()} Volte em **1 hora** para trabalhar novamente.`
-    ));
+      return interaction.reply(v2Err(`Você está cansado! Descanse mais **${msToHuman(WORK_CD - diff)}** antes de trabalhar novamente.`));
+    return interaction.reply(workMenuPayload(eco));
   },
 
   async executePrefix(message) {
@@ -532,17 +708,7 @@ const cmdTrabalho = {
     const diff    = now - last;
     if (!isAdmin && diff < WORK_CD)
       return message.reply(v2Err(`Você está cansado! Descanse mais **${msToHuman(WORK_CD - diff)}** antes de trabalhar novamente.`));
-    const amount = WORK_AMOUNT();
-    const msg    = WORK_MSGS[Math.floor(Math.random() * WORK_MSGS.length)];
-    await prisma.economy.update({
-      where: { userId_guildId: { userId: message.author.id, guildId: message.guildId } },
-      data:  { balance: { increment: amount }, lastWork: new Date() },
-    });
-    return message.reply(trabalhoPayload(
-      `## 💼 Trabalho Concluído!\n` +
-      `**${msg}** e ganhou ${COIN()} **${amount.toLocaleString('pt-BR')}**!\n\n` +
-      `${CLK()} Volte em **1 hora** para trabalhar novamente.`
-    ));
+    return message.reply(workMenuPayload(eco));
   },
 };
 
