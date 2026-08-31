@@ -26,6 +26,15 @@ const FISH_SEAL = () => getEmoji('fish_seal');
 const FISH_LEGENDARY = () => getEmoji('fish_legendary');
 const FISH_ROD = () => getEmoji('fish_rod');
 const FISH_SHARK = () => getEmoji('fish_shark');
+const FISH_PIRANHA = () => getEmoji('fish_piranha');
+const FISH_BETTA = () => getEmoji('fish_betta');
+const FISH_MARLIN = () => getEmoji('fish_marlin');
+const FISH_LOBSTER = () => getEmoji('fish_lobster');
+const FISH_STARFISH = () => getEmoji('fish_starfish');
+const FISH_OCTOPUS = () => getEmoji('fish_octopus');
+const FISH_TURTLE = () => getEmoji('fish_turtle');
+const FISH_ORCA = () => getEmoji('fish_orca');
+const FISH_SHARK_ANGRY = () => getEmoji('fish_shark_angry');
 const FISH_CD = 5 * 1000;
 const SHARK_BATTLE_START_HP = 12;
 const SHARK_REWARD_MIN = 1300;
@@ -50,14 +59,14 @@ export const FISH = Object.freeze([
   { key: 'peixe_comum', name: 'Peixe comum', emoji: FISH_COMMON, value: 42, chance: 48, rarity: 0, artwork: 'common', description: 'O peixe mais comum e fácil de conseguir.' },
   { key: 'tubarao_comum', name: 'Tubarão comum', emoji: FISH_SHARK, value: 324, chance: 13, rarity: 1, artwork: 'shark', description: 'Um tubarão que vale muitas coins.' },
   { key: 'carpa_lendaria', name: 'Carpa Solar lendária', emoji: FISH_LEGENDARY, value: 1200, chance: 4, rarity: 2.2, artwork: 'legendary', description: 'Uma carpa dourada rara que pode aparecer por conta própria — e ainda exige duas escolhas certeiras.' },
-  { key: 'piranha_rubra', name: 'Piranha Rubra', emoji: () => '🐡', value: 282, chance: 6, rarity: 1.2, artwork: 'piranha', ability: 'piranha', description: 'Uma mordida nervosa que transforma respeito em coins.' },
-  { key: 'betta_fogo', name: 'Betta de Fogo', emoji: () => '🐠', value: 210, chance: 5, rarity: 1.1, artwork: 'betta', ability: 'betta', description: 'Dança com as nadadeiras e chama a sorte para perto.' },
-  { key: 'marlin_neon', name: 'Agulhão Neon', emoji: () => '🐟', value: 450, chance: 3.5, rarity: 2, artwork: 'marlin', ability: 'marlin', description: 'Um velocista do oceano que encurta a espera da próxima pescaria.' },
-  { key: 'lagosta_espinhosa', name: 'Lagosta Espinhosa', emoji: () => '🦞', value: 378, chance: 7, rarity: 1.4, artwork: 'lobster', ability: 'lobster', description: 'Uma pinça dourada que recompensa quem tem coragem de segurá-la.' },
-  { key: 'estrela_do_mar', name: 'Estrela do Mar', emoji: () => '⭐', value: 252, chance: 5.5, rarity: 1.2, artwork: 'starfish', ability: 'starfish', description: 'Faça um pedido: esta estrela pode abrir uma maré lendária.' },
-  { key: 'polvo_rosa', name: 'Polvo Rosa', emoji: () => '🐙', value: 552, chance: 4.5, rarity: 1.8, artwork: 'octopus', ability: 'octopus', description: 'Oito tentáculos, oito chances de encontrar uma isca especial.' },
-  { key: 'tartaruga_marinha', name: 'Tartaruga Marinha', emoji: () => '🐢', value: 648, chance: 3.5, rarity: 2, artwork: 'turtle', ability: 'turtle', description: 'Um casco antigo que ensina a esperar menos pela próxima maré.' },
-  { key: 'orca', name: 'Orca da Maré', emoji: () => '🐋', value: 1500, chance: 1.5, rarity: 3, artwork: 'orca', ability: 'orca', description: 'Um chamado raro que traz tesouro e coins para o pescador.' },
+  { key: 'piranha_rubra', name: 'Piranha Rubra', emoji: FISH_PIRANHA, value: 282, chance: 6, rarity: 1.2, artwork: 'piranha', ability: 'piranha', description: 'Uma mordida nervosa que transforma respeito em coins.' },
+  { key: 'betta_fogo', name: 'Betta de Fogo', emoji: FISH_BETTA, value: 210, chance: 5, rarity: 1.1, artwork: 'betta', ability: 'betta', description: 'Dança com as nadadeiras e chama a sorte para perto.' },
+  { key: 'marlin_neon', name: 'Agulhão Neon', emoji: FISH_MARLIN, value: 450, chance: 3.5, rarity: 2, artwork: 'marlin', ability: 'marlin', description: 'Um velocista do oceano que encurta a espera da próxima pescaria.' },
+  { key: 'lagosta_espinhosa', name: 'Lagosta Espinhosa', emoji: FISH_LOBSTER, value: 378, chance: 7, rarity: 1.4, artwork: 'lobster', ability: 'lobster', description: 'Uma pinça dourada que recompensa quem tem coragem de segurá-la.' },
+  { key: 'estrela_do_mar', name: 'Estrela do Mar', emoji: FISH_STARFISH, value: 252, chance: 5.5, rarity: 1.2, artwork: 'starfish', ability: 'starfish', description: 'Faça um pedido: esta estrela pode abrir uma maré lendária.' },
+  { key: 'polvo_rosa', name: 'Polvo Rosa', emoji: FISH_OCTOPUS, value: 552, chance: 4.5, rarity: 1.8, artwork: 'octopus', ability: 'octopus', description: 'Oito tentáculos, oito chances de encontrar uma isca especial.' },
+  { key: 'tartaruga_marinha', name: 'Tartaruga Marinha', emoji: FISH_TURTLE, value: 648, chance: 3.5, rarity: 2, artwork: 'turtle', ability: 'turtle', description: 'Um casco antigo que ensina a esperar menos pela próxima maré.' },
+  { key: 'orca', name: 'Orca da Maré', emoji: FISH_ORCA, value: 1500, chance: 1.5, rarity: 3, artwork: 'orca', ability: 'orca', description: 'Um chamado raro que traz tesouro e coins para o pescador.' },
   { key: 'escama_lendaria', name: 'Escama lendária', emoji: FISH_LEGENDARY, value: 0, chance: 0, rarity: 0, sellable: false, description: 'Uma escama obtida ao derrotar o tubarão raivoso.' },
   // Mantém capturas antigas vendáveis e visíveis após a evolução do sistema.
   { key: 'sardinha', name: 'Sardinha', emoji: FISH_COMMON, value: 240, chance: 0, rarity: 0, artwork: 'common', legacy: true, description: 'Captura antiga.' },
@@ -78,46 +87,64 @@ export const RODS = Object.freeze([
 const FISH_BY_KEY = new Map(FISH.map(fish => [fish.key, fish]));
 const ROD_BY_KEY = new Map(RODS.map(rod => [rod.key, rod]));
 
+function decorateFishReferences(text) {
+  return [
+    ['Piranhas Rubras', FISH_PIRANHA],
+    ['Piranha Rubra', FISH_PIRANHA],
+    ['Carpa Solar', FISH_LEGENDARY],
+    ['tubarões comuns', FISH_SHARK],
+    ['Tubarão raivoso', FISH_SHARK_ANGRY],
+    ['Agulhão Neon', FISH_MARLIN],
+    ['Betta de Fogo', FISH_BETTA],
+    ['Lagosta Espinhosa', FISH_LOBSTER],
+    ['Estrela do Mar', FISH_STARFISH],
+    ['Polvo Rosa', FISH_OCTOPUS],
+    ['Tartaruga Marinha', FISH_TURTLE],
+    ['Orca da Maré', FISH_ORCA],
+    ['peixe comum', FISH_COMMON],
+  ].reduce((result, [name, emoji]) => result.replaceAll(name, `${emoji()} ${name}`), text);
+}
+
 const FISH_ABILITIES = Object.freeze({
   piranha: {
     label: 'Domar a mordida',
     emoji: '🩸',
-    hint: 'A Piranha Rubra ainda está rosnando. Clique no botão para transformar a mordida em uma gorjeta.',
+    hint: () => `${FISH_PIRANHA()} **Piranha Rubra** ainda está rosnando. Clique no botão para transformar a mordida em uma gorjeta.`,
   },
   betta: {
     label: 'Fazer a dança',
     emoji: '✨',
-    hint: 'O Betta de Fogo está fazendo charme. Clique no botão e ele pode chamar uma maré lendária.',
+    hint: () => `${FISH_BETTA()} **Betta de Fogo** está fazendo charme. Clique no botão e ele pode chamar uma maré lendária.`,
   },
   marlin: {
     label: 'Pegar carona',
     emoji: '⚡',
-    hint: 'O Agulhão Neon quer correr com você. Clique no botão para encurtar a espera da próxima pescaria.',
+    hint: () => `${FISH_MARLIN()} **Agulhão Neon** quer correr com você. Clique no botão para encurtar a espera da próxima pescaria.`,
   },
   lobster: {
     label: 'Apertar a pinça',
     emoji: '🦞',
-    hint: 'A Lagosta Espinhosa ainda está segurando sua linha. Aperte a pinça e transforme a captura em uma gorjeta.',
+    hint: () => `${FISH_LOBSTER()} **Lagosta Espinhosa** ainda está segurando sua linha. Aperte a pinça e transforme a captura em uma gorjeta.`,
   },
   starfish: {
     label: 'Fazer um pedido',
     emoji: '🌟',
-    hint: 'A Estrela do Mar está brilhando. Faça um pedido para tentar chamar a próxima maré lendária.',
+    hint: () => `${FISH_STARFISH()} **Estrela do Mar** está brilhando. Faça um pedido para tentar chamar a próxima maré lendária.`,
   },
   octopus: {
     label: 'Usar oito tentáculos',
     emoji: '🐙',
-    hint: 'O Polvo Rosa encontrou algo entre as pedras. Use os oito tentáculos para revelar uma isca especial.',
+    hint: () => `${FISH_OCTOPUS()} **Polvo Rosa** encontrou algo entre as pedras. Use os oito tentáculos para revelar uma isca especial.`,
   },
   turtle: {
     label: 'Ativar o casco',
     emoji: '🛡️',
-    hint: 'A Tartaruga Marinha conhece uma corrente secreta. Ative o casco para reduzir a espera da próxima pescaria.',
+    hint: () => `${FISH_TURTLE()} **Tartaruga Marinha** conhece uma corrente secreta. Ative o casco para reduzir a espera da próxima pescaria.`,
   },
   orca: {
     label: 'Chamar a matilha',
     emoji: '🌊',
-    hint: 'A Orca da Maré está chamando outras orcas. Responda ao chamado para receber um tesouro de alto mar.',
+    hint: () => `${FISH_ORCA()} **Orca da Maré** está chamando outras orcas. Responda ao chamado para receber um tesouro de alto mar.`,
   },
 });
 
@@ -727,7 +754,7 @@ function buildCollectionText(catches) {
   const lines = FISH
     .filter(fish => !fish.legacy || owned.has(fish.key))
     .map(fish => owned.has(fish.key)
-      ? `✅ ${fishEmoji(fish)} **${fish.name}** × **${owned.get(fish.key)}** — ${fish.description}`
+      ? `✅ ${fishEmoji(fish)} **${fish.name}** × **${owned.get(fish.key)}** — ${decorateFishReferences(fish.description)}`
       : `⬜ ??? **${fish.name}** — ainda não descoberto`);
   const discovered = FISH.filter(fish => owned.has(fish.key)).length;
   return (
@@ -778,8 +805,8 @@ export function buildFishingMarketPayload(guildId) {
     `Os preços são individuais por servidor e mudam a cada **6 horas**.\n` +
     `A qualidade da captura altera o valor final: de **0,7×** a **1,8×**.\n\n` +
     lines.join('\n') +
-    `\n\n📌 Alta do momento: **${market.hot.fish.name}** (${marketMovementLabel(market.hot.movement)})\n` +
-    `📌 Baixa do momento: **${market.cold.fish.name}** (${marketMovementLabel(market.cold.movement)})\n` +
+    `\n\n📌 Alta do momento: ${fishEmoji(market.hot.fish)} **${market.hot.fish.name}** (${marketMovementLabel(market.hot.movement)})\n` +
+    `📌 Baixa do momento: ${fishEmoji(market.cold.fish)} **${market.cold.fish.name}** (${marketMovementLabel(market.cold.movement)})\n` +
     `⏱️ Próxima atualização em **${msToHuman(marketTimeRemaining())}**.`,
     { components: [buildFishingBackRow()] },
   );
@@ -791,7 +818,7 @@ export function buildFishingSpotsPayload(currentSpotKey) {
     const option = new StringSelectMenuOptionBuilder()
       .setLabel(`${spot.name}${spot.key === current.key ? ' (atual)' : ''}`)
       .setValue(`fish_spot:${spot.key}`)
-      .setDescription(spot.description)
+      .setDescription(decorateFishReferences(spot.description))
       .setEmoji(spot.emoji);
     if (spot.key === current.key) option.setDefault(true);
     return option;
@@ -817,7 +844,7 @@ export function buildFishingBaitShopPayload() {
   const options = FISHING_BAITS.map(bait => new StringSelectMenuOptionBuilder()
     .setLabel(`${bait.name} — pacote com ${bait.pack}`)
     .setValue(`fish_buybait:${bait.key}`)
-    .setDescription(`${bait.price.toLocaleString('pt-BR')} coins · ${bait.description}`)
+    .setDescription(`${bait.price.toLocaleString('pt-BR')} coins · ${decorateFishReferences(bait.description)}`)
     .setEmoji(bait.emoji));
   return v2(
     `## 🪱 Loja de iscas\n` +
@@ -852,7 +879,7 @@ export function buildFishingBaitEquipPayload(items, activeBaitKey = null) {
       const option = new StringSelectMenuOptionBuilder()
         .setLabel(`${bait.name} × ${row.quantity}`)
         .setValue(`fish_equipbait:${bait.key}`)
-        .setDescription(bait.description)
+        .setDescription(decorateFishReferences(bait.description))
         .setEmoji(bait.emoji);
       if (bait.key === activeBaitKey) option.setDefault(true);
       return option;
@@ -997,7 +1024,7 @@ function buildFishAbilityComponents(fish, userId) {
   const button = new ButtonBuilder()
     .setCustomId(`fish_ability:${userId}:${fish.key}:${token}`)
     .setLabel(ability.label)
-    .setEmoji(ability.emoji)
+      .setEmoji(fishEmoji(fish))
     .setStyle(ButtonStyle.Secondary);
 
   return [new ActionRowBuilder().addComponents(button)];
@@ -1183,7 +1210,7 @@ export async function handleFishingInteraction(interaction) {
       update: { selectedSpotKey: spot.key },
     });
     return interaction.update(await fishingArtworkPayload(
-      `## ${spot.emoji} Ponto escolhido!\nSua próxima pescaria será no **${spot.name}**.\n\n${spot.description}\n\nA paisagem deste ponto foi salva para as próximas capturas.`,
+      `## ${spot.emoji} Ponto escolhido!\nSua próxima pescaria será no **${spot.name}**.\n\n${decorateFishReferences(spot.description)}\n\nA paisagem deste ponto foi salva para as próximas capturas.`,
       null,
       [buildFishingBackRow()],
       { large: true, scene: spot.scene },
@@ -1213,7 +1240,7 @@ export async function handleFishingInteraction(interaction) {
       return interaction.update(fishingUpdateError(`Saldo insuficiente. Você tem **${result.balance.toLocaleString('pt-BR')}** ${COIN()}.`));
     }
     return interaction.update(v2(
-      `## ${bait.emoji} Isca comprada!\nVocê recebeu **${bait.pack}x ${bait.name}**.\n\n${bait.description}\n\nUse **Equipar isca** para ativá-la.`,
+      `## ${bait.emoji} Isca comprada!\nVocê recebeu **${bait.pack}x ${bait.name}**.\n\n${decorateFishReferences(bait.description)}\n\nUse **Equipar isca** para ativá-la.`,
         { components: [buildFishingBackRow()] },
     ));
   }
@@ -1293,14 +1320,14 @@ function sharkBattlePayload({ hp, reward, defeated = false }) {
   const attackButton = new ButtonBuilder()
     .setCustomId('fish_shark_attack')
     .setLabel('Atacar o tubarão')
-    .setEmoji(FISH_SHARK())
+    .setEmoji(FISH_SHARK_ANGRY())
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(defeated);
 
   if (defeated) {
     return {
       text:
-        `## ${FISH_SHARK()} Tubarão raivoso derrotado!\n` +
+        `## ${FISH_SHARK_ANGRY()} Tubarão raivoso derrotado!\n` +
         `Você recebeu **${reward.toLocaleString('pt-BR')}** ${COIN()} e uma ${FISH_LEGENDARY()} **Escama lendária**.\n` +
         `A escama foi guardada no seu inventário como troféu.`,
       artwork: 'angryShark',
@@ -1310,7 +1337,7 @@ function sharkBattlePayload({ hp, reward, defeated = false }) {
 
   return {
     text:
-      `## ${FISH_SHARK()} Tubarão raivoso!\n` +
+      `## ${FISH_SHARK_ANGRY()} Tubarão raivoso!\n` +
       `Ele apareceu na sua linha. Ataque até reduzir a vida dele a zero para ganhar uma bolada de coins e uma escama lendária.\n\n` +
       `${FISH_SHARK()} Vida do tubarão: **${hp}/${SHARK_BATTLE_START_HP}**\n` +
       `${COIN()} Recompensa: até **${reward.toLocaleString('pt-BR')}** ${COIN()} + ${FISH_LEGENDARY()} escama lendária`,
@@ -1531,7 +1558,7 @@ async function handleSharkAttack(interaction) {
     : sharkBattlePayload({ hp: result.hp, reward: result.reward });
   if (result.status === 'defeated') battle.components.push(buildFishingResultNavigation());
   return interaction.update(await fishingArtworkPayload(
-    `${battle.text}\n\n${FISH_SHARK()} Você causou **${result.damage}** de dano.`,
+    `${battle.text}\n\n${FISH_SHARK_ANGRY()} Você causou **${result.damage}** de dano.`,
     battle.artwork,
     battle.components,
   ));
@@ -1662,25 +1689,26 @@ async function handleFishAbility(interaction) {
       return interaction.update(fishingUpdateError('Esse peixe não está mais no seu balde.'));
     }
 
+    const fishLabel = `${fishEmoji(fish)} **${fish.name}**`;
     let text;
     if (result.status === 'piranha') {
-      text = `## 🩸 Mordida domada!\nA **${fish.name}** respeitou sua coragem e deixou uma gorjeta de **+${result.bonus.toLocaleString('pt-BR')}** ${COIN()} na sua carteira.\n\nEla continua no seu balde — hoje vocês fizeram as pazes.`;
+      text = `## ${fishEmoji(fish)} Mordida domada!\n${fishLabel} respeitou sua coragem e deixou uma gorjeta de **+${result.bonus.toLocaleString('pt-BR')}** ${COIN()} na sua carteira.\n\nEla continua no seu balde — hoje vocês fizeram as pazes.`;
     } else if (result.status === 'already_blessed') {
-      text = `## ✨ ${fish.name} já estava brilhando!\nA próxima pescaria já tinha uma bênção guardada. O animal fez uma festa extra e ficou todo convencido.`;
+      text = `## ${fishEmoji(fish)} ${fishLabel} já estava brilhando!\nA próxima pescaria já tinha uma bênção guardada. O animal fez uma festa extra e ficou todo convencido.`;
     } else if (result.status === 'betta') {
-      text = `## ✨ Dança do Betta de Fogo!\nAs nadadeiras do **${fish.name}** chamaram a foca lendária. Sua próxima pescaria terá uma oportunidade garantida de carpa lendária.`;
+      text = `## ${fishEmoji(fish)} Dança do Betta de Fogo!\nAs nadadeiras de ${fishLabel} chamaram a foca lendária. Sua próxima pescaria terá uma oportunidade garantida de carpa lendária.`;
     } else if (result.status === 'marlin') {
-      text = `## ⚡ Carona no Agulhão Neon!\nO **${fish.name}** puxou sua linha pela correnteza. A próxima espera foi reduzida para **15 segundos**.`;
+      text = `## ${fishEmoji(fish)} Carona no Agulhão Neon!\n${fishLabel} puxou sua linha pela correnteza. A próxima espera foi reduzida para **15 segundos**.`;
     } else if (result.status === 'turtle') {
-      text = `## 🛡️ Casco protetor ativado!\nA **${fish.name}** abriu uma corrente tranquila. Sua próxima espera foi reduzida para **20 segundos**.`;
+      text = `## ${fishEmoji(fish)} Casco protetor ativado!\n${fishLabel} abriu uma corrente tranquila. Sua próxima espera foi reduzida para **20 segundos**.`;
     } else if (result.status === 'lobster') {
-      text = `## 🦞 Pinça da sorte!\nA **${fish.name}** respeitou sua coragem e deixou uma gorjeta de **+${result.bonus.toLocaleString('pt-BR')}** ${COIN()} na sua carteira.`;
+      text = `## ${fishEmoji(fish)} Pinça da sorte!\n${fishLabel} respeitou sua coragem e deixou uma gorjeta de **+${result.bonus.toLocaleString('pt-BR')}** ${COIN()} na sua carteira.`;
     } else if (result.status === 'starfish') {
-      text = `## 🌟 Pedido realizado!\nA **${fish.name}** brilhou no seu balde. Sua próxima pescaria terá uma oportunidade garantida de carpa lendária.`;
+      text = `## ${fishEmoji(fish)} Pedido realizado!\n${fishLabel} brilhou no seu balde. Sua próxima pescaria terá uma oportunidade garantida de carpa lendária.`;
     } else if (result.status === 'octopus') {
-      text = `## 🐙 Oito tentáculos, uma descoberta!\nO **${fish.name}** encontrou uma **${result.bait.name}** escondida entre as pedras e guardou a isca no seu bolso.`;
+      text = `## ${fishEmoji(fish)} Oito tentáculos, uma descoberta!\n${fishLabel} encontrou uma **${result.bait.name}** escondida entre as pedras e guardou a isca no seu bolso.`;
     } else if (result.status === 'orca') {
-      text = `## 🌊 Chamado da matilha!\nA **${fish.name}** chamou a maré inteira. Você recebeu **+${result.bonus.toLocaleString('pt-BR')}** ${COIN()} e uma **${result.bait.name}**.`;
+      text = `## ${fishEmoji(fish)} Chamado da matilha!\n${fishLabel} chamou a maré inteira. Você recebeu **+${result.bonus.toLocaleString('pt-BR')}** ${COIN()} e uma **${result.bait.name}**.`;
     } else {
       text = '## 🌊 A habilidade se perdeu na correnteza!\nO animal escapou antes de completar a interação.';
     }
@@ -1766,7 +1794,7 @@ async function executeFishing(userId, guildId, isAdmin, reply, requestedSpotKey 
       saleText + `\n\n` +
       `Use **/pesca vender** quando quiser trocar seus peixes por coins.\n` +
        `${FISH_ROD()} Próxima pescaria em **${fishingCooldownLabel(condition)}**.` +
-       (ability ? `\n\n${ability.hint}` : ''),
+       (ability ? `\n\n${ability.hint()}` : ''),
       fish.artwork,
        [...buildFishAbilityComponents(fish, userId), buildFishingResultNavigation()],
        { large: true, scene: spot.scene },

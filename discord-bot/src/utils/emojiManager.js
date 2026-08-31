@@ -1,8 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { createCanvas, loadImage } from '@napi-rs/canvas';
 
 const LOCAL_EMOJI_DIR = fileURLToPath(new URL('../../assets/emojis/', import.meta.url));
+const FISHING_ART_DIR = fileURLToPath(new URL('../../assets/fishing/', import.meta.url));
+const MAX_APPLICATION_EMOJI_BYTES = 256 * 1024;
 
 const REQUIRED_EMOJIS = [
   // ── Originais ──────────────────────────────────────────────────────────────
@@ -34,6 +37,15 @@ const REQUIRED_EMOJIS = [
   { name: 'fish_legendary', asset: 'fish-legendary.gif', mime: 'image/gif', animated: true, fallback: '🐉' },
   { name: 'fish_rod',       asset: 'fish-rod.png',       mime: 'image/png',  fallback: '🎣' },
   { name: 'fish_shark',     asset: 'fish-shark.png',     mime: 'image/png',  fallback: '🦈' },
+  { name: 'fish_piranha',   asset: 'piranha-rubra.png',  assetDir: 'fishing', mime: 'image/png',  fallback: '🐡' },
+  { name: 'fish_betta',     asset: 'betta-fogo.png',     assetDir: 'fishing', mime: 'image/png',  fallback: '🐠' },
+  { name: 'fish_marlin',    asset: 'marlin-neon.png',    assetDir: 'fishing', mime: 'image/png',  fallback: '🐟' },
+  { name: 'fish_lobster',   asset: 'lobster.jpg',        assetDir: 'fishing', mime: 'image/jpeg', fallback: '🦞' },
+  { name: 'fish_starfish',  asset: 'starfish.jpg',       assetDir: 'fishing', mime: 'image/jpeg', fallback: '⭐' },
+  { name: 'fish_octopus',   asset: 'octopus.jpg',        assetDir: 'fishing', mime: 'image/jpeg', fallback: '🐙' },
+  { name: 'fish_turtle',    asset: 'turtle.jpg',         assetDir: 'fishing', mime: 'image/jpeg', fallback: '🐢' },
+  { name: 'fish_orca',      asset: 'orca.jpg',           assetDir: 'fishing', mime: 'image/jpeg', fallback: '🐋' },
+  { name: 'fish_shark_angry', asset: 'shark-angry.png',  assetDir: 'fishing', mime: 'image/png',  fallback: '🦈' },
   // ── Interações dos pets ─────────────────────────────────────────────────────
   { name: 'pet_heart', asset: 'pet-heart.png', mime: 'image/png', fallback: '❤️' },
   { name: 'pet_time',  asset: 'pet-time.png',  mime: 'image/png', fallback: '⏱️' },
@@ -57,6 +69,22 @@ function fmt(emoji) {
     : `<:${emoji.name}:${emoji.id}>`;
 }
 
+async function prepareEmojiAsset(buffer, mime, animated = false) {
+  if (animated || buffer.length <= MAX_APPLICATION_EMOJI_BYTES) {
+    return { buffer, mime };
+  }
+
+  const image = await loadImage(buffer);
+  const size = 128;
+  const canvas = createCanvas(size, size);
+  const context = canvas.getContext('2d');
+  const scale = Math.min(size / image.width, size / image.height);
+  const width = Math.round(image.width * scale);
+  const height = Math.round(image.height * scale);
+  context.drawImage(image, Math.round((size - width) / 2), Math.round((size - height) / 2), width, height);
+  return { buffer: canvas.toBuffer('image/png'), mime: 'image/png' };
+}
+
 export async function initEmojis(client) {
   try {
     const existing = await client.application.emojis.fetch();
@@ -73,7 +101,8 @@ export async function initEmojis(client) {
         let buf;
         let mime = def.mime;
         if (def.asset) {
-          buf = await readFile(path.join(LOCAL_EMOJI_DIR, def.asset));
+          const assetDir = def.assetDir === 'fishing' ? FISHING_ART_DIR : LOCAL_EMOJI_DIR;
+          buf = await readFile(path.join(assetDir, def.asset));
         } else {
           const url = cdnUrl(def.sourceId, def.animated);
           const resp = await fetch(url);
@@ -81,6 +110,7 @@ export async function initEmojis(client) {
           buf = Buffer.from(await resp.arrayBuffer());
           mime = `image/${def.animated ? 'gif' : 'png'}`;
         }
+        ({ buffer: buf, mime } = await prepareEmojiAsset(buf, mime, def.animated));
         const b64 = `data:${mime};base64,${buf.toString('base64')}`;
 
         const created = await client.application.emojis.create({ name: def.name, attachment: b64 });
