@@ -337,11 +337,12 @@ model FishingProfile {
 }
 
 model FishingCatch {
-  id       String @id @default(cuid())
-  userId   String
-  guildId  String
-  fishKey  String
-  quantity Int    @default(0)
+  id           String @id @default(cuid())
+  userId       String
+  guildId      String
+  fishKey      String
+  quantity     Int    @default(0)
+  qualityTotal Int    @default(0)
 
   @@unique([userId, guildId, fishKey])
   @@index([userId, guildId])
