@@ -57,12 +57,12 @@ export const FISH = Object.freeze([
   { key: 'orca', name: 'Orca da Maré', emoji: () => '🐋', value: 1500, chance: 1.5, rarity: 3, artwork: 'orca', ability: 'orca', description: 'Um chamado raro que traz tesouro e coins para o pescador.' },
   { key: 'escama_lendaria', name: 'Escama lendária', emoji: FISH_LEGENDARY, value: 0, chance: 0, rarity: 0, sellable: false, description: 'Uma escama obtida ao derrotar o tubarão raivoso.' },
   // Mantém capturas antigas vendáveis e visíveis após a evolução do sistema.
-  { key: 'sardinha', name: 'Sardinha', emoji: FISH_COMMON, value: 80, chance: 0, rarity: 0, artwork: 'common', legacy: true, description: 'Captura antiga.' },
-  { key: 'carpa', name: 'Carpa', emoji: FISH_COMMON, value: 140, chance: 0, rarity: 0, artwork: 'common', legacy: true, description: 'Captura antiga.' },
-  { key: 'salmao', name: 'Salmão', emoji: FISH_COMMON, value: 240, chance: 0, rarity: 0, artwork: 'common', legacy: true, description: 'Captura antiga.' },
-  { key: 'atum', name: 'Atum', emoji: FISH_COMMON, value: 390, chance: 0, rarity: 0, artwork: 'common', legacy: true, description: 'Captura antiga.' },
-  { key: 'dourado', name: 'Dourado', emoji: FISH_COMMON, value: 700, chance: 0, rarity: 0, artwork: 'common', legacy: true, description: 'Captura antiga.' },
-  { key: 'lendario', name: 'Peixe lendário', emoji: FISH_LEGENDARY, value: 1800, chance: 0, rarity: 0, artwork: 'legendary', legacy: true, description: 'Captura antiga.' },
+  { key: 'sardinha', name: 'Sardinha', emoji: FISH_COMMON, value: 240, chance: 0, rarity: 0, artwork: 'common', legacy: true, description: 'Captura antiga.' },
+  { key: 'carpa', name: 'Carpa', emoji: FISH_COMMON, value: 420, chance: 0, rarity: 0, artwork: 'common', legacy: true, description: 'Captura antiga.' },
+  { key: 'salmao', name: 'Salmão', emoji: FISH_COMMON, value: 720, chance: 0, rarity: 0, artwork: 'common', legacy: true, description: 'Captura antiga.' },
+  { key: 'atum', name: 'Atum', emoji: FISH_COMMON, value: 1170, chance: 0, rarity: 0, artwork: 'common', legacy: true, description: 'Captura antiga.' },
+  { key: 'dourado', name: 'Dourado', emoji: FISH_COMMON, value: 2100, chance: 0, rarity: 0, artwork: 'common', legacy: true, description: 'Captura antiga.' },
+  { key: 'lendario', name: 'Peixe lendário', emoji: FISH_LEGENDARY, value: 5400, chance: 0, rarity: 0, artwork: 'legendary', legacy: true, description: 'Captura antiga.' },
 ]);
 
 export const RODS = Object.freeze([
