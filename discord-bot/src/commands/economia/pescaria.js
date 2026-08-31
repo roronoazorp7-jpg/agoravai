@@ -741,8 +741,23 @@ function buildFishingBackRow() {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('fish_panel')
-      .setLabel('Voltar ao painel')
+      .setLabel('Voltar')
       .setEmoji('🎣')
+      .setStyle(ButtonStyle.Secondary),
+  );
+}
+
+function buildFishingResultNavigation() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('fish_cast')
+      .setLabel('Pescar novamente')
+      .setEmoji('🎣')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('fish_panel')
+      .setLabel('Voltar')
+      .setEmoji('↩️')
       .setStyle(ButtonStyle.Secondary),
   );
 }
@@ -1460,7 +1475,7 @@ async function handleLegendaryChoice(interaction, choice) {
       `Você escolheu uma posição errada e perdeu esta oportunidade. A bênção da foca foi consumida.\n\n` +
         `${FISH_ROD()} Você poderá pescar novamente em **5 segundos**.`,
       'legendary',
-      [buildFishingBackRow()],
+      [buildFishingResultNavigation()],
       { large: true },
     ));
   }
@@ -1480,7 +1495,7 @@ async function handleLegendaryChoice(interaction, choice) {
     `${COIN()} Valor atual de venda: **${getFishSaleValue(guildId, FISH_BY_KEY.get('carpa_lendaria'), { quantity: 1, qualityTotal: 5 }).toLocaleString('pt-BR')}** ${COIN()} — qualidade perfeita\n` +
        `${FISH_ROD()} Próxima pescaria em **5 segundos**.`,
     'legendary',
-    [buildFishingBackRow()],
+    [buildFishingResultNavigation()],
     { large: true },
   ));
 }
@@ -1526,7 +1541,7 @@ async function handleSharkAttack(interaction) {
   const battle = result.status === 'defeated'
     ? sharkBattlePayload({ defeated: true, reward: result.reward })
     : sharkBattlePayload({ hp: result.hp, reward: result.reward });
-  if (result.status === 'defeated') battle.components.push(buildFishingBackRow());
+  if (result.status === 'defeated') battle.components.push(buildFishingResultNavigation());
   return interaction.update(await fishingArtworkPayload(
     `${battle.text}\n\n${FISH_SHARK()} Você causou **${result.damage}** de dano.`,
     battle.artwork,
@@ -1682,7 +1697,12 @@ async function handleFishAbility(interaction) {
       text = '## 🌊 A habilidade se perdeu na correnteza!\nO animal escapou antes de completar a interação.';
     }
 
-    return interaction.update(await fishingArtworkPayload(text, fish.artwork, [], { large: true, scene: result.scene }));
+    return interaction.update(await fishingArtworkPayload(
+      text,
+      fish.artwork,
+      [buildFishingResultNavigation()],
+      { large: true, scene: result.scene },
+    ));
   } catch (error) {
     fishAbilityClaims.delete(token);
     console.error('[PESCA HABILIDADE]', error);
@@ -1705,7 +1725,7 @@ async function executeFishing(userId, guildId, isAdmin, reply, requestedSpotKey 
         `${contextText}\n` +
         `${FISH_ROD()} A bênção da foca está guardada. Próxima pescaria em **${fishingCooldownLabel(condition)}**.`,
         'seal',
-        [buildFishingBackRow()],
+        [buildFishingResultNavigation()],
         { large: true, scene: spot.scene },
       ));
     }
@@ -1731,7 +1751,7 @@ async function executeFishing(userId, guildId, isAdmin, reply, requestedSpotKey 
         `${rewardText}.\n${contextText}\n\n` +
         `A maré muda em **1 hora**. Volte para descobrir o próximo evento.`,
         'treasure',
-        [buildFishingBackRow()],
+        [buildFishingResultNavigation()],
         { large: true, scene: spot.scene },
       ));
     }
@@ -1760,7 +1780,7 @@ async function executeFishing(userId, guildId, isAdmin, reply, requestedSpotKey 
        `${FISH_ROD()} Próxima pescaria em **${fishingCooldownLabel(condition)}**.` +
        (ability ? `\n\n${ability.hint}` : ''),
       fish.artwork,
-       [...buildFishAbilityComponents(fish, userId), buildFishingBackRow()],
+       [...buildFishAbilityComponents(fish, userId), buildFishingResultNavigation()],
        { large: true, scene: spot.scene },
     ));
   } catch (error) {
