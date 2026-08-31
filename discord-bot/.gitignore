@@ -3,4 +3,5 @@ data/
 .env
 *.db
 *.db-journal
+rpc.config.json
 package-lock.json

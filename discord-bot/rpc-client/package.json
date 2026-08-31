@@ -1,0 +1,14 @@
+{
+  "name": "savagge-rpc-client",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Cliente local de Rich Presence para membros do Discord",
+  "scripts": {
+    "start": "node src/index.js",
+    "clear": "node src/index.js --clear"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -45,7 +45,7 @@ const CATEGORIES = [
     emoji: '🔧',
     title: '🔧 Utilidades',
     commandNames: [
-      'ajuda', 'ping', 'call', 'musica', 'radio', 'instagram', 'ia', 'quest',
+      'ajuda', 'ping', 'call', 'musica', 'radio', 'instagram', 'ia', 'quest', 'rpc',
       'afk', 'avatar', 'banner', 'server-info', 'reputacao',
     ],
   },
