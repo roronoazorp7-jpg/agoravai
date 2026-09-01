@@ -30,7 +30,7 @@ export async function isGifUrl(url) {
  * Baixa um GIF, extrai e compõe até `maxFrames` frames.
  * Retorna Array de { image: Image, delayMs: number }.
  */
-async function fetchGifFrames(url, maxFrames = 10) {
+async function fetchGifFrames(url, maxFrames = 6) {
   // Download
   const ctrl  = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 15_000);
@@ -48,6 +48,9 @@ async function fetchGifFrames(url, maxFrames = 10) {
 
   const gW = gif.lsd.width;
   const gH = gif.lsd.height;
+  if (!gW || !gH || gW * gH > 12_000_000) {
+    throw new Error(`GIF grande demais (${gW}x${gH})`);
+  }
 
   // Canvas de composição
   const compCanvas = createCanvas(gW, gH);
@@ -104,10 +107,10 @@ function encodeCanvasAsGif(canvas, delayMs = 100) {
  * @returns {Promise<Buffer>} Buffer do GIF animado
  */
 export async function generateAnimatedProfileCard(params) {
-  const { activeBanner, guildId } = params;
+  const { activeBanner, guildId, _resolvedBanner } = params;
 
   // Resolve o banner para checar se é GIF
-  const banner = await resolveBanner(activeBanner, guildId);
+  const banner = _resolvedBanner ?? await resolveBanner(activeBanner, guildId);
   if (!banner?.imageUrl) throw new Error('Banner não encontrado para card animado');
 
   const gifFrames = await fetchGifFrames(banner.imageUrl);
@@ -129,6 +132,7 @@ export async function generateAnimatedProfileCard(params) {
       const frameCanvas = await generateProfileCard({
         ...params,
         _bannerImage:  bannerFrame,  // pula o loadUrl do banner
+        _resolvedBanner: banner,
         _returnCanvas: true,          // retorna o canvas em vez de PNG
       });
 

@@ -18,3 +18,4 @@
 - [Reputação e XP](reputation-xp.md) — progressão vem de interações reais com o bot, com metas crescentes e barra compacta no perfil.
 - [Dashboard e schema](dashboard-schema-sync.md) — endpoints que retornam colunas novas exigem sincronização explícita do banco de desenvolvimento antes da validação visual.
 - [Empresas e renda passiva](business-economy.md) — ao alterar a taxa de uma empresa, liquide o lucro acumulado antes para evitar ganhos retroativos.
+- [Renderização de GIF no perfil](profile-gif-rendering.md) — nunca inicie fallback enquanto uma renderização nativa não cancelável ainda estiver rodando.

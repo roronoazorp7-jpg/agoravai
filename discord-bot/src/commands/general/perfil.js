@@ -25,34 +25,36 @@ async function fetchProfileData(userId, guildId) {
   return { eco, profile, purchases, guildBadgeEmojis };
 }
 
-const ANIMATED_PROFILE_TIMEOUT_MS = 12_000;
-
 async function renderProfileAttachment(cardParams) {
   const banner = await resolveBanner(cardParams.activeBanner, cardParams.guildId);
   const bannerIsGif = banner?.imageUrl ? await isGifUrl(banner.imageUrl) : false;
 
   if (bannerIsGif) {
-    let timer;
     try {
-      const animatedCard = generateAnimatedProfileCard(cardParams);
-      const timeout = new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new Error('tempo limite ao gerar card GIF')), ANIMATED_PROFILE_TIMEOUT_MS);
+      // Não usar Promise.race aqui: a renderização nativa não pode ser cancelada
+      // com segurança. Iniciar o fallback antes dela terminar trava o canvas.
+      const buf = await generateAnimatedProfileCard({
+        ...cardParams,
+        _resolvedBanner: banner,
       });
-      const buf = await Promise.race([animatedCard, timeout]);
       return { buf, filename: 'perfil.gif' };
     } catch (error) {
       console.error('[perfil] Falha no card GIF animado; usando GIF de um frame:', error?.message ?? error);
       return {
-        buf: await generateStaticProfileGifCard(cardParams),
+        buf: await generateStaticProfileGifCard({
+          ...cardParams,
+          _resolvedBanner: banner,
+        }),
         filename: 'perfil.gif',
       };
-    } finally {
-      clearTimeout(timer);
     }
   }
 
   return {
-    buf: await generateProfileCard(cardParams),
+    buf: await generateProfileCard({
+      ...cardParams,
+      _resolvedBanner: banner,
+    }),
     filename: 'perfil.png',
   };
 }
@@ -68,6 +70,10 @@ export default {
     await interaction.deferReply();
 
     try {
+      // A renderização pode envolver download e composição de imagens. Atualiza
+      // primeiro para o Discord não ficar preso mostrando apenas "pensando...".
+      await interaction.editReply({ content: '⏳ Gerando seu perfil…' });
+
       const target = interaction.user;
       const member = await interaction.guild.members.fetch(target.id).catch(() => null);
       const { eco, profile, purchases, guildBadgeEmojis } = await fetchProfileData(target.id, interaction.guildId);

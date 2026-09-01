@@ -385,12 +385,13 @@ export async function generateProfileCard({
   xp = 0, reps = 0,
   // Parâmetros internos para geração de GIF animado:
   _bannerImage = null,   // Image já carregada — pula o loadUrl do banner
+  _resolvedBanner = null, // Banner já resolvido — evita nova consulta/download
   _returnCanvas = false, // se true, retorna o canvas em vez de PNG buffer
 }) {
   const canvas = createCanvas(W, H);
   const ctx    = canvas.getContext('2d');
 
-  const banner = _bannerImage ? null : await resolveBanner(activeBanner, guildId);
+  const banner = _bannerImage ? null : (_resolvedBanner ?? await resolveBanner(activeBanner, guildId));
   const { c1: rc1, c2: rc2 } = getRingColors(activeRing ?? null);
   const { level, current: xpCurrent, needed: xpNeeded } = computeLevel(xp);
   const earnedKeys = computeEarnedBadgeKeys({
