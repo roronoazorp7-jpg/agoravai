@@ -53,9 +53,12 @@ function isExpiredOrStale(url) {
 async function refreshDiscordUrl(url) {
   const token = process.env.DISCORD_TOKEN;
   if (!token) return url;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
   try {
     const res = await fetch('https://discord.com/api/v10/attachments/refresh-urls', {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         'Authorization': `Bot ${token}`,
         'Content-Type': 'application/json',
@@ -71,6 +74,8 @@ async function refreshDiscordUrl(url) {
   } catch (e) {
     console.warn('[banner] refresh-urls erro:', e.message);
     return url;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

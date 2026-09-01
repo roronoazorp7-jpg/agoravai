@@ -67,58 +67,66 @@ export default {
   async execute(interaction) {
     await interaction.deferReply();
 
-    const target = interaction.user;
-    const member = await interaction.guild.members.fetch(target.id).catch(() => null);
-    const { eco, profile, purchases, guildBadgeEmojis } = await fetchProfileData(target.id, interaction.guildId);
+    try {
+      const target = interaction.user;
+      const member = await interaction.guild.members.fetch(target.id).catch(() => null);
+      const { eco, profile, purchases, guildBadgeEmojis } = await fetchProfileData(target.id, interaction.guildId);
 
-    let activePetEmoji = null;
-    if (profile?.activePet) {
-      const pet = await prisma.pet.findUnique({ where: { id: profile.activePet } }).catch(() => null);
-      activePetEmoji = pet?.emoji ?? null;
+      let activePetEmoji = null;
+      if (profile?.activePet) {
+        const pet = await prisma.pet.findUnique({ where: { id: profile.activePet } }).catch(() => null);
+        activePetEmoji = pet?.emoji ?? null;
+      }
+
+      const cardParams = {
+        username:        member?.displayName ?? target.username,
+        avatarUrl:       target.displayAvatarURL({ extension: 'png', size: 256 }),
+        balance:         eco?.balance          ?? 0,
+        bank:            eco?.bank             ?? 0,
+        xp:              eco?.xp               ?? 0,
+        activeBanner:    profile?.activeBanner  ?? null,
+        activeRing:      profile?.activeRing    ?? null,
+        ringBorderColor: profile?.ringBorderColor ?? null,
+        activePet:       activePetEmoji,
+        marriedToName:   profile?.marriedToName  ?? null,
+        bestFriendName:  profile?.bestFriendName ?? null,
+        reps:            profile?.reps           ?? 0,
+        bio:             profile?.bio            ?? null,
+        cardBg1:         profile?.cardBg1        ?? null,
+        cardBg2:         profile?.cardBg2        ?? null,
+        cardPanelColor:  profile?.cardPanelColor ?? null,
+        purchases,
+        guildBadgeEmojis,
+        guildId: interaction.guildId,
+      };
+
+      const { buf, filename } = await renderProfileAttachment(cardParams);
+
+      const attachment = new AttachmentBuilder(buf, { name: filename });
+
+      const menu = new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId('profile_menu')
+          .setPlaceholder('✨ Personalizar perfil...')
+          .addOptions([
+            { label: 'Banner',      value: 'profile_banner_btn',     emoji: '🖼️' },
+            { label: 'Argola',      value: 'profile_ring_btn',       emoji: '💠' },
+            { label: 'Molduras VIP', value: 'profile_ring_vip',      emoji: '👑' },
+            { label: 'Fundo',       value: 'profile_bg_btn',         emoji: '🎨' },
+            { label: 'Painel',      value: 'profile_panel_btn',      emoji: '🟦' },
+            { label: 'Pet',         value: 'profile_pet_btn',        emoji: '🐾' },
+            { label: 'Conquistas',  value: 'profile_conquistas_btn', emoji: '🏅' },
+          ]),
+      );
+
+      return interaction.editReply({ files: [attachment], components: [menu] });
+    } catch (error) {
+      console.error('[perfil] Falha ao responder slash:', error?.stack ?? error);
+      return interaction.editReply({
+        content: '❌ Não consegui carregar seu perfil agora. O banner GIF foi preservado; tente novamente em alguns segundos.',
+        components: [],
+      }).catch(() => {});
     }
-
-    const cardParams = {
-      username:        member?.displayName ?? target.username,
-      avatarUrl:       target.displayAvatarURL({ extension: 'png', size: 256 }),
-      balance:         eco?.balance          ?? 0,
-      bank:            eco?.bank             ?? 0,
-      xp:              eco?.xp               ?? 0,
-      activeBanner:    profile?.activeBanner  ?? null,
-      activeRing:      profile?.activeRing    ?? null,
-      ringBorderColor: profile?.ringBorderColor ?? null,
-      activePet:       activePetEmoji,
-      marriedToName:   profile?.marriedToName  ?? null,
-      bestFriendName:  profile?.bestFriendName ?? null,
-      reps:            profile?.reps           ?? 0,
-      bio:             profile?.bio            ?? null,
-      cardBg1:         profile?.cardBg1        ?? null,
-      cardBg2:         profile?.cardBg2        ?? null,
-      cardPanelColor:  profile?.cardPanelColor ?? null,
-      purchases,
-      guildBadgeEmojis,
-      guildId: interaction.guildId,
-    };
-
-    const { buf, filename } = await renderProfileAttachment(cardParams);
-
-    const attachment = new AttachmentBuilder(buf, { name: filename });
-
-    const menu = new ActionRowBuilder().addComponents(
-      new StringSelectMenuBuilder()
-        .setCustomId('profile_menu')
-        .setPlaceholder('✨ Personalizar perfil...')
-        .addOptions([
-          { label: 'Banner',      value: 'profile_banner_btn',     emoji: '🖼️' },
-          { label: 'Argola',      value: 'profile_ring_btn',       emoji: '💠' },
-          { label: 'Molduras VIP', value: 'profile_ring_vip',      emoji: '👑' },
-          { label: 'Fundo',       value: 'profile_bg_btn',         emoji: '🎨' },
-          { label: 'Painel',      value: 'profile_panel_btn',      emoji: '🟦' },
-          { label: 'Pet',         value: 'profile_pet_btn',        emoji: '🐾' },
-          { label: 'Conquistas',  value: 'profile_conquistas_btn', emoji: '🏅' },
-        ]),
-    );
-
-    return interaction.editReply({ files: [attachment], components: [menu] });
   },
 
   async executePrefix(message) {
