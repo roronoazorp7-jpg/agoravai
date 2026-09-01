@@ -30,7 +30,7 @@ export async function isGifUrl(url) {
  * Baixa um GIF, extrai e compõe até `maxFrames` frames.
  * Retorna Array de { image: Image, delayMs: number }.
  */
-async function fetchGifFrames(url, maxFrames = 18) {
+async function fetchGifFrames(url, maxFrames = 10) {
   // Download
   const ctrl  = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 15_000);

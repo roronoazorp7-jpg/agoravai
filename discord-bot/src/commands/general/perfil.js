@@ -21,6 +21,34 @@ async function fetchProfileData(userId, guildId) {
   return { eco, profile, purchases, guildBadgeEmojis };
 }
 
+const ANIMATED_PROFILE_TIMEOUT_MS = 12_000;
+
+async function renderProfileAttachment(cardParams) {
+  const banner = await resolveBanner(cardParams.activeBanner, cardParams.guildId);
+  const bannerIsGif = banner?.imageUrl ? await isGifUrl(banner.imageUrl) : false;
+
+  if (bannerIsGif) {
+    let timer;
+    try {
+      const animatedCard = generateAnimatedProfileCard(cardParams);
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('tempo limite ao gerar card GIF')), ANIMATED_PROFILE_TIMEOUT_MS);
+      });
+      const buf = await Promise.race([animatedCard, timeout]);
+      return { buf, filename: 'perfil.gif' };
+    } catch (error) {
+      console.error('[perfil] Falha no card GIF; usando PNG:', error?.message ?? error);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  return {
+    buf: await generateProfileCard(cardParams),
+    filename: 'perfil.png',
+  };
+}
+
 export default {
   data: new SlashCommandBuilder()
     .setName('perfil')
@@ -63,18 +91,7 @@ export default {
       guildId: interaction.guildId,
     };
 
-    // Detecta se o banner ativo é um GIF para gerar card animado
-    const bannerObj  = await resolveBanner(cardParams.activeBanner, interaction.guildId);
-    const bannerIsGif = bannerObj?.imageUrl ? await isGifUrl(bannerObj.imageUrl) : false;
-
-    let buf, filename;
-    if (bannerIsGif) {
-      buf      = await generateAnimatedProfileCard(cardParams);
-      filename = 'perfil.gif';
-    } else {
-      buf      = await generateProfileCard(cardParams);
-      filename = 'perfil.png';
-    }
+    const { buf, filename } = await renderProfileAttachment(cardParams);
 
     const attachment = new AttachmentBuilder(buf, { name: filename });
 
@@ -130,17 +147,7 @@ export default {
       guildId: message.guildId,
     };
 
-    const bannerObj   = await resolveBanner(cardParams.activeBanner, message.guildId);
-    const bannerIsGif = bannerObj?.imageUrl ? await isGifUrl(bannerObj.imageUrl) : false;
-
-    let buf, filename;
-    if (bannerIsGif) {
-      buf      = await generateAnimatedProfileCard(cardParams);
-      filename = 'perfil.gif';
-    } else {
-      buf      = await generateProfileCard(cardParams);
-      filename = 'perfil.png';
-    }
+    const { buf, filename } = await renderProfileAttachment(cardParams);
 
     return message.reply({ files: [new AttachmentBuilder(buf, { name: filename })] });
   },
