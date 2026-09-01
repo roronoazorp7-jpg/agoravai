@@ -1,7 +1,11 @@
 import { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, AttachmentBuilder } from 'discord.js';
 import prisma from '../../database/client.js';
 import { generateProfileCard }         from '../../utils/profileCard.js';
-import { generateAnimatedProfileCard, isGifUrl } from '../../utils/animatedProfileCard.js';
+import {
+  generateAnimatedProfileCard,
+  generateStaticProfileGifCard,
+  isGifUrl,
+} from '../../utils/animatedProfileCard.js';
 import { resolveBanner }               from '../../utils/shopData.js';
 
 async function getGuildBadgeEmojis(guildId) {
@@ -37,7 +41,11 @@ async function renderProfileAttachment(cardParams) {
       const buf = await Promise.race([animatedCard, timeout]);
       return { buf, filename: 'perfil.gif' };
     } catch (error) {
-      console.error('[perfil] Falha no card GIF; usando PNG:', error?.message ?? error);
+      console.error('[perfil] Falha no card GIF animado; usando GIF de um frame:', error?.message ?? error);
+      return {
+        buf: await generateStaticProfileGifCard(cardParams),
+        filename: 'perfil.gif',
+      };
     } finally {
       clearTimeout(timer);
     }

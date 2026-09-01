@@ -86,6 +86,18 @@ async function fetchGifFrames(url, maxFrames = 10) {
 
 const W = 800, H = 600;
 
+function encodeCanvasAsGif(canvas, delayMs = 100) {
+  const encoder = new GifEncoder(W, H, { repeat: 0, quality: 8 });
+  try {
+    const ctx = canvas.getContext('2d');
+    const data = ctx.getImageData(0, 0, W, H);
+    encoder.addFrame(new Uint8Array(data.data.buffer), W, H, { delay: delayMs });
+    return encoder.finish();
+  } finally {
+    encoder.dispose();
+  }
+}
+
 /**
  * Gera um card de perfil animado (GIF).
  * @param {object} params — mesmos parâmetros de generateProfileCard
@@ -109,25 +121,41 @@ export async function generateAnimatedProfileCard(params) {
   // garante que avatar/emojis não sejam re-buscados.
 
   const encoder = new GifEncoder(W, H, { repeat: 0, quality: 8 });
+  try {
+    for (let fi = 0; fi < gifFrames.length; fi++) {
+      const { image: bannerFrame, delayMs } = gifFrames[fi];
 
-  for (let fi = 0; fi < gifFrames.length; fi++) {
-    const { image: bannerFrame, delayMs } = gifFrames[fi];
+      // Renderiza o card com este frame de banner
+      const frameCanvas = await generateProfileCard({
+        ...params,
+        _bannerImage:  bannerFrame,  // pula o loadUrl do banner
+        _returnCanvas: true,          // retorna o canvas em vez de PNG
+      });
 
-    // Renderiza o card com este frame de banner
-    const frameCanvas = await generateProfileCard({
-      ...params,
-      _bannerImage:  bannerFrame,  // pula o loadUrl do banner
-      _returnCanvas: true,          // retorna o canvas em vez de PNG
-    });
+      // Extrai RGBA e adiciona ao GIF
+      const ctx  = frameCanvas.getContext('2d');
+      const data = ctx.getImageData(0, 0, W, H);
+      encoder.addFrame(new Uint8Array(data.data.buffer), W, H, { delay: delayMs });
+    }
 
-    // Extrai RGBA e adiciona ao GIF
-    const ctx  = frameCanvas.getContext('2d');
-    const data = ctx.getImageData(0, 0, W, H);
-    encoder.addFrame(new Uint8Array(data.data.buffer), W, H, { delay: delayMs });
+    const gifBuffer = encoder.finish();
+    console.log(`[animCard] GIF pronto: ${(gifBuffer.length / 1024).toFixed(0)} KB`);
+    return gifBuffer;
+  } finally {
+    encoder.dispose();
   }
+}
 
-  const gifBuffer = encoder.finish();
-  encoder.dispose();
-  console.log(`[animCard] GIF pronto: ${(gifBuffer.length / 1024).toFixed(0)} KB`);
+/**
+ * Gera um GIF válido de um único frame para banners incompatíveis ou lentos.
+ * Mesmo no fallback, o /perfil continua entregando GIF, nunca PNG.
+ */
+export async function generateStaticProfileGifCard(params) {
+  const canvas = await generateProfileCard({
+    ...params,
+    _returnCanvas: true,
+  });
+  const gifBuffer = encodeCanvasAsGif(canvas);
+  console.log(`[animCard] GIF estático de segurança pronto: ${(gifBuffer.length / 1024).toFixed(0)} KB`);
   return gifBuffer;
 }
