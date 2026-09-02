@@ -23,22 +23,12 @@ function formatDate(timestamp) {
   return timestamp ? `<t:${Math.floor(timestamp / 1000)}:F>` : 'Não disponível';
 }
 
-function buildPayload(user, member, guild) {
+function buildPayload(user, member) {
   const name = displayName(user, member);
-  const roles = member
-    ? member.roles.cache
-      .filter(role => role.id !== guild.id)
-      .sort((a, b) => b.position - a.position)
-      .map(role => role.toString())
-      .slice(0, 15)
-    : [];
   const flags = user.flags?.toArray?.()
     .map(flag => FLAG_LABELS[flag] ?? flag)
     .filter(Boolean) ?? [];
 
-  const roleText = roles.length
-    ? `${roles.join(', ')}${member.roles.cache.size - 1 > roles.length ? ` e mais ${member.roles.cache.size - roles.length - 1}` : ''}`
-    : 'Nenhum cargo além do padrão';
   const flagText = flags.length ? flags.join(', ') : 'Nenhuma';
   const memberType = user.bot ? 'Bot' : 'Usuário';
 
@@ -51,7 +41,6 @@ function buildPayload(user, member, guild) {
     `**Conta criada:** ${formatDate(user.createdTimestamp)}`,
     member ? `**Entrou no servidor:** ${formatDate(member.joinedTimestamp)}` : '**Membro do servidor:** Não',
     `**Badges:** ${flagText}`,
-    `**Cargos:** ${roleText}`,
   ].join('\n');
 
   return buildUtilityV2({
@@ -82,7 +71,7 @@ export default {
   async execute(interaction) {
     const user = interaction.options.getUser('usuario') ?? interaction.user;
     const member = await resolveMember(interaction.guild, user);
-    return interaction.reply(buildPayload(user, member, interaction.guild));
+    return interaction.reply(buildPayload(user, member));
   },
 
   async executePrefix(message) {
@@ -90,6 +79,6 @@ export default {
 
     const user = message.mentions.users.first() ?? message.author;
     const member = await resolveMember(message.guild, user);
-    return message.reply(buildPayload(user, member, message.guild));
+    return message.reply(buildPayload(user, member));
   },
 };
