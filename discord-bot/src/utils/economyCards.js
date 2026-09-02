@@ -696,8 +696,9 @@ function isDark(hex) {
 }
 
 export async function generateBalanceCard({ username, avatarUrl, balance, bank, cardBg1, cardBg2, cardPanelColor, walletRing, walletRingBorder, walletBg }) {
-  const W   = 480, H = 580;
-  const PAD = 18;
+  // Card vertical em alta resolução para o Discord não suavizar o texto e o avatar.
+  const W   = 720, H = 1080;
+  const PAD = 42;
   const canvas = createCanvas(W, H);
   const ctx    = canvas.getContext('2d');
 
@@ -750,10 +751,16 @@ export async function generateBalanceCard({ username, avatarUrl, balance, bank, 
     roundRect(ctx, 10, 10, W - 20, H - 20, 18); ctx.fill();
   }
 
-  // ─── Avatar ───────────────────────────────────────────────────────────────
-  const AV_R  = 76;
+  // ─── Título e avatar ───────────────────────────────────────────────────────
+  const titleColor = darkMode ? 'rgba(255,255,255,0.82)' : '#666666';
+  ctx.fillStyle = titleColor;
+  ctx.font = `bold 25px ${FONT}`;
+  ctx.textAlign = 'center';
+  ctx.fillText('CARTEIRA', W / 2, 54);
+
+  const AV_R  = 132;
   const AV_CX = W / 2;
-  const AV_CY = AV_R + (darkMode ? 28 : 34);
+  const AV_CY = 200;
 
   // Ring — argola/moldura própria da carteira (independente da argola do /perfil)
   if (walletRing) {
@@ -767,7 +774,7 @@ export async function generateBalanceCard({ username, avatarUrl, balance, bank, 
   ctx.save();
   ctx.beginPath(); ctx.arc(AV_CX, AV_CY, AV_R, 0, Math.PI * 2); ctx.clip();
   try {
-    const img = await loadAvatarImg(avatarUrl);
+    const img = await loadAvatarImg(avatarUrl, 1024);
     if (!img) throw new Error('avatar image unavailable');
     ctx.drawImage(img, AV_CX - AV_R, AV_CY - AV_R, AV_R * 2, AV_R * 2);
   } catch {
@@ -779,8 +786,8 @@ export async function generateBalanceCard({ username, avatarUrl, balance, bank, 
   ctx.restore();
 
   // ─── Name ─────────────────────────────────────────────────────────────────
-  const PILL_Y = AV_CY + AV_R + 16;
-  ctx.font = `bold 20px ${FONT}`;
+  const PILL_Y = AV_CY + AV_R + 28;
+  ctx.font = `bold 30px ${FONT}`;
   const nameW = ctx.measureText(username).width;
 
   if (darkMode) {
@@ -790,19 +797,19 @@ export async function generateBalanceCard({ username, avatarUrl, balance, bank, 
     ctx.fillText(username, W / 2, PILL_Y + 20);
     ctx.shadowBlur = 0;
   } else {
-    const pillW = Math.max(nameW + 48, 120), pillH = 36;
+    const pillW = Math.min(Math.max(nameW + 72, 220), W - PAD * 2), pillH = 58;
     const pillX = W / 2 - pillW / 2;
     ctx.fillStyle = '#E5E5E5';
     roundRect(ctx, pillX, PILL_Y, pillW, pillH, pillH / 2); ctx.fill();
     ctx.fillStyle = '#1A1A1A'; ctx.textAlign = 'center';
-    ctx.fillText(username, W / 2, PILL_Y + 24);
+    ctx.fillText(username, W / 2, PILL_Y + 38);
   }
 
   // ─── Stat rows ───────────────────────────────────────────────────────────
-  const ROW_H   = 78;
-  const ROW_GAP = 10;
-  const ROW_Y0  = PILL_Y + (darkMode ? 46 : 56);
-  const ICON_R  = 30;
+  const ROW_H   = 145;
+  const ROW_GAP = 22;
+  const ROW_Y0  = PILL_Y + (darkMode ? 86 : 92);
+  const ICON_R  = 52;
 
   // Load custom emoji icons
   let imgCoins, imgBank, imgItems;
@@ -832,7 +839,7 @@ export async function generateBalanceCard({ username, avatarUrl, balance, bank, 
     roundRect(ctx, PAD, ry, rw, ROW_H, ROW_H / 2); ctx.fill();
 
     // Black icon circle
-    const circleCx = PAD + ICON_R + 6;
+    const circleCx = PAD + ICON_R + 18;
     const circleCy = ry + ROW_H / 2;
 
     ctx.fillStyle = '#000000';
@@ -840,17 +847,17 @@ export async function generateBalanceCard({ username, avatarUrl, balance, bank, 
 
     // Draw custom emoji image inside circle
     if (iconImg) {
-      const imgSize = ICON_R * 1.35;
+       const imgSize = ICON_R * 1.35;
       ctx.drawImage(iconImg, circleCx - imgSize / 2, circleCy - imgSize / 2, imgSize, imgSize);
     }
 
-    const textX = circleCx + ICON_R + 14;
+    const textX = circleCx + ICON_R + 24;
 
-    ctx.fillStyle = labelColor; ctx.font = `bold 16px ${FONT}`; ctx.textAlign = 'left';
-    ctx.fillText(label, textX, ry + 28);
+    ctx.fillStyle = labelColor; ctx.font = `bold 28px ${FONT}`; ctx.textAlign = 'left';
+    ctx.fillText(label, textX, ry + 54);
 
-    ctx.fillStyle = valueColor; ctx.font = `13px ${FONT}`;
-    ctx.fillText(value, textX, ry + 51);
+    ctx.fillStyle = valueColor; ctx.font = `23px ${FONT}`;
+    ctx.fillText(value, textX, ry + 96);
   }
 
   return canvas.toBuffer('image/png');
@@ -942,14 +949,14 @@ function drawCrown(ctx, cx, cy, w) {
   ctx.beginPath(); ctx.arc(r - w * 0.2, top + h * 0.62, w * 0.04, 0, Math.PI * 2); ctx.fill();
 }
 
-async function loadAvatarImg(url) {
+async function loadAvatarImg(url, requestedSize = 256) {
   try {
     if (!url) return null;
 
     // discord.js already returns `?size=256`; setSearchParams avoids creating
     // an invalid `...?size=256?size=256` URL when a caller passes it through.
     const avatarUrl = new URL(url);
-    avatarUrl.searchParams.set('size', '256');
+    avatarUrl.searchParams.set('size', String(requestedSize));
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 7000);

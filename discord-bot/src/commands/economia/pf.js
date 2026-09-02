@@ -39,7 +39,7 @@ export async function buildWalletCard(userId, guildId, guild, target) {
   ]);
   const member   = await guild.members.fetch(userId).catch(() => null);
   const username = member?.displayName ?? target.username;
-  const avatarUrl = target.displayAvatarURL({ extension: 'png', size: 256 });
+  const avatarUrl = target.displayAvatarURL({ extension: 'png', size: 1024 });
 
   const buf = await generateBalanceCard({
     username,

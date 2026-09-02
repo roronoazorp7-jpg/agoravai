@@ -17,7 +17,7 @@ import prisma from '../database/client.js';
 import { getEmoji } from './emojiManager.js';
 import { generateDarkMinesGrid } from './darkMinesGrid.js';
 import { generateBlackjackCard } from './economyCards.js';
-import { spendCoins } from './economyFunds.js';
+import { spendCoins, totalCoins } from './economyFunds.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(__dirname, '../../public/games');
@@ -184,8 +184,9 @@ export async function startBlackjack(ctx, bet, sendFn) {
     return sendFn({ content: '❌ Você já tem um jogo de blackjack em andamento!' });
 
   const eco = await getEco(userId, guildId);
-  if (bet > eco.balance)
-    return sendFn({ content: `❌ Saldo insuficiente. Você tem **${fmtNum(eco.balance)} ${COIN()}**.` });
+  const available = totalCoins(eco);
+  if (bet > available)
+    return sendFn({ content: `❌ Saldo insuficiente. Você tem **${fmtNum(available)} ${COIN()}** disponíveis entre carteira e banco.` });
 
   await deductBet(userId, guildId, bet);
 
@@ -228,7 +229,7 @@ export async function handleBJHit(interaction, targetId) {
     return interaction.reply({ content: '❌ Este não é o seu jogo!', ephemeral: true });
 
   const state = blackjackGames.get(targetId);
-  if (!state?.status === 'playing') return interaction.update({ components: [] });
+  if (!state || state.status !== 'playing') return interaction.update({ components: [] });
 
   state.player.push(state.deck.pop());
   const total = handTotal(state.player);
@@ -381,8 +382,9 @@ export async function startMines(ctx, bet, bombs, sendFn) {
     return sendFn({ content: `❌ Número de bombas inválido (1–${total - 1}).` });
 
   const eco = await getEco(userId, guildId);
-  if (bet > eco.balance)
-    return sendFn({ content: `❌ Saldo insuficiente. Você tem **${fmtNum(eco.balance)} ${COIN()}**.` });
+  const available = totalCoins(eco);
+  if (bet > available)
+    return sendFn({ content: `❌ Saldo insuficiente. Você tem **${fmtNum(available)} ${COIN()}** disponíveis entre carteira e banco.` });
 
   await deductBet(userId, guildId, bet);
 
