@@ -78,7 +78,7 @@ export function buildPainelMain(guild, cfg) {
     `${getEmoji('rx_bran')} **Painel**`,
     'Painel › Inicial',
     `**Servidor** · ${guild.name}`,
-    `${getEmoji('s7aaranha')} **Funções** · streaming, usernames, engajamento, registros e segurança`,
+    `${getEmoji('s7aaranha')} **Funções** · streaming, Presenced, engajamento, registros e segurança`,
     'Tudo o que dá pra configurar nesse servidor.',
   ].join('\n');
 
@@ -139,6 +139,7 @@ export function buildPainelFuncoes(guild, cfg) {
   const antiLinkOk   = !!cfg.antiLinkEnabled;
   const boostOk      = !!cfg.boostRoles;
   const bumpOk       = !!(cfg.bumpEnabled && cfg.bumpChannel);
+  const presencedOk  = !!cfg.presencedEnabled;
 
   const c = new ContainerBuilder();
 
@@ -183,13 +184,16 @@ export function buildPainelFuncoes(guild, cfg) {
 
   c.addTextDisplayComponents(new TextDisplayBuilder().setContent([
     '**Ferramentas & Segurança**',
-    `${D(antiLinkOk)} Anti-Link Avançado · ${D(bumpOk)} Bump Reminder`,
-    'Status do bot, proteção contra links e lembretes automáticos do DISBOARD.',
+    `${D(antiLinkOk)} Anti-Link · ${D(bumpOk)} Bump · ${D(presencedOk)} Presenced`,
+    'Status do bot, proteção contra links, lembretes e Rich Presence de consoles.',
   ].join('\n')));
   c.addActionRowComponents(new ActionRowBuilder().addComponents(
     moduleBtn('painel_cfg_status', 'Status'),
     moduleBtn('painel_cfg_antilink', 'Anti-Link'),
     moduleBtn('painel_cfg_bump', 'Bump Reminder'),
+  ));
+  c.addActionRowComponents(new ActionRowBuilder().addComponents(
+    moduleBtn('painel_cfg_presenced', 'Presenced'),
   ));
 
   return { components: [c, voltarRow()], flags: MessageFlags.IsComponentsV2 };
@@ -435,6 +439,235 @@ export function buildStatusConfigPayload() {
   return { components: [c, voltarRow()], flags: MessageFlags.IsComponentsV2 };
 }
 
+// ─── Mini-config do Presenced ─────────────────────────────────────────────────
+
+export function buildPresencedConfigPayload(cfg) {
+  const consoles = (cfg.presencedConsoles ?? 'PS3,WiiU')
+    .split(',')
+    .map(value => value.trim().toUpperCase())
+    .filter(Boolean);
+  const ps3On = consoles.includes('PS3');
+  const wiiuOn = consoles.includes('WIIU');
+  const c = new ContainerBuilder();
+
+  c.addTextDisplayComponents(new TextDisplayBuilder().setContent([
+    `${D(cfg.presencedEnabled)} **Presenced** — ${cfg.presencedEnabled ? 'ATIVO' : 'DESATIVADO'}`,
+    '',
+    'Monitora PS3/Wii U na sua rede e publica a atividade no Discord Desktop.',
+    'O bot salva as preferências e o botão de download gera o arquivo do cliente local.',
+    '',
+    `**Consoles:** ${[ps3On && 'PS3', wiiuOn && 'Wii U'].filter(Boolean).join(' + ') || 'nenhum'}`,
+    `**Intervalo:** ${cfg.presencedPollInterval ?? 10}s`,
+    `**PS3:** ${cfg.presencedPs3Address || 'IP não configurado'}`,
+    `**Wii U:** porta UDP ${cfg.presencedWiiuPort ?? 5005}`,
+  ].join('\n')));
+
+  c.addActionRowComponents(new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('presenced_toggle')
+      .setLabel(cfg.presencedEnabled ? 'Desativar no painel' : 'Ativar no painel')
+      .setStyle(cfg.presencedEnabled ? ButtonStyle.Danger : ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId('presenced_general')
+      .setLabel('Consoles e intervalo')
+      .setStyle(ButtonStyle.Secondary),
+  ));
+  c.addActionRowComponents(new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('presenced_ps3')
+      .setLabel('Configurar PS3')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('presenced_wiiu')
+      .setLabel('Configurar Wii U')
+      .setStyle(ButtonStyle.Secondary),
+  ));
+  c.addActionRowComponents(new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('presenced_download')
+      .setLabel('Baixar configuração')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('presenced_reset')
+      .setLabel('Limpar configuração')
+      .setStyle(ButtonStyle.Danger),
+  ));
+
+  return { components: [c, voltarRow()], flags: MessageFlags.IsComponentsV2 };
+}
+
+function buildPresencedDownloadConfig(cfg, clientId) {
+  return {
+    enabled: Boolean(cfg.presencedEnabled),
+    clientId,
+    pollInterval: cfg.presencedPollInterval ?? 10,
+    consoleClients: (cfg.presencedConsoles ?? 'PS3,WiiU')
+      .split(',')
+      .map(value => value.trim().toUpperCase())
+      .filter(value => ['PS3', 'WIIU'].includes(value))
+      .map(value => value === 'WIIU' ? 'WiiU' : value),
+    presence: {
+      useCommonFormat: true,
+      resetTimeOnAppChange: true,
+      commonFormat: {
+        displayType: 2,
+        appName: 'console_name',
+        details1: 'app_name',
+        details2: 'info_network',
+        imageBigText: 'app_name',
+        imageBigType: 'image_app',
+        imageSmallText: 'info_firmware',
+        imageSmallType: 'image_console',
+      },
+    },
+    clientConfig: {
+      ps3: {
+        address: cfg.presencedPs3Address ?? '',
+        networkName: cfg.presencedPs3Network ?? 'PSN',
+        networkNameFull: cfg.presencedPs3NetworkFull ?? 'PlayStation Network',
+        networkId: cfg.presencedPs3NetworkId ?? '{anon-user}',
+        useCelsius: cfg.presencedPs3UseCelsius !== false,
+      },
+      wiiu: {
+        udpPort: cfg.presencedWiiuPort ?? 5005,
+        firmwareVer: cfg.presencedWiiuFirmware ?? '{unknown-ver}',
+        hardwareText: cfg.presencedWiiuHardware ?? 'IBM Espresso | AMD Latte',
+      },
+    },
+  };
+}
+
+export async function handlePresencedCfgBtn(interaction) {
+  if (!interaction.memberPermissions?.has(0x20n)) {
+    return interaction.reply({ content: '❌ Sem permissão.', flags: 64 });
+  }
+
+  const cfg = await getCfg(interaction.guildId);
+  const { customId } = interaction;
+
+  if (customId === 'presenced_toggle') {
+    await prisma.guildConfig.update({
+      where: { guildId: interaction.guildId },
+      data: { presencedEnabled: !cfg.presencedEnabled },
+    });
+  } else if (customId === 'presenced_reset') {
+    await prisma.guildConfig.update({
+      where: { guildId: interaction.guildId },
+      data: {
+        presencedEnabled: false,
+        presencedConsoles: 'PS3,WiiU',
+        presencedPollInterval: 10,
+        presencedPs3Address: null,
+        presencedPs3Network: 'PSN',
+        presencedPs3NetworkFull: 'PlayStation Network',
+        presencedPs3NetworkId: '{anon-user}',
+        presencedPs3UseCelsius: true,
+        presencedWiiuPort: 5005,
+        presencedWiiuFirmware: '{unknown-ver}',
+        presencedWiiuHardware: 'IBM Espresso | AMD Latte',
+      },
+    });
+  } else if (customId === 'presenced_download') {
+    const config = buildPresencedDownloadConfig(cfg, interaction.client.user.id);
+    return interaction.reply({
+      content: [
+        '✅ Configuração gerada. Salve o anexo como `presenced.config.json`',
+        'na pasta `discord-bot/rpc-client` e execute `npm run presenced`.',
+      ].join('\n'),
+      files: [{
+        attachment: Buffer.from(`${JSON.stringify(config, null, 2)}\n`, 'utf8'),
+        name: 'presenced.config.json',
+      }],
+      flags: 64,
+    });
+  } else if (customId === 'presenced_general') {
+    const { ModalBuilder, TextInputBuilder, TextInputStyle } = await import('discord.js');
+    const modal = new ModalBuilder().setCustomId('presenced_modal_general').setTitle('Presenced — Geral');
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId('consoles').setLabel('Consoles: PS3, WiiU ou ambos')
+          .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(20)
+          .setValue(cfg.presencedConsoles ?? 'PS3,WiiU'),
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId('interval').setLabel('Intervalo de leitura em segundos')
+          .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(4)
+          .setValue(String(cfg.presencedPollInterval ?? 10)),
+      ),
+    );
+    return interaction.showModal(modal);
+  } else if (customId === 'presenced_ps3') {
+    const { ModalBuilder, TextInputBuilder, TextInputStyle } = await import('discord.js');
+    const modal = new ModalBuilder().setCustomId('presenced_modal_ps3').setTitle('Presenced — PS3');
+    for (const [id, label, value, placeholder] of [
+      ['address', 'IP ou hostname do PS3', cfg.presencedPs3Address, '192.168.1.100'],
+      ['network', 'Nome curto da rede', cfg.presencedPs3Network, 'PSN'],
+      ['networkFull', 'Nome completo da rede', cfg.presencedPs3NetworkFull, 'PlayStation Network'],
+      ['networkId', 'ID exibido (opcional)', cfg.presencedPs3NetworkId, '{anon-user}'],
+    ]) {
+      modal.addComponents(new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId(id).setLabel(label).setStyle(TextInputStyle.Short)
+          .setRequired(false).setMaxLength(100).setPlaceholder(placeholder).setValue(value ?? ''),
+      ));
+    }
+    return interaction.showModal(modal);
+  } else if (customId === 'presenced_wiiu') {
+    const { ModalBuilder, TextInputBuilder, TextInputStyle } = await import('discord.js');
+    const modal = new ModalBuilder().setCustomId('presenced_modal_wiiu').setTitle('Presenced — Wii U');
+    for (const [id, label, value, placeholder] of [
+      ['port', 'Porta UDP do Rich Presence U', cfg.presencedWiiuPort, '5005'],
+      ['firmware', 'Versão do CafeOS', cfg.presencedWiiuFirmware, '{unknown-ver}'],
+      ['hardware', 'Texto do hardware', cfg.presencedWiiuHardware, 'IBM Espresso | AMD Latte'],
+    ]) {
+      modal.addComponents(new ActionRowBuilder().addComponents(
+        new TextInputBuilder().setCustomId(id).setLabel(label).setStyle(TextInputStyle.Short)
+          .setRequired(false).setMaxLength(100).setPlaceholder(placeholder).setValue(String(value ?? '')),
+      ));
+    }
+    return interaction.showModal(modal);
+  }
+
+  return interaction.update(buildPresencedConfigPayload(await getCfg(interaction.guildId)));
+}
+
+export async function handlePresencedCfgModal(interaction) {
+  await interaction.deferUpdate();
+  const { customId } = interaction;
+  const value = id => interaction.fields.getTextInputValue(id).trim();
+  let data;
+
+  if (customId === 'presenced_modal_general') {
+    const consoles = value('consoles').toUpperCase().replace(/\s+/g, '');
+    const selected = ['PS3', 'WIIU'].filter(consoleName => consoles.includes(consoleName));
+    data = {
+      presencedConsoles: selected.map(consoleName => consoleName === 'WIIU' ? 'WiiU' : consoleName).join(',') || 'PS3,WiiU',
+      presencedPollInterval: Math.min(3600, Math.max(2, Number(value('interval')) || 10)),
+    };
+  } else if (customId === 'presenced_modal_ps3') {
+    data = {
+      presencedPs3Address: value('address') || null,
+      presencedPs3Network: value('network') || 'PSN',
+      presencedPs3NetworkFull: value('networkFull') || 'PlayStation Network',
+      presencedPs3NetworkId: value('networkId') || '{anon-user}',
+    };
+  } else if (customId === 'presenced_modal_wiiu') {
+    data = {
+      presencedWiiuPort: Math.min(65535, Math.max(1, Number(value('port')) || 5005)),
+      presencedWiiuFirmware: value('firmware') || '{unknown-ver}',
+      presencedWiiuHardware: value('hardware') || 'IBM Espresso | AMD Latte',
+    };
+  }
+
+  if (data) {
+    await prisma.guildConfig.upsert({
+      where: { guildId: interaction.guildId },
+      create: { guildId: interaction.guildId, ...data },
+      update: data,
+    });
+  }
+  return interaction.message.edit(buildPresencedConfigPayload(await getCfg(interaction.guildId)));
+}
+
 // ─── Mini-config dos cargos de boost ─────────────────────────────────────────
 
 export function buildBoostConfigPayload(guild, cfg) {
@@ -571,6 +804,9 @@ export async function handlePainelCfgBtn(interaction) {
       break;
     case 'status':
       payload = buildStatusConfigPayload();
+      break;
+    case 'presenced':
+      payload = buildPresencedConfigPayload(cfg);
       break;
     case 'boost':
       payload = buildBoostConfigPayload(interaction.guild, cfg);

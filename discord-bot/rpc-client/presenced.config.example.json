@@ -1,4 +1,5 @@
 {
+  "enabled": true,
   "clientId": "cole_o_id_da_aplicacao_aqui",
   "pollInterval": 10,
   "consoleClients": [

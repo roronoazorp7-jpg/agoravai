@@ -15,6 +15,7 @@ const RECONNECT_DELAY_MS = 4_000;
 const CONFIG_FILE = path.resolve('presenced.config.json');
 
 const DEFAULT_CONFIG = {
+  enabled: true,
   clientId: '',
   pollInterval: 10,
   consoleClients: 'all',
@@ -95,6 +96,7 @@ async function loadConfig() {
   const config = merge(DEFAULT_CONFIG, fileConfig);
 
   config.clientId = args.clientid || config.clientId || env.DISCORD_APPLICATION_ID || '';
+  config.enabled = fileConfig.enabled !== false;
   config.pollInterval = Math.max(
     2,
     Number(args.pollinterval || config.pollInterval || env.PRESENCED_POLL_INTERVAL || 10),
@@ -540,6 +542,10 @@ function printUsage() {
 
 export async function runPresenced(config = null) {
   const settings = config ?? await loadConfig();
+  if (!settings.enabled && !settings.dryRun && !settings.clear) {
+    console.log('[Presenced] monitoramento desativado pelo painel.');
+    return;
+  }
   if (!settings.clientId && !settings.dryRun) {
     printUsage();
     throw new Error('DISCORD_APPLICATION_ID/clientId não foi configurado.');

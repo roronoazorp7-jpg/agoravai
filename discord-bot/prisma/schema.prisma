@@ -185,6 +185,18 @@ model GuildConfig {
   botBannerUrl String?
   botBio       String?
 
+  presencedEnabled        Boolean @default(false)
+  presencedConsoles       String  @default("PS3,WiiU")
+  presencedPollInterval   Int     @default(10)
+  presencedPs3Address     String?
+  presencedPs3Network     String  @default("PSN")
+  presencedPs3NetworkFull String  @default("PlayStation Network")
+  presencedPs3NetworkId   String  @default("{anon-user}")
+  presencedPs3UseCelsius  Boolean @default(true)
+  presencedWiiuPort       Int     @default(5005)
+  presencedWiiuFirmware   String  @default("{unknown-ver}")
+  presencedWiiuHardware   String  @default("IBM Espresso | AMD Latte")
+
   aiChannelId      String?
   dropAllowedRoles String?
   boostRoles       String?

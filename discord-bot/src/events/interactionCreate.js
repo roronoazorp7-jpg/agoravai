@@ -97,6 +97,8 @@ import {
   handleBoostCfgBtn,
   handleBumpCfgBtn,
   handleBumpCfgChannelSelect,
+  handlePresencedCfgBtn,
+  handlePresencedCfgModal,
 } from '../utils/painelHandlers.js';
 
 const tellonymSessions = new Map();
@@ -1340,6 +1342,10 @@ export default {
 
         if (customId === 'bump_toggle' || customId === 'bump_channel_clear') {
           return handleBumpCfgBtn(interaction);
+        }
+
+        if (customId.startsWith('presenced_')) {
+          return handlePresencedCfgBtn(interaction);
         }
 
         if (customId.startsWith('antilink_')) {
@@ -3311,6 +3317,10 @@ export default {
 
         if (interaction.customId.startsWith('antilink_modal_')) {
           return handleAntiLinkCfgModal(interaction);
+        }
+
+        if (interaction.customId.startsWith('presenced_modal_')) {
+          return handlePresencedCfgModal(interaction);
         }
 
         // ── PAINEL CENTRAL: Modals do mini-config Instagram ───────────
