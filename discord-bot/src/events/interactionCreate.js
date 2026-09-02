@@ -23,7 +23,7 @@ import {
 import prisma from '../database/client.js';
 import { generateTranscript } from '../utils/transcript.js';
 import { baseEmbed, buildConfigEmbed, errorEmbed, successEmbed, v2Simple, Colors } from '../utils/embed.js';
-import { ACTIONS, buildInteractionEmbed } from '../commands/interacoes/interacoes.js';
+import { ACTIONS, REJECTION_GIFS, buildInteractionEmbed, fetchGif } from '../commands/interacoes/interacoes.js';
 import { generateTellonymCard } from '../utils/cardGenerator.js';
 import { buildWeddingCardPayload, getMarriageStats } from '../utils/weddingCard.js';
 import { likesMap, postDataMap } from '../utils/instaState.js';
@@ -2634,6 +2634,7 @@ export default {
           const parts       = customId.split('_');
           const type        = parts[2];
           const originalToId = parts[3];
+          if (!ACTIONS[type]) return;
 
           const from = interaction.member ?? interaction.user;
 
@@ -2647,7 +2648,13 @@ export default {
 
           const fromName = from.displayName ?? from.user?.username ?? 'Alguém';
           await interaction.deferUpdate();
-          return interaction.editReply(v2Simple(`**${fromName}** rejeitou a interação. ✖️`));
+          const gifData = await fetchGif(REJECTION_GIFS);
+          return interaction.editReply(
+            v2Payload(v2Rich({
+              text: `**${fromName}** rejeitou a interação. ✖️`,
+              imageUrl: gifData.url,
+            })),
+          );
         }
 
         // ── TELLONYM: Botão principal → escolha ─────────────────────────
