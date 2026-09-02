@@ -1,0 +1,36 @@
+{
+  "clientId": "cole_o_id_da_aplicacao_aqui",
+  "pollInterval": 10,
+  "consoleClients": [
+    "PS3",
+    "WiiU"
+  ],
+  "presence": {
+    "useCommonFormat": true,
+    "resetTimeOnAppChange": true,
+    "commonFormat": {
+      "displayType": 2,
+      "appName": "console_name",
+      "details1": "app_name",
+      "details2": "info_network",
+      "imageBigText": "app_name",
+      "imageBigType": "image_app",
+      "imageSmallText": "info_firmware",
+      "imageSmallType": "image_console"
+    }
+  },
+  "clientConfig": {
+    "ps3": {
+      "address": "192.168.1.100",
+      "networkName": "PSN",
+      "networkNameFull": "PlayStation Network",
+      "networkId": "{anon-user}",
+      "useCelsius": true
+    },
+    "wiiu": {
+      "udpPort": 5005,
+      "firmwareVer": "{unknown-ver}",
+      "hardwareText": "IBM Espresso | AMD Latte"
+    }
+  }
+}

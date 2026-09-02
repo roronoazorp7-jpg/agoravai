@@ -28,6 +28,35 @@ editar os textos. Argumentos da linha de comando sobrescrevem o arquivo:
 npm start -- --details "Savagge" --state "Jogando com a comunidade"
 ```
 
+## Presenced para PS3 e Wii U
+
+O modo `Presenced` é a adaptação integrada do sistema do repositório
+[BenchatonDev/Presenced](https://github.com/BenchatonDev/Presenced). Ele monitora
+um PS3 com WebMAN MOD e/ou um Wii U com o plugin Rich Presence U e atualiza a
+atividade do Discord automaticamente.
+
+Ele usa somente o IPC do Discord Desktop, sem token de usuário ou self-bot.
+Por isso precisa ser executado no computador que tem o Discord aberto e que
+consegue alcançar o console pela rede; não deve ser iniciado junto do bot no
+Railway.
+
+```bash
+cp presenced.config.example.json presenced.config.json
+# edite clientId e clientConfig.ps3.address, se necessário
+npm run presenced
+```
+
+Também é possível configurar por variáveis de ambiente:
+
+```bash
+DISCORD_APPLICATION_ID=... PRESENCED_PS3_ADDRESS=192.168.1.100 npm run presenced
+```
+
+Use `npm run presenced -- --dry-run --once` para testar a leitura dos consoles
+sem publicar uma atividade. As chaves `ps3`, `wiiu`, `unknown`, `nintendo`,
+`pretendo` e `playstation` precisam existir como assets na aplicação do Discord
+para que as imagens apareçam.
+
 ## Imagens e botões
 
 Os campos `RPC_LARGE_IMAGE` e `RPC_SMALL_IMAGE` recebem as chaves dos assets

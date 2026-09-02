@@ -6,7 +6,8 @@
   "description": "Cliente local de Rich Presence para membros do Discord",
   "scripts": {
     "start": "node src/index.js",
-    "clear": "node src/index.js --clear"
+    "clear": "node src/index.js --clear",
+    "presenced": "node src/presenced.js"
   },
   "engines": {
     "node": ">=18"
