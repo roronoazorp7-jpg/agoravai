@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import prisma from '../../database/client.js';
-import { BANNERS } from '../../utils/shopData.js';
+import { BANNERS, buildBannerUrl, cacheBannerImage } from '../../utils/shopData.js';
 
 import { getEmoji } from '../../utils/emojiManager.js';
 const COIN = () => getEmoji('futecoins');
@@ -61,9 +61,14 @@ export default {
       if (!existing)
         return interaction.editReply({ content: `❌ Banner com chave \`${chaveExistente}\` não encontrado.` });
 
+      const storedImage = await cacheBannerImage(imagem, `${interaction.guildId}_${existing.key}`);
+      if (!storedImage) {
+        return interaction.editReply({ content: '❌ Não foi possível salvar uma cópia permanente da imagem. Use uma URL direta de imagem acessível.' });
+      }
+
       await prisma.customBanner.update({
         where: { id: existing.id },
-        data: { imageUrl: imagem, active: true, name: nome },
+        data: { imageUrl: storedImage, active: true, name: nome },
       });
 
       return interaction.editReply({
@@ -72,7 +77,7 @@ export default {
             .setColor(0x57F287)
             .setTitle('✅ Banner Atualizado!')
             .setDescription(`O banner **${nome}** foi atualizado com sucesso!`)
-            .setImage(imagem)
+            .setImage(buildBannerUrl(storedImage) || imagem)
             .addFields({ name: '🔑 Chave', value: `\`${chaveExistente}\``, inline: true })
             .setFooter({ text: 'Use /loja painel → Vitrine para ver o banner' }),
         ],
@@ -98,6 +103,11 @@ export default {
     });
     const finalKey = (existing || staticKeys.has(chave)) ? `${chave}_${Date.now().toString(36)}` : chave;
 
+    const storedImage = await cacheBannerImage(imagem, `${interaction.guildId}_${finalKey}`);
+    if (!storedImage) {
+      return interaction.editReply({ content: '❌ Não foi possível salvar uma cópia permanente da imagem. Use uma URL direta de imagem acessível.' });
+    }
+
     await prisma.customBanner.create({
       data: {
         guildId:     interaction.guildId,
@@ -105,7 +115,7 @@ export default {
         name:        nome,
         description: '',
         price:       priceVal,
-        imageUrl:    imagem,
+        imageUrl:    storedImage,
         gradient1:   '#1a0533',
         gradient2:   '#4a1a8a',
         emoji:       '🖼️',
@@ -119,7 +129,7 @@ export default {
           .setColor(0x9B4FD6)
           .setTitle('✅ Banner Criado!')
           .setDescription(`O banner **${nome}** foi adicionado à loja!\nOs membros já podem comprar e equipar.`)
-          .setImage(imagem)
+          .setImage(buildBannerUrl(storedImage) || imagem)
           .addFields(
             { name: '💰 Preço', value: `**${priceVal.toLocaleString('pt-BR')} ${COIN()}**`, inline: true },
             { name: '🔑 Chave', value: `\`${finalKey}\``, inline: true },

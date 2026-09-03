@@ -22,6 +22,7 @@ import { ensureMarriageSchema } from './database/client.js';
 import { readdirSync } from 'fs';
 import { fileURLToPath, pathToFileURL } from 'url';
 import path from 'path';
+import { startBannerServer } from './utils/shopData.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -38,6 +39,8 @@ const client = new Client({
   partials: [Partials.Channel, Partials.Message],
 });
 
+const bannerServer = startBannerServer();
+
 client.commands   = new Collection();
 client.prefixCmds = new Collection();
 client.voiceConns = new Map();
@@ -50,6 +53,7 @@ async function desligar(sinal) {
   // re-registrados no próximo boot. Limpar aqui fazia os comandos sumirem
   // sempre que o bot reiniciava sem sucesso.
   try { client.destroy(); } catch {}
+  try { bannerServer?.close(); } catch {}
   console.log(`⏹️  Bot offline (${sinal}).`);
   process.exit(0);
 }

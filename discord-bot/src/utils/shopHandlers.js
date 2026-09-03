@@ -27,6 +27,8 @@ import {
   VIP_FRAME_PRESETS,
   getVipFrame,
   buildBannerUrl,
+  cacheBannerImage,
+  resolveBanner,
 } from './shopData.js';
 import { ROBBERY_WEAPONS, getRobberyWeapon } from './robberyData.js';
 import { renderRingPreview } from './ringPreview.js';
@@ -91,22 +93,23 @@ async function getCfg(guildId) {
 async function getAllBannersForGuild(guildId) {
   if (!guildId) return [];
   const custom = await prisma.customBanner.findMany({ where: { guildId, active: true }, orderBy: { createdAt: 'asc' } });
-  return custom.map(c => ({
-    key: c.key, name: c.name, description: c.description || '',
-    price: c.price, imageUrl: buildBannerUrl(c.imageUrl),
-    gradient: [c.gradient1, c.gradient2], emoji: c.emoji, isCustom: true,
+  return Promise.all(custom.map(async c => {
+    // Passa pelo resolvedor central para renovar URLs antigas do Discord antes
+    // de montar o carrossel. O fallback mantém o banner visível mesmo se uma
+    // renovação falhar temporariamente.
+    const resolved = await resolveBanner(c.key, guildId);
+    return {
+      key: c.key, name: c.name, description: c.description || '',
+      price: c.price, imageUrl: resolved?.imageUrl ?? buildBannerUrl(c.imageUrl),
+      gradient: [c.gradient1, c.gradient2], emoji: c.emoji, isCustom: true,
+    };
   }));
 }
 
 async function resolveBannerForGuild(key, guildId) {
   if (!guildId) return null;
-  const custom = await prisma.customBanner.findFirst({ where: { key, guildId, active: true } });
-  if (!custom) return null;
-  return {
-    key: custom.key, name: custom.name, description: custom.description || '',
-    price: custom.price, imageUrl: buildBannerUrl(custom.imageUrl),
-    gradient: [custom.gradient1, custom.gradient2], emoji: custom.emoji, isCustom: true,
-  };
+  const resolved = await resolveBanner(key, guildId);
+  return resolved?.isCustom ? resolved : null;
 }
 
 // ─── Painel Admin ─────────────────────────────────────────────────────────────
@@ -354,6 +357,18 @@ async function handleLojaAdminCriarBannerModal(interaction) {
   });
   const finalKey = existing ? `${chaveBase}_${Date.now().toString(36)}` : chaveBase;
 
+  const storedImage = await cacheBannerImage(imagem, `${interaction.guildId}_${finalKey}`);
+  if (!storedImage) {
+    const c = new ContainerBuilder();
+    c.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+      '❌ Não foi possível salvar uma cópia permanente da imagem. Use uma URL direta de imagem acessível.',
+    ));
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('loja_admin_voltar').setLabel('← Voltar').setStyle(ButtonStyle.Secondary),
+    );
+    return interaction.editReply({ components: [c, row], flags: MessageFlags.IsComponentsV2 });
+  }
+
   await prisma.customBanner.create({
     data: {
       guildId:     interaction.guildId,
@@ -361,7 +376,7 @@ async function handleLojaAdminCriarBannerModal(interaction) {
       name:        nome,
       description: desc,
       price:       preco,
-      imageUrl:    imagem,
+      imageUrl:    storedImage,
       gradient1:   '#1a0533',
       gradient2:   '#4a1a8a',
       emoji:       '🖼️',
@@ -378,7 +393,7 @@ async function handleLojaAdminCriarBannerModal(interaction) {
   ));
   const { MediaGalleryBuilder, MediaGalleryItemBuilder } = await import('discord.js');
   c.addMediaGalleryComponents(
-    new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(imagem)),
+    new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(buildBannerUrl(storedImage) || imagem)),
   );
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('loja_admin_criar_banner').setLabel('Criar Outro Banner').setEmoji('🖼️').setStyle(ButtonStyle.Success),

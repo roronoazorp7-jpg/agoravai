@@ -1,10 +1,15 @@
 import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { dirname, join, resolve, basename } from 'path';
+import { mkdir, readFile, writeFile } from 'fs/promises';
+import { createServer } from 'http';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = dirname(__filename);
 const RINGS_DIR  = join(__dirname, '../assets/rings');
+const BANNERS_DIR = join(__dirname, '../../data/banners');
+const STORED_BANNER_PREFIX = '__stored__';
+const MAX_BANNER_BYTES = 20 * 1024 * 1024;
 
 export const WALLET_BACKGROUNDS = [
   { key: 'wbg_galaxy',   name: '🌌 Galáxia Roxa',    emoji: '🌌', url: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=900&q=90' },
@@ -38,7 +43,19 @@ export const BANNERS = [];
 // Esta função renova via API oficial: POST /attachments/refresh-urls
 
 function isDiscordAttachmentUrl(url) {
-  return typeof url === 'string' && url.includes('cdn.discordapp.com/attachments/');
+  try {
+    const parsed = new URL(url);
+    return (
+      (parsed.hostname === 'cdn.discordapp.com' || parsed.hostname === 'media.discordapp.net')
+      && parsed.pathname.includes('/attachments/')
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isStoredBannerRef(value) {
+  return typeof value === 'string' && value.startsWith(STORED_BANNER_PREFIX);
 }
 
 function isExpiredOrStale(url) {
@@ -79,14 +96,86 @@ async function refreshDiscordUrl(url) {
   }
 }
 
+function bannerExtension(contentType, sourceUrl) {
+  const mime = contentType.split(';', 1)[0].toLowerCase();
+  const byMime = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/gif': 'gif',
+    'image/webp': 'webp',
+    'image/avif': 'avif',
+  };
+  if (byMime[mime]) return byMime[mime];
+
+  try {
+    const extension = new URL(sourceUrl).pathname.match(/\.([a-z0-9]{2,5})$/i)?.[1]?.toLowerCase();
+    if (extension && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif'].includes(extension)) {
+      return extension === 'jpeg' ? 'jpg' : extension;
+    }
+  } catch {}
+
+  return 'jpg';
+}
+
+function bannerFileStem(key) {
+  const safe = String(key || 'banner')
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 100);
+  return safe || 'banner';
+}
+
+/**
+ * Downloads an image to the bot's persistent banner directory.
+ * The returned reference is safe to store in the database and never expires.
+ */
+export async function cacheBannerImage(sourceUrl, key) {
+  if (!sourceUrl || isStoredBannerRef(sourceUrl)) return sourceUrl;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20_000);
+  try {
+    const response = await fetch(sourceUrl, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SavageBot/1.0)' },
+      redirect: 'follow',
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.toLowerCase().startsWith('image/')) {
+      throw new Error(`Tipo inválido: ${contentType || 'desconhecido'}`);
+    }
+
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (!bytes.length) throw new Error('arquivo vazio');
+    if (bytes.length > MAX_BANNER_BYTES) throw new Error('imagem maior que 20 MB');
+
+    await mkdir(BANNERS_DIR, { recursive: true });
+    const filename = `${bannerFileStem(key)}.${bannerExtension(contentType, sourceUrl)}`;
+    await writeFile(join(BANNERS_DIR, filename), bytes);
+    return `${STORED_BANNER_PREFIX}${filename}`;
+  } catch (error) {
+    console.warn(`[banner] não foi possível salvar cópia local: ${error.message}`);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ── Banner URL helpers ──────────────────────────────────────────────────────
 // Always rebuild from the CURRENT domain so stale stored URLs never break.
 function getBannerBaseUrl() {
-  const domains = process.env.REPLIT_DOMAINS?.split(',').filter(Boolean);
-  if (domains?.length) return `https://${domains[0]}`;
-  if (process.env.REPLIT_DEV_DOMAIN) return `https://${process.env.REPLIT_DEV_DOMAIN}`;
-  if (process.env.RAILWAY_PUBLIC_DOMAIN) return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
-  if (process.env.API_BASE_URL) return process.env.API_BASE_URL.replace(/\/$/, '');
+  const configured = process.env.BANNER_PUBLIC_BASE_URL
+    || process.env.RAILWAY_PUBLIC_DOMAIN
+    || process.env.REPLIT_DEV_DOMAIN
+    || process.env.REPLIT_DOMAINS?.split(',').filter(Boolean)[0]
+    || process.env.API_BASE_URL;
+  if (configured) {
+    return /^https?:\/\//i.test(configured)
+      ? configured.replace(/\/$/, '')
+      : `https://${configured}`;
+  }
   return null;
 }
 
@@ -97,6 +186,13 @@ function getBannerBaseUrl() {
 //                              but only if it points to our own server
 export function buildBannerUrl(stored) {
   if (!stored) return null;
+
+  // Permanent copy served by this bot.
+  if (isStoredBannerRef(stored)) {
+    const filename = stored.slice(STORED_BANNER_PREFIX.length);
+    const base = getBannerBaseUrl();
+    return base && filename ? `${base}/media/banners/${encodeURIComponent(filename)}` : null;
+  }
 
   // New format: bare filename (no protocol, no __local__ prefix)
   if (!stored.startsWith('http') && !stored.startsWith('__local__')) {
@@ -153,6 +249,18 @@ export async function resolveBanner(key, guildId) {
 
 async function buildCustomBannerResult(custom, prisma) {
   try {
+    if (isStoredBannerRef(custom.imageUrl)) {
+      return {
+        key:         custom.key,
+        name:        custom.name,
+        description: custom.description ?? '',
+        price:       custom.price,
+        imageUrl:    buildBannerUrl(custom.imageUrl),
+        gradient:    [custom.gradient1, custom.gradient2],
+        emoji:       custom.emoji,
+        isCustom:    true,
+      };
+    }
 
     let imageUrl = buildBannerUrl(custom.imageUrl);
 
@@ -172,6 +280,19 @@ async function buildCustomBannerResult(custom, prisma) {
       }
     }
 
+    // Migra banners antigos para uma cópia local. Mesmo que o link do Discord
+    // ainda esteja válido, a cópia evita que ele volte a expirar depois.
+    const storedRef = await cacheBannerImage(imageUrl, `${custom.guildId}_${custom.key}`);
+    if (storedRef) {
+      try {
+        await prisma.customBanner.update({
+          where: { id: custom.id },
+          data: { imageUrl: storedRef },
+        });
+        imageUrl = buildBannerUrl(storedRef);
+      } catch {}
+    }
+
     return {
       key:         custom.key,
       name:        custom.name,
@@ -186,6 +307,74 @@ async function buildCustomBannerResult(custom, prisma) {
     console.error('[banner] resolveBanner erro:', e.message);
     return null;
   }
+}
+
+const bannerMimeTypes = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.avif': 'image/avif',
+};
+
+/**
+ * Serves cached banners from the same public Railway service as the bot.
+ * This keeps Discord embeds independent from expiring CDN attachment URLs.
+ */
+export function startBannerServer() {
+  const port = Number(process.env.PORT);
+  if (!Number.isInteger(port) || port <= 0) return null;
+
+  const root = resolve(BANNERS_DIR);
+  const server = createServer(async (request, response) => {
+    const requestUrl = request.url ? new URL(request.url, 'http://localhost') : null;
+    if (request.method !== 'GET' || !requestUrl?.pathname.startsWith('/media/banners/')) {
+      response.statusCode = 404;
+      response.end('Not found');
+      return;
+    }
+
+    let filename;
+    try {
+      filename = basename(decodeURIComponent(requestUrl.pathname.slice('/media/banners/'.length)));
+    } catch {
+      response.statusCode = 400;
+      response.end('Bad request');
+      return;
+    }
+    if (!filename || filename.includes('..')) {
+      response.statusCode = 400;
+      response.end('Bad request');
+      return;
+    }
+
+    const filePath = resolve(root, filename);
+    if (!filePath.startsWith(`${root}/`)) {
+      response.statusCode = 400;
+      response.end('Bad request');
+      return;
+    }
+
+    try {
+      const file = await readFile(filePath);
+      const extension = filename.slice(filename.lastIndexOf('.')).toLowerCase();
+      response.setHeader('Content-Type', bannerMimeTypes[extension] || 'application/octet-stream');
+      response.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      response.end(file);
+    } catch {
+      response.statusCode = 404;
+      response.end('Not found');
+    }
+  });
+
+  server.on('error', error => {
+    console.error('[banner] servidor de arquivos:', error.message);
+  });
+  server.listen(port, '0.0.0.0', () => {
+    console.log(`[banner] arquivos locais disponíveis na porta ${port}`);
+  });
+  return server;
 }
 
 // Todas as cores também são molduras elaboradas em imagem real (relevo 3D, gemas,
