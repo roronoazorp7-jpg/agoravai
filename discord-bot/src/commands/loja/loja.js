@@ -31,12 +31,47 @@ function parseEmoji(str) {
   return str;
 }
 
+function currentServerBanner(guild) {
+  try {
+    return guild?.bannerURL?.({
+      extension: 'png',
+      size: 1024,
+      forceStatic: true,
+    }) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function isDiscordCdnImage(url) {
+  try {
+    const parsed = new URL(url);
+    return (
+      (parsed.hostname === 'cdn.discordapp.com' || parsed.hostname === 'media.discordapp.net')
+      && (parsed.pathname.includes('/attachments/') || parsed.pathname.includes('/banners/'))
+    );
+  } catch {
+    return false;
+  }
+}
+
+function resolveShopImage(configuredUrl, serverBanner) {
+  if (!configuredUrl) return null;
+  // Discord attachment URLs contain temporary signatures. When the shop image
+  // was copied from the server banner, always rebuild it from the live Guild.
+  if (isDiscordCdnImage(configuredUrl)) return serverBanner;
+  return configuredUrl;
+}
+
 // ─── Painel público em Components V2 (sem barra lateral por padrão) ──────────
 export function buildShopMain(guild, cfg = {}) {
   const title    = cfg.lojaTitle  ?? `🛒 Loja do ${guild.name}`;
   const conv     = cfg.lojaConversao ?? DEFAULT_CONV();
   const bodyText = cfg.lojaText   ?? DEFAULT_TEXT();
   const useDivider = cfg.lojaUseDivider ?? false;
+  const serverBanner = currentServerBanner(guild);
+  const shopBanner = resolveShopImage(cfg.lojaBanner, serverBanner);
+  const shopThumb = resolveShopImage(cfg.lojaThumb, serverBanner);
 
   const sep  = useDivider ? `\n${DIVIDER}\n\n` : '\n\n';
   const fullText = `## ${title}\n\n${bodyText}${sep}**Conversão 🪙**\n${conv}`;
@@ -52,13 +87,13 @@ export function buildShopMain(guild, cfg = {}) {
   const bannerPos = cfg.lojaBannerPos ?? 'top';
 
   // Banner no topo (padrão)
-  if (cfg.lojaBanner && bannerPos === 'top') {
+  if (shopBanner && bannerPos === 'top') {
     container.addMediaGalleryComponents(
-      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(cfg.lojaBanner)),
+      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(shopBanner)),
     );
   }
 
-  const thumbUrl = cfg.lojaThumb || guild.iconURL({ size: 128 }) || null;
+  const thumbUrl = shopThumb || guild.iconURL({ size: 128 }) || null;
   if (thumbUrl) {
     const section = new SectionBuilder()
       .addTextDisplayComponents(new TextDisplayBuilder().setContent(fullText))
@@ -69,9 +104,9 @@ export function buildShopMain(guild, cfg = {}) {
   }
 
   // Banner na base (opcional)
-  if (cfg.lojaBanner && bannerPos === 'bottom') {
+  if (shopBanner && bannerPos === 'bottom') {
     container.addMediaGalleryComponents(
-      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(cfg.lojaBanner)),
+      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(shopBanner)),
     );
   }
 
