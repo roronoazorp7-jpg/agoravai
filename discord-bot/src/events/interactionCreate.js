@@ -480,6 +480,10 @@ export default {
           return handleBoostCfgRoleSelect(interaction);
         }
 
+        if (interaction.customId === 'bump_role_select') {
+          return handleBumpCfgRoleSelect(interaction);
+        }
+
         // ── MONTAR-MENSAGEM: Cargo no embed ──────────────────────────────
         if (interaction.customId === 'msg_role_sel') {
           const session = getMsgSession(interaction.user.id, interaction.guildId);
@@ -641,10 +645,6 @@ export default {
 
         if (interaction.customId === 'bump_channel_select') {
           return handleBumpCfgChannelSelect(interaction);
-        }
-
-        if (interaction.customId === 'bump_role_select') {
-          return handleBumpCfgRoleSelect(interaction);
         }
 
         if (interaction.customId === 'chansel_wc') {
