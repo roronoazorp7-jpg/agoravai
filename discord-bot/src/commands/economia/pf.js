@@ -2,6 +2,8 @@ import {
   SlashCommandBuilder,
   ActionRowBuilder,
   StringSelectMenuBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   AttachmentBuilder,
   PermissionFlagsBits,
 } from 'discord.js';
@@ -77,6 +79,16 @@ function editMenu() {
   ];
 }
 
+export function walletRefreshRow(userId) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`wallet_refresh:${userId}`)
+      .setLabel('Atualizar')
+      .setEmoji('🔄')
+      .setStyle(ButtonStyle.Secondary),
+  );
+}
+
 // ─── Export ───────────────────────────────────────────────────────────────────
 
 export default {
@@ -95,7 +107,10 @@ export default {
       interaction.guild,
       interaction.user,
     );
-    return interaction.editReply({ files: [file], components: editMenu() });
+    return interaction.editReply({
+      files: [file],
+      components: [...editMenu(), walletRefreshRow(interaction.user.id)],
+    });
   },
 
   async executePrefix(message, args) {
@@ -133,9 +148,9 @@ export default {
       );
     }
 
-    // savage pf [@user] → view carteira (sem botões de edição)
+    // savage pf [@user] → view carteira (com botão de atualização)
     const target = message.mentions.users.first() ?? message.author;
     const file   = await buildWalletCard(target.id, message.guildId, message.guild, target);
-    return message.reply({ files: [file] });
+    return message.reply({ files: [file], components: [walletRefreshRow(target.id)] });
   },
 };

@@ -42,6 +42,8 @@ import {
   COLOR_MAP,
 } from '../utils/containerSessions.js';
 import { handleShopInteraction } from '../utils/shopHandlers.js';
+import { buildProfilePayload } from '../commands/general/perfil.js';
+import { buildWalletCard, walletRefreshRow } from '../commands/economia/pf.js';
 import { handlePetButton } from '../commands/general/pet.js';
 import { handleModerationButton } from '../commands/admin/moderacao.js';
 import { handleVipButton, handleVipConfigModal } from '../commands/loja/vip.js';
@@ -1145,6 +1147,54 @@ export default {
       // ── BUTTONS ────────────────────────────────────────────────────────────
       if (interaction.isButton()) {
         const { customId } = interaction;
+
+        if (customId.startsWith('profile_refresh:') || customId.startsWith('wallet_refresh:')) {
+          const isProfile = customId.startsWith('profile_refresh:');
+          const userId = customId.slice((isProfile ? 'profile_refresh:' : 'wallet_refresh:').length);
+          await interaction.deferUpdate();
+
+          const target = await client.users.fetch(userId).catch(() => null);
+          if (!target) {
+            return interaction.editReply({
+              content: '❌ Não consegui encontrar o usuário deste card.',
+              components: [],
+            });
+          }
+
+          try {
+            if (isProfile) {
+              const includeCustomization = interaction.message.components
+                ?.some(row => row.components?.some(component => component.customId === 'profile_menu'));
+              return interaction.editReply(await buildProfilePayload({
+                userId,
+                guildId: interaction.guildId,
+                guild: interaction.guild,
+                target,
+                includeCustomization,
+              }));
+            }
+
+            const file = await buildWalletCard(userId, interaction.guildId, interaction.guild, target);
+            const includeCustomization = interaction.message.components
+              ?.some(row => row.components?.some(component => component.customId === 'wallet_menu'));
+            return interaction.editReply({
+              files: [file],
+              components: includeCustomization
+                ? [
+                    ...interaction.message.components
+                      .filter(row => row.components?.some(component => component.customId === 'wallet_menu'))
+                      .map(row => ActionRowBuilder.from(row)),
+                    walletRefreshRow(userId),
+                  ]
+                : [walletRefreshRow(userId)],
+            });
+          } catch (error) {
+            console.error('[CARD REFRESH]', error?.stack ?? error);
+            return interaction.editReply({
+              content: '❌ Não consegui atualizar este card agora. Tente novamente em alguns segundos.',
+            }).catch(() => {});
+          }
+        }
 
         if (customId.startsWith('bank_')) {
           return handleBankInteraction(interaction);
