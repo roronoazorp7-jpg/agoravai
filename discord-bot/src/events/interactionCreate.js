@@ -4163,6 +4163,24 @@ export default {
 
 const TELLONYM_OWNER_IDS = ['1510918703640875028', '1513613689322995804'];
 
+async function resolveTellonymMentionedUsers(interaction, taggedTo) {
+  const ids = [...String(taggedTo ?? '').matchAll(/<@!?(\d+)>/g)]
+    .map(match => match[1])
+    .filter((id, index, all) => all.indexOf(id) === index)
+    .slice(0, 3);
+
+  return Promise.all(ids.map(async id => {
+    const member = await interaction.guild.members.fetch(id).catch(() => null);
+    const user = member?.user ?? await interaction.client.users.fetch(id).catch(() => null);
+    if (!user) return { name: `@${id}`, avatarUrl: null };
+
+    return {
+      name: member?.displayName ?? user.globalName ?? user.username,
+      avatarUrl: user.displayAvatarURL({ extension: 'png', size: 64 }),
+    };
+  }));
+}
+
 async function sendTellonymMsg(interaction, msg, toText, identityAnon = true) {
   await interaction.deferReply({ ephemeral: true });
 
@@ -4178,7 +4196,16 @@ async function sendTellonymMsg(interaction, msg, toText, identityAnon = true) {
     : interaction.user.displayAvatarURL({ extension: 'png', size: 64 });
 
   try {
-    const imgBuf     = await generateTellonymCard({ authorName, authorUsername: authorSub, message: msg, taggedTo: toText ?? null, avatarUrl, isAnon });
+    const taggedUsers = await resolveTellonymMentionedUsers(interaction, toText);
+    const imgBuf     = await generateTellonymCard({
+      authorName,
+      authorUsername: authorSub,
+      message: msg,
+      taggedTo: toText ?? null,
+      taggedUsers,
+      avatarUrl,
+      isAnon,
+    });
     const attachment = new AttachmentBuilder(imgBuf, { name: 'tellonym.png' });
     const cardRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('tellonym_reply').setLabel('Responder').setEmoji(getEmoji('tell_paperplane')).setStyle(ButtonStyle.Secondary),

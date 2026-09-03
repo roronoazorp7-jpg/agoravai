@@ -1,24 +1,38 @@
 import { createCanvas, loadImage } from '@napi-rs/canvas';
 
-const W  = 680;
-const P  = 24;
-const AV = 48;
+const W = 732;
+const OUTER = 18;
+const CARD_W = W - OUTER * 2;
+const CONTENT_X = 54;
+const CONTENT_RIGHT = W - CONTENT_X;
+const AV = 58;
+const FONT = '"Arial", "DejaVu Sans", sans-serif';
 
 function wrapText(ctx, text, maxWidth) {
-  const words = text.split(' ');
   const lines = [];
-  let line    = '';
-  for (const word of words) {
-    const test = line ? `${line} ${word}` : word;
-    if (ctx.measureText(test).width > maxWidth && line) {
-      lines.push(line);
-      line = word;
-    } else {
-      line = test;
+  const paragraphs = String(text ?? '').split(/\r?\n/);
+
+  for (const paragraph of paragraphs) {
+    const words = paragraph.trim().split(/\s+/).filter(Boolean);
+    if (!words.length) {
+      lines.push('');
+      continue;
     }
+
+    let line = '';
+    for (const word of words) {
+      const test = line ? `${line} ${word}` : word;
+      if (ctx.measureText(test).width > maxWidth && line) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = test;
+      }
+    }
+    if (line) lines.push(line);
   }
-  if (line) lines.push(line);
-  return lines;
+
+  return lines.length ? lines : [''];
 }
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -35,116 +49,171 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-export async function generateTellonymCard({ authorName, authorUsername, message, taggedTo, avatarUrl, isAnon }) {
-  const LH       = 22;
-  const MSG_W    = W - P * 2;
-  const FONT     = '"Noto Sans", "DejaVu Sans", Arial, sans-serif';
+async function loadRemoteImage(url) {
+  if (!url) return null;
+  try {
+    const separator = url.includes('?') ? '&' : '?';
+    const response = await fetch(`${url}${separator}size=128`);
+    if (!response.ok) return null;
+    return loadImage(Buffer.from(await response.arrayBuffer()));
+  } catch {
+    return null;
+  }
+}
 
-  // Measure text lines using a temp canvas
-  const tmp     = createCanvas(W, 50);
-  const tCtx    = tmp.getContext('2d');
-  tCtx.font     = `15px ${FONT}`;
-  const lines   = wrapText(tCtx, message, MSG_W);
-  const msgH    = lines.length * LH;
-
-  const H = P + AV + 18 + msgH + 20 + 1 + 14 + 22 + P;
-
-  const canvas = createCanvas(W, H);
-  const ctx    = canvas.getContext('2d');
-
-  // ── Background ─────────────────────────────────────────────────────────────
-  ctx.fillStyle = '#FFFFFF';
-  roundRect(ctx, 0, 0, W, H, 12);
-  ctx.fill();
-
-  // Border
-  ctx.strokeStyle = '#E7E7E7';
-  ctx.lineWidth = 1;
-  roundRect(ctx, 0.5, 0.5, W - 1, H - 1, 12);
-  ctx.stroke();
-
-  let y = P;
-
-  // ── Avatar ─────────────────────────────────────────────────────────────────
-  const ax = P, ay = y, ar = AV / 2;
+async function drawCircularImage(ctx, image, x, y, size, fallback = '#C6CED5') {
+  const radius = size / 2;
   ctx.save();
   ctx.beginPath();
-  ctx.arc(ax + ar, ay + ar, ar, 0, Math.PI * 2);
+  ctx.arc(x + radius, y + radius, radius, 0, Math.PI * 2);
   ctx.clip();
-  try {
-    const buf = Buffer.from(await (await fetch(`${avatarUrl}?size=64`)).arrayBuffer());
-    const img = await loadImage(buf);
-    ctx.drawImage(img, ax, ay, AV, AV);
-  } catch {
-    ctx.fillStyle = '#9CA3AF';
-    ctx.fillRect(ax, ay, AV, AV);
+  if (image) {
+    ctx.drawImage(image, x, y, size, size);
+  } else {
+    ctx.fillStyle = fallback;
+    ctx.fillRect(x, y, size, size);
   }
   ctx.restore();
+}
 
-  // ── Author text ────────────────────────────────────────────────────────────
-  const tx = ax + AV + 12;
-  ctx.fillStyle = '#0F1419';
-  ctx.font      = `bold 15px ${FONT}`;
-  ctx.fillText(authorName, tx, y + 17);
-
-  ctx.fillStyle = '#71767B';
-  ctx.font      = `13px ${FONT}`;
-  ctx.fillText(authorUsername, tx, y + 35);
-
-  // ── Marcados (top right) ───────────────────────────────────────────────────
-  if (taggedTo) {
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#71767B';
-    ctx.font      = `12px ${FONT}`;
-    ctx.fillText('Marcados', W - P, y + 15);
-
-    // Pill badge
-    const pill  = taggedTo.replace(/^@/, '');
-    ctx.font    = `bold 12px ${FONT}`;
-    const pw    = ctx.measureText(pill).width + 16;
-    const px    = W - P - pw;
-    const py    = y + 22;
-    const ph    = 22;
-    ctx.textAlign = 'left';
-
-    ctx.fillStyle = '#EFF3F4';
-    roundRect(ctx, px, py, pw, ph, 11);
+function drawFooterCommentIcon(ctx, x, y) {
+  ctx.save();
+  ctx.fillStyle = '#C6CED5';
+  roundRect(ctx, x, y, 22, 18, 6);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(x + 5, y + 17);
+  ctx.lineTo(x + 4, y + 22);
+  ctx.lineTo(x + 10, y + 18);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#FFFFFF';
+  for (const dotX of [x + 7, x + 11, x + 15]) {
+    ctx.beginPath();
+    ctx.arc(dotX, y + 9, 1.3, 0, Math.PI * 2);
     ctx.fill();
+  }
+  ctx.restore();
+}
 
-    ctx.fillStyle = '#0F1419';
-    ctx.fillText(pill, px + 8, py + 15);
+function getMentionLabel(taggedTo, taggedUsers) {
+  if (taggedUsers?.length) return taggedUsers[0].name;
+  const id = String(taggedTo ?? '').match(/<@!?(\d+)>/)?.[1];
+  return id ? `@${id}` : String(taggedTo ?? '').replace(/^@/, '');
+}
+
+export async function generateTellonymCard({
+  authorName,
+  authorUsername,
+  message,
+  taggedTo,
+  taggedUsers = [],
+  avatarUrl,
+  isAnon,
+}) {
+  const LH = 38;
+  const MSG_W = CONTENT_RIGHT - CONTENT_X;
+  const MESSAGE_FONT = `30px ${FONT}`;
+  const tmp = createCanvas(MSG_W, 80);
+  const tCtx = tmp.getContext('2d');
+  tCtx.font = MESSAGE_FONT;
+  const lines = wrapText(tCtx, message, MSG_W);
+  const messageBaseline = 151;
+  const separatorY = messageBaseline + (lines.length - 1) * LH + 26;
+  const footerBaseline = separatorY + 29;
+  const cardBottom = separatorY + 42;
+  const H = cardBottom + OUTER;
+
+  const canvas = createCanvas(W, H);
+  const ctx = canvas.getContext('2d');
+  const cardY = OUTER;
+  const cardH = H - OUTER * 2;
+
+  // ── Card surface: transparent outside + soft dark shadow ───────────────────
+  ctx.save();
+  ctx.shadowColor = 'rgba(6, 16, 48, 0.72)';
+  ctx.shadowBlur = 18;
+  ctx.shadowOffsetY = 3;
+  ctx.fillStyle = '#FFFFFF';
+  roundRect(ctx, OUTER, cardY, CARD_W, cardH, 26);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.strokeStyle = '#EEF0F2';
+  ctx.lineWidth = 1;
+  roundRect(ctx, OUTER + 0.5, cardY + 0.5, CARD_W - 1, cardH - 1, 26);
+  ctx.stroke();
+
+  const headerY = 52;
+  const authorImage = await loadRemoteImage(avatarUrl);
+  await drawCircularImage(ctx, authorImage, CONTENT_X, headerY, AV);
+
+  // ── Author ──────────────────────────────────────────────────────────────────
+  const authorX = CONTENT_X + AV + 16;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#101318';
+  ctx.font = `700 29px ${FONT}`;
+  ctx.fillText(authorName, authorX, headerY + 29);
+
+  ctx.fillStyle = '#98A1A8';
+  ctx.font = `20px ${FONT}`;
+  ctx.fillText(authorUsername, authorX, headerY + 53);
+
+  // ── Mentioned user ─────────────────────────────────────────────────────────
+  if (taggedTo) {
+    const mentioned = taggedUsers?.[0];
+    const mentionLabel = getMentionLabel(taggedTo, taggedUsers);
+    const remaining = Math.max(0, (taggedUsers?.length ?? 1) - 1);
+    const fullLabel = remaining ? `${mentionLabel} +${remaining}` : mentionLabel;
+    const mentionAvatar = await loadRemoteImage(mentioned?.avatarUrl);
+    const mentionAvatarSize = 30;
+    const pillHeight = 31;
+    const pillGap = 8;
+    const pillY = 91;
+    const maxPillWidth = 160;
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#17191D';
+    ctx.font = `700 18px ${FONT}`;
+    ctx.fillText('Mencionados', CONTENT_RIGHT, headerY + 18);
+
+    ctx.font = `700 16px ${FONT}`;
+    const label = fullLabel.length > 18 ? `${fullLabel.slice(0, 17)}…` : fullLabel;
+    const pillWidth = Math.min(maxPillWidth, ctx.measureText(label).width + 20);
+    const avatarX = CONTENT_RIGHT - mentionAvatarSize;
+    const pillX = avatarX - pillGap - pillWidth;
+    ctx.fillStyle = '#17191D';
+    roundRect(ctx, pillX, pillY, pillWidth, pillHeight, 10);
+    ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, pillX + pillWidth / 2, pillY + 21);
+    await drawCircularImage(ctx, mentionAvatar, avatarX, pillY, mentionAvatarSize);
   }
 
-  y += AV + 18;
-
-  // ── Message ────────────────────────────────────────────────────────────────
-  ctx.fillStyle = '#0F1419';
-  ctx.font      = `15px ${FONT}`;
+  // ── Message ─────────────────────────────────────────────────────────────────
   ctx.textAlign = 'left';
-  for (const l of lines) {
-    ctx.fillText(l, P, y);
+  ctx.fillStyle = '#242A30';
+  ctx.font = MESSAGE_FONT;
+  let y = messageBaseline;
+  for (const line of lines) {
+    ctx.fillText(line, CONTENT_X, y);
     y += LH;
   }
 
-  y += 16;
-
-  // ── Separator ─────────────────────────────────────────────────────────────
-  ctx.strokeStyle = '#EFF3F4';
-  ctx.lineWidth   = 1;
+  // ── Separator + footer ─────────────────────────────────────────────────────
+  ctx.strokeStyle = '#EFF1F2';
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(P, y);
-  ctx.lineTo(W - P, y);
+  ctx.moveTo(CONTENT_X, separatorY);
+  ctx.lineTo(CONTENT_RIGHT, separatorY);
   ctx.stroke();
 
-  y += 14;
-
-  // ── Footer ────────────────────────────────────────────────────────────────
-  ctx.fillStyle = '#71767B';
-  ctx.font      = `13px ${FONT}`;
-  ctx.textAlign = 'left';
-  ctx.fillText('💬', P, y + 14);
+  drawFooterCommentIcon(ctx, CONTENT_X, separatorY + 10);
   ctx.textAlign = 'right';
-  ctx.fillText('há poucos segundos', W - P, y + 14);
+  ctx.fillStyle = '#B5BEC5';
+  ctx.font = `16px ${FONT}`;
+  ctx.fillText('há poucos segundos', CONTENT_RIGHT, footerBaseline);
 
   return canvas.toBuffer('image/png');
 }
