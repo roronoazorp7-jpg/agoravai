@@ -70,3 +70,18 @@ no interactionCreate.js changes needed when only adding new customId suffixes th
 **Why:** Banners defined in code (not DB) to avoid per-guild seeding complexity and keep them consistent. Roles are per-guild because Discord roleIds are guild-specific.
 
 **How to apply:** When adding new banners, add to `BANNERS` array in `shopData.js` — no DB migration needed. Roles always require admin to add via slash command.
+
+## Banner image persistence
+
+Discord attachment URLs are temporary, including URLs on both `cdn.discordapp.com` and
+`media.discordapp.net`. Custom shop banners must be downloaded to the bot's local
+banner storage when created or updated; old external banners are migrated on first
+access. The bot serves that directory over its Railway HTTP port and stores a local
+reference in `CustomBanner.imageUrl`.
+
+**Why:** Refreshing Discord CDN URLs only postpones expiry. A local copy keeps shop
+carousels, previews, and equipped banners independent from Discord attachment expiry.
+
+**How to apply:** Route all custom-banner creation/update paths through the shared
+cache helper and keep carousel/detail paths using the shared resolver so old records
+are migrated instead of reading `imageUrl` directly.
