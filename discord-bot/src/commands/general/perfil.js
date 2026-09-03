@@ -8,11 +8,6 @@ import {
 } from 'discord.js';
 import prisma from '../../database/client.js';
 import { generateProfileCard }         from '../../utils/profileCard.js';
-import {
-  generateAnimatedProfileCard,
-  generateStaticProfileGifCard,
-  isGifUrl,
-} from '../../utils/animatedProfileCard.js';
 import { resolveBanner }               from '../../utils/shopData.js';
 import { getEmoji }                    from '../../utils/emojiManager.js';
 
@@ -37,34 +32,13 @@ async function fetchProfileData(userId, guildId) {
 
 async function renderProfileAttachment(cardParams) {
   const banner = await resolveBanner(cardParams.activeBanner, cardParams.guildId);
-  const bannerIsGif = banner?.imageUrl ? await isGifUrl(banner.imageUrl) : false;
-
-  if (bannerIsGif) {
-    try {
-      // Não usar Promise.race aqui: a renderização nativa não pode ser cancelada
-      // com segurança. Iniciar o fallback antes dela terminar trava o canvas.
-      const buf = await generateAnimatedProfileCard({
-        ...cardParams,
-        _resolvedBanner: banner,
-      });
-      return { buf, filename: 'perfil.gif' };
-    } catch (error) {
-      console.error('[perfil] Falha no card GIF animado; usando GIF de um frame:', error?.message ?? error);
-      return {
-        buf: await generateStaticProfileGifCard({
-          ...cardParams,
-          _resolvedBanner: banner,
-        }),
-        filename: 'perfil.gif',
-      };
-    }
-  }
+  const bannerIsGif = /\.gif(?:[?#].*)?$/i.test(banner?.imageUrl ?? '');
+  const renderParams = bannerIsGif
+    ? { ...cardParams, activeBanner: null, _resolvedBanner: null }
+    : { ...cardParams, _resolvedBanner: banner };
 
   return {
-    buf: await generateProfileCard({
-      ...cardParams,
-      _resolvedBanner: banner,
-    }),
+    buf: await generateProfileCard(renderParams),
     filename: 'perfil.png',
   };
 }
@@ -165,7 +139,7 @@ export default {
     } catch (error) {
       console.error('[perfil] Falha ao responder slash:', error?.stack ?? error);
       return interaction.editReply({
-        content: '❌ Não consegui carregar seu perfil agora. O banner GIF foi preservado; tente novamente em alguns segundos.',
+        content: '❌ Não consegui carregar seu perfil agora. Tente novamente em alguns segundos.',
         components: [],
       }).catch(() => {});
     }
