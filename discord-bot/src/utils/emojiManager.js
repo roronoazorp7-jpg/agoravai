@@ -57,6 +57,8 @@ const REQUIRED_EMOJIS = [
   { name: 'tell_paperplane', asset: 'tell-paperplane.png', mime: 'image/png', fallback: '💬' },
   { name: 'tell_message',    asset: 'tell-message.png',    mime: 'image/png', fallback: '💭' },
   { name: 'tell_hearts',     asset: 'tell-hearts.png',     mime: 'image/png',  fallback: '🗨️' },
+  // ── Controles de cards ───────────────────────────────────────────────────────
+  { name: 'refresh_button',  asset: 'refresh-button.png', mime: 'image/png', fallback: '🔄' },
   // ── Moderação ────────────────────────────────────────────────────────────────
   { name: 'mod_heart', asset: 'mod-heart.png', mime: 'image/png', fallback: '❤️' },
 ];

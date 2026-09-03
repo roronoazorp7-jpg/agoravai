@@ -14,6 +14,9 @@ import {
   isGifUrl,
 } from '../../utils/animatedProfileCard.js';
 import { resolveBanner }               from '../../utils/shopData.js';
+import { getEmoji }                    from '../../utils/emojiManager.js';
+
+const REFRESH = () => getEmoji('refresh_button');
 
 async function getGuildBadgeEmojis(guildId) {
   const overrides = await prisma.guildBadgeEmoji.findMany({ where: { guildId } }).catch(() => []);
@@ -88,7 +91,7 @@ export function profileRefreshRow(userId) {
     new ButtonBuilder()
       .setCustomId(`profile_refresh:${userId}`)
       .setLabel('Atualizar')
-      .setEmoji('🔄')
+      .setEmoji(REFRESH())
       .setStyle(ButtonStyle.Secondary),
   );
 }

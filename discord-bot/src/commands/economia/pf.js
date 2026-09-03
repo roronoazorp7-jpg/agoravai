@@ -9,6 +9,9 @@ import {
 } from 'discord.js';
 import prisma from '../../database/client.js';
 import { generateBalanceCard } from '../../utils/economyCards.js';
+import { getEmoji } from '../../utils/emojiManager.js';
+
+const REFRESH = () => getEmoji('refresh_button');
 
 // ─── VIP helpers ─────────────────────────────────────────────────────────────
 
@@ -84,7 +87,7 @@ export function walletRefreshRow(userId) {
     new ButtonBuilder()
       .setCustomId(`wallet_refresh:${userId}`)
       .setLabel('Atualizar')
-      .setEmoji('🔄')
+      .setEmoji(REFRESH())
       .setStyle(ButtonStyle.Secondary),
   );
 }
