@@ -25,6 +25,7 @@ import { generateTranscript } from '../utils/transcript.js';
 import { baseEmbed, buildConfigEmbed, errorEmbed, successEmbed, v2Simple, Colors } from '../utils/embed.js';
 import { ACTIONS, REJECTION_GIFS, buildInteractionEmbed, fetchGif } from '../commands/interacoes/interacoes.js';
 import { generateTellonymCard } from '../utils/cardGenerator.js';
+import { getEmoji } from '../utils/emojiManager.js';
 import { buildWeddingCardPayload, getMarriageStats } from '../utils/weddingCard.js';
 import { likesMap, postDataMap } from '../utils/instaState.js';
 import { buildTicketConfigPayload, buildTellonymConfigPayload, buildWelcomeConfigPayload, buildWelcomeV2, buildTicketPanelV2, buildTellonymPanelV2, buildTellonymComposerPanelV2, buildTellonymIdentityPanelV2, DEFAULT_TICKET_TEXT, DEFAULT_TICKET_OPEN_TEXT, DEFAULT_TELLONYM_TEXT, formatDeleteTime } from '../utils/configPanels.js';
@@ -4180,9 +4181,9 @@ async function sendTellonymMsg(interaction, msg, toText, identityAnon = true) {
     const imgBuf     = await generateTellonymCard({ authorName, authorUsername: authorSub, message: msg, taggedTo: toText ?? null, avatarUrl, isAnon });
     const attachment = new AttachmentBuilder(imgBuf, { name: 'tellonym.png' });
     const cardRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('tellonym_reply').setLabel('Responder').setEmoji('💬').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId('tellonym_comment').setLabel('Comentar').setEmoji('💭').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId('tellonym_comments').setLabel('Comentários (0)').setEmoji('🗨️').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('tellonym_reply').setLabel('Responder').setEmoji(getEmoji('tell_paperplane')).setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('tellonym_comment').setLabel('Comentar').setEmoji(getEmoji('tell_message')).setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('tellonym_comments').setLabel('Comentários (0)').setEmoji(getEmoji('tell_hearts')).setStyle(ButtonStyle.Secondary),
     );
     await targetChannel.send({
       content: toText ? `**Para:** ${toText}` : '**Para:** comunidade',

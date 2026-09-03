@@ -53,6 +53,10 @@ const REQUIRED_EMOJIS = [
   { name: 'pet_ball',  asset: 'pet-ball.png',  mime: 'image/png', fallback: '🎾' },
   { name: 'pet_value',   asset: 'pet-value.webp',   mime: 'image/webp', fallback: '▶️' },
   { name: 'pet_balance', asset: 'pet-balance.webp', mime: 'image/webp', fallback: '💲' },
+  // ── Tellonym ────────────────────────────────────────────────────────────────
+  { name: 'tell_paperplane', asset: 'tell-paperplane.png', mime: 'image/png', fallback: '💬' },
+  { name: 'tell_message',    asset: 'tell-message.png',    mime: 'image/png', fallback: '💭' },
+  { name: 'tell_hearts',     asset: 'tell-hearts.png',     mime: 'image/png',  fallback: '🗨️' },
   // ── Moderação ────────────────────────────────────────────────────────────────
   { name: 'mod_heart', asset: 'mod-heart.png', mime: 'image/png', fallback: '❤️' },
 ];
