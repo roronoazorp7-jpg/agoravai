@@ -97,6 +97,7 @@ import {
   handleBoostCfgBtn,
   handleBumpCfgBtn,
   handleBumpCfgChannelSelect,
+  handleBumpCfgRoleSelect,
   handlePresencedCfgBtn,
   handlePresencedCfgModal,
 } from '../utils/painelHandlers.js';
@@ -640,6 +641,10 @@ export default {
 
         if (interaction.customId === 'bump_channel_select') {
           return handleBumpCfgChannelSelect(interaction);
+        }
+
+        if (interaction.customId === 'bump_role_select') {
+          return handleBumpCfgRoleSelect(interaction);
         }
 
         if (interaction.customId === 'chansel_wc') {

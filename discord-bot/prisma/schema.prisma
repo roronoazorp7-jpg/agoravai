@@ -110,6 +110,7 @@ model GuildConfig {
 
   bumpEnabled  Boolean  @default(false)
   bumpChannel  String?
+  bumpRole     String?
   bumpNextAt   DateTime?
 
   tellonymChannel  String?

@@ -232,6 +232,8 @@ export async function ensureMarriageSchema() {
           THEN ALTER TABLE "GuildConfig" ADD COLUMN "bumpEnabled" BOOLEAN NOT NULL DEFAULT false; END IF;
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'GuildConfig' AND column_name = 'bumpChannel')
           THEN ALTER TABLE "GuildConfig" ADD COLUMN "bumpChannel" TEXT; END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'GuildConfig' AND column_name = 'bumpRole')
+          THEN ALTER TABLE "GuildConfig" ADD COLUMN "bumpRole" TEXT; END IF;
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'GuildConfig' AND column_name = 'bumpNextAt')
           THEN ALTER TABLE "GuildConfig" ADD COLUMN "bumpNextAt" TIMESTAMP(3); END IF;
       END IF;

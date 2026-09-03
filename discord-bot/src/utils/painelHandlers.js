@@ -206,6 +206,7 @@ export function buildBumpConfigPayload(cfg) {
       '',
       'O bot reconhece a confirmação do DISBOARD e avisa quando o próximo bump estiver liberado.',
       `**Canal:** ${cfg.bumpChannel ? `<#${cfg.bumpChannel}>` : 'não configurado'}`,
+      `**Cargo marcado:** ${cfg.bumpRole ? `<@&${cfg.bumpRole}>` : 'nenhum'}`,
       `**Próximo bump:** ${cfg.bumpNextAt ? `<t:${Math.floor(new Date(cfg.bumpNextAt).getTime() / 1000)}:R>` : 'aguardando um bump'}`,
     ].join('\n')))
     .addActionRowComponents(new ActionRowBuilder().addComponents(
@@ -218,6 +219,11 @@ export function buildBumpConfigPayload(cfg) {
         .setLabel('Limpar canal')
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(!cfg.bumpChannel),
+      new ButtonBuilder()
+        .setCustomId('bump_role_clear')
+        .setLabel('Limpar cargo')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(!cfg.bumpRole),
     ))
     .addActionRowComponents(new ActionRowBuilder().addComponents(
       new ChannelSelectMenuBuilder()
@@ -225,6 +231,11 @@ export function buildBumpConfigPayload(cfg) {
         .setPlaceholder('Escolha o canal dos lembretes')
         .setChannelTypes(0),
     ));
+  c.addActionRowComponents(new ActionRowBuilder().addComponents(
+    new RoleSelectMenuBuilder()
+      .setCustomId('bump_role_select')
+      .setPlaceholder('Escolha o cargo que será marcado'),
+  ));
   return { components: [c, voltarRow()], flags: MessageFlags.IsComponentsV2 };
 }
 
@@ -236,6 +247,18 @@ export async function handleBumpCfgChannelSelect(interaction) {
     where: { guildId: interaction.guildId },
     create: { guildId: interaction.guildId, bumpChannel: interaction.values[0] },
     update: { bumpChannel: interaction.values[0] },
+  });
+  return interaction.update(buildBumpConfigPayload(await getCfg(interaction.guildId)));
+}
+
+export async function handleBumpCfgRoleSelect(interaction) {
+  if (!interaction.memberPermissions?.has(0x20n)) {
+    return interaction.reply({ content: '❌ Sem permissão.', flags: 64 });
+  }
+  await prisma.guildConfig.upsert({
+    where: { guildId: interaction.guildId },
+    create: { guildId: interaction.guildId, bumpRole: interaction.values[0] },
+    update: { bumpRole: interaction.values[0] },
   });
   return interaction.update(buildBumpConfigPayload(await getCfg(interaction.guildId)));
 }
@@ -254,6 +277,11 @@ export async function handleBumpCfgBtn(interaction) {
     await prisma.guildConfig.update({
       where: { guildId: interaction.guildId },
       data: { bumpChannel: null, bumpNextAt: null },
+    });
+  } else if (interaction.customId === 'bump_role_clear') {
+    await prisma.guildConfig.update({
+      where: { guildId: interaction.guildId },
+      data: { bumpRole: null },
     });
   }
   return interaction.update(buildBumpConfigPayload(await getCfg(interaction.guildId)));

@@ -86,9 +86,13 @@ export async function checkBumpReminders(client, now = new Date()) {
     }
 
     try {
+      const roleMention = cfg.bumpRole ? `<@&${cfg.bumpRole}> ` : '';
       await channel.send({
-        content: '🔔 **Já está liberado!** Use `/bump` para divulgar o servidor novamente.',
-        allowedMentions: { parse: [] },
+        content: `${roleMention}🔔 **Já está liberado!** Use \`/bump\` para divulgar o servidor novamente.`,
+        allowedMentions: {
+          parse: [],
+          roles: cfg.bumpRole ? [cfg.bumpRole] : [],
+        },
       });
       await prisma.guildConfig.update({
         where: { guildId: cfg.guildId },
