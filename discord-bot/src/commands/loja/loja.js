@@ -16,6 +16,7 @@ import {
 import prisma from '../../database/client.js';
 import { getEmoji } from '../../utils/emojiManager.js';
 import { buildLojaAdminPayload } from '../../utils/shopHandlers.js';
+import { buildBannerUrl } from '../../utils/shopData.js';
 
 const COIN          = () => getEmoji('futecoins');
 const DEFAULT_CONV  = () => `> \`1000 mensagens\` → **500 ${COIN()}**\n> \`1 hora em call\` → **500 ${COIN()}**`;
@@ -31,47 +32,16 @@ function parseEmoji(str) {
   return str;
 }
 
-function currentServerBanner(guild) {
-  try {
-    return guild?.bannerURL?.({
-      extension: 'png',
-      size: 1024,
-      forceStatic: true,
-    }) ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function isDiscordCdnImage(url) {
-  try {
-    const parsed = new URL(url);
-    return (
-      (parsed.hostname === 'cdn.discordapp.com' || parsed.hostname === 'media.discordapp.net')
-      && (parsed.pathname.includes('/attachments/') || parsed.pathname.includes('/banners/'))
-    );
-  } catch {
-    return false;
-  }
-}
-
-function resolveShopImage(configuredUrl, serverBanner) {
-  if (!configuredUrl) return null;
-  // Discord attachment URLs contain temporary signatures. When the shop image
-  // was copied from the server banner, always rebuild it from the live Guild.
-  if (isDiscordCdnImage(configuredUrl)) return serverBanner;
-  return configuredUrl;
-}
-
 // ─── Painel público em Components V2 (sem barra lateral por padrão) ──────────
 export function buildShopMain(guild, cfg = {}) {
   const title    = cfg.lojaTitle  ?? `🛒 Loja do ${guild.name}`;
   const conv     = cfg.lojaConversao ?? DEFAULT_CONV();
   const bodyText = cfg.lojaText   ?? DEFAULT_TEXT();
   const useDivider = cfg.lojaUseDivider ?? false;
-  const serverBanner = currentServerBanner(guild);
-  const shopBanner = resolveShopImage(cfg.lojaBanner, serverBanner);
-  const shopThumb = resolveShopImage(cfg.lojaThumb, serverBanner);
+  // A loja não herda o banner do servidor. Exibe somente imagens configuradas
+  // pelo administrador no painel de configuração da loja.
+  const shopBanner = buildBannerUrl(cfg.lojaBanner);
+  const shopThumb = buildBannerUrl(cfg.lojaThumb);
 
   const sep  = useDivider ? `\n${DIVIDER}\n\n` : '\n\n';
   const fullText = `## ${title}\n\n${bodyText}${sep}**Conversão 🪙**\n${conv}`;

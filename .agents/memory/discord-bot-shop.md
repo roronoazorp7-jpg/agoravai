@@ -85,3 +85,15 @@ carousels, previews, and equipped banners independent from Discord attachment ex
 **How to apply:** Route all custom-banner creation/update paths through the shared
 cache helper and keep carousel/detail paths using the shared resolver so old records
 are migrated instead of reading `imageUrl` directly.
+
+## Shop panel banner configuration
+
+The public shop panel must show only the image saved in `GuildConfig.lojaBanner`;
+it must not fall back to or reinterpret the guild's own Discord banner. An empty
+configuration intentionally means that the shop has no banner.
+
+**Why:** The server banner prevented administrators from changing the shop visual
+through `loja config` and made the shop inherit an unrelated guild asset.
+
+**How to apply:** Keep the shop banner independent from `guild.bannerURL()` and
+use the shared banner URL builder only for the explicitly configured shop image.
