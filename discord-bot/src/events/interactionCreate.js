@@ -104,6 +104,12 @@ import {
   handlePresencedCfgBtn,
   handlePresencedCfgModal,
 } from '../utils/painelHandlers.js';
+import {
+  GLOBAL_MESSAGE_OWNER_ID,
+  isGlobalMessageOwner,
+  startGlobalMessageJob,
+  buildGlobalMessageConfirmPayload,
+} from '../utils/globalMessage.js';
 
 const tellonymSessions = new Map();
 const tellonymSessionKey = (interaction) => `${interaction.guildId}:${interaction.user.id}`;
@@ -2819,6 +2825,76 @@ export default {
             await refreshMsgPreview(session, interaction.guild);
           }
 
+          if (customId === 'msg_global_send') {
+            if (!isGlobalMessageOwner(interaction.user.id)) {
+              return interaction.reply({ content: '❌ Este painel é exclusivo do proprietário do bot.', ephemeral: true });
+            }
+            if (!session?.globalMode) {
+              return interaction.reply({ content: '❌ Sessão global expirada.', ephemeral: true });
+            }
+            if (msgTotalCount(session) === 0) {
+              return interaction.reply({ content: '❌ Adicione pelo menos um item antes de enviar.', ephemeral: true });
+            }
+            return interaction.update(buildGlobalMessageConfirmPayload(session));
+          }
+
+          if (customId === 'msg_global_abort') {
+            if (!isGlobalMessageOwner(interaction.user.id)) {
+              return interaction.reply({ content: '❌ Este painel é exclusivo do proprietário do bot.', ephemeral: true });
+            }
+            if (!session?.globalMode) {
+              return interaction.update({ content: '❌ Sessão global expirada.', components: [] });
+            }
+            return interaction.update({
+              content: `**📣 Painel de Mensagem Global**\nTotal: **${msgTotalCount(session)}** item(s).`,
+              embeds: [],
+              components: buildMsgMainControls(session),
+            });
+          }
+
+          if (customId === 'msg_global_confirm') {
+            if (!isGlobalMessageOwner(interaction.user.id)) {
+              return interaction.reply({ content: '❌ Este painel é exclusivo do proprietário do bot.', ephemeral: true });
+            }
+            if (!session?.globalMode) {
+              return interaction.update({ content: '❌ Sessão global expirada.', components: [] });
+            }
+            if (msgTotalCount(session) === 0) {
+              return interaction.update({ content: '❌ A mensagem está vazia. Sessão encerrada.', components: [] });
+            }
+
+            const job = startGlobalMessageJob(
+              interaction.client,
+              buildMsgPayload(session),
+              GLOBAL_MESSAGE_OWNER_ID,
+            );
+            if (!job) {
+              return interaction.update({
+                content: '⚠️ Já existe um envio global em andamento.',
+                embeds: [],
+                components: [],
+              });
+            }
+
+            try {
+              const ch = interaction.guild?.channels.cache.get(session.previewChannelId);
+              const preview = ch
+                ? await ch.messages.fetch(session.previewMessageId).catch(() => null)
+                : null;
+              await preview?.delete().catch(() => {});
+            } catch {}
+
+            deleteMsgSession(interaction.user.id, interaction.guildId);
+            return interaction.update({
+              content:
+                '🚀 **Envio global iniciado!**\n' +
+                'O bot está coletando os membros e enviando as DMs em segundo plano. ' +
+                'Você receberá um resumo ao terminar.',
+              embeds: [],
+              components: [],
+            });
+          }
+
           if (customId === 'msg_back') {
             if (!session) return interaction.update({ content: '❌ Sessão expirada.', components: [] });
             return interaction.update({
@@ -2829,6 +2905,9 @@ export default {
 
           if (customId === 'msg_add_role') {
             if (!session) return interaction.reply({ content: '❌ Sessão expirada. Use `/montar-mensagem` novamente.', ephemeral: true });
+            if (session.globalMode) {
+              return interaction.reply({ content: '❌ Cargos não podem ser usados em mensagens globais por DM.', ephemeral: true });
+            }
             return interaction.update({
               content: '**💬 Montador de Mensagem**\n👤 Selecione os cargos que deseja adicionar:',
               components: buildRoleSelector(),
@@ -2918,12 +2997,15 @@ export default {
             if (!session) return interaction.reply({ content: '❌ Sessão expirada.', ephemeral: true });
             return interaction.update({
               content: '**💬 Montador de Mensagem**\n🔘 Que tipo de botão deseja adicionar?',
-              components: buildMsgButtonTypeSelector(),
+              components: buildMsgButtonTypeSelector(session.globalMode),
             });
           }
 
           if (customId === 'msg_btn_info') {
             if (!session) return interaction.reply({ content: '❌ Sessão expirada.', ephemeral: true });
+            if (session.globalMode) {
+              return interaction.reply({ content: '❌ Botões de informação não funcionam em mensagens globais por DM. Use um botão de link.', ephemeral: true });
+            }
             const modal = new ModalBuilder().setCustomId('msg_modal_btn_info').setTitle('💬 Botão — Info');
             modal.addComponents(
               new ActionRowBuilder().addComponents(
@@ -2956,6 +3038,9 @@ export default {
           // ── Adicionar Cargos (menu dropdown automático) ───────────────────
           if (customId === 'msg_add_cargos') {
             if (!session) return interaction.reply({ content: '❌ Sessão expirada.', ephemeral: true });
+            if (session.globalMode) {
+              return interaction.reply({ content: '❌ Menus de cargos não podem ser usados em mensagens globais por DM.', ephemeral: true });
+            }
             return interaction.update({
               content: '**💬 Montador de Mensagem**\n➕ Selecione os cargos que vão aparecer no menu dropdown:',
               components: buildCargoRoleSelector(),
@@ -2990,6 +3075,7 @@ export default {
           if (customId === 'msg_publish') {
             if (!session) return interaction.reply({ content: '❌ Sessão expirada.', ephemeral: true });
             if (msgTotalCount(session) === 0) return interaction.reply({ content: '❌ Adicione pelo menos um item antes de publicar.', ephemeral: true });
+            if (session.globalMode) return interaction.update(buildGlobalMessageConfirmPayload(session));
             const persistData = {};
             if (session.selectMenu?.options?.length > 0) {
               publishedMenus.set(session.previewMessageId, session.selectMenu);

@@ -26,10 +26,11 @@ export const publishedInfoBtns = new Map();
 
 function key(userId, guildId) { return `${guildId}_${userId}`; }
 
-export function createMsgSession(userId, guildId) {
+export function createMsgSession(userId, guildId, options = {}) {
   const s = {
     userId,
     guildId,
+    globalMode:   options.globalMode === true,
     accentColor: 0x5865F2,
     blocks: [],
     thumbnail:   null,
@@ -268,13 +269,14 @@ export function buildMsgPayload(session) {
 
 export function buildMsgMainControls(session) {
   const total = msgTotalCount(session);
+  const isGlobal = session.globalMode === true;
   return [
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('msg_add_role').setLabel('Cargo').setStyle(ButtonStyle.Primary).setEmoji('👤'),
+      new ButtonBuilder().setCustomId('msg_add_role').setLabel('Cargo').setStyle(ButtonStyle.Primary).setEmoji('👤').setDisabled(isGlobal),
       new ButtonBuilder().setCustomId('msg_add_text').setLabel('Texto').setStyle(ButtonStyle.Primary).setEmoji('📝'),
       new ButtonBuilder().setCustomId('msg_add_sep').setLabel('Texto 2').setStyle(ButtonStyle.Secondary).setEmoji('➕'),
       new ButtonBuilder().setCustomId('msg_color').setLabel('Cor').setStyle(ButtonStyle.Secondary).setEmoji('🎨'),
-      new ButtonBuilder().setCustomId('msg_add_cargos').setLabel('Adicionar Cargos').setStyle(ButtonStyle.Secondary).setEmoji('➕'),
+      new ButtonBuilder().setCustomId('msg_add_cargos').setLabel('Adicionar Cargos').setStyle(ButtonStyle.Secondary).setEmoji('➕').setDisabled(isGlobal),
     ),
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('msg_banner').setLabel('Banner').setStyle(ButtonStyle.Secondary).setEmoji('🖼️'),
@@ -284,13 +286,27 @@ export function buildMsgMainControls(session) {
     ),
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('msg_remove_last').setLabel('Remover Último').setStyle(ButtonStyle.Danger).setEmoji('🗑️').setDisabled(total === 0),
-      new ButtonBuilder().setCustomId('msg_publish').setLabel('Publicar').setStyle(ButtonStyle.Success).setEmoji('✅').setDisabled(total === 0),
+      new ButtonBuilder()
+        .setCustomId(isGlobal ? 'msg_global_send' : 'msg_publish')
+        .setLabel(isGlobal ? 'Enviar para todos' : 'Publicar')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji(isGlobal ? '📣' : '✅')
+        .setDisabled(total === 0),
       new ButtonBuilder().setCustomId('msg_cancel').setLabel('Cancelar').setStyle(ButtonStyle.Danger).setEmoji('❌'),
     ),
   ];
 }
 
-export function buildMsgButtonTypeSelector() {
+export function buildMsgButtonTypeSelector(globalMode = false) {
+  if (globalMode) {
+    return [
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('msg_btn_link').setLabel('🔗 Link (abre URL)').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('msg_back').setLabel('Voltar').setStyle(ButtonStyle.Danger).setEmoji('↩️'),
+      ),
+    ];
+  }
+
   return [
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('msg_btn_info').setLabel('💬 Info (mostra texto)').setStyle(ButtonStyle.Primary),
