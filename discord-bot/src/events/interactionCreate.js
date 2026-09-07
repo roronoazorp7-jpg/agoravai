@@ -578,6 +578,15 @@ export default {
 
       // ── STRING SELECT MENUS ────────────────────────────────────────────────
       if (interaction.isStringSelectMenu()) {
+        if (
+          interaction.customId.startsWith('survival_biome:')
+          || interaction.customId.startsWith('survival_lobby:')
+          || interaction.customId.startsWith('survival_decision:')
+          || interaction.customId.startsWith('survival_control:')
+        ) {
+          return handleSurvivalInteraction(interaction);
+        }
+
         if (interaction.customId === 'trigger_delete_select') {
           return handleTriggerButton(interaction);
         }
