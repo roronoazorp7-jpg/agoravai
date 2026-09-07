@@ -3,7 +3,11 @@ import {
   AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder,
+  ContainerBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
+  MessageFlags,
+  TextDisplayBuilder,
 } from 'discord.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -21,7 +25,7 @@ const games = new Map();
 const SCENARIOS = [
   {
     key: 'storm',
-    image: 'survival-storm.png',
+    image: 'survival-storm-banner.png',
     title: '🌩️ Rodada 1 — A tempestade',
     text: 'O céu ficou preto. A chuva está levando os suprimentos e um raio atingiu a velha torre de rádio.',
     choices: [
@@ -32,7 +36,7 @@ const SCENARIOS = [
   },
   {
     key: 'cave',
-    image: 'survival-cave.png',
+    image: 'survival-cave-banner.png',
     title: '🕯️ Rodada 2 — A noite na caverna',
     text: 'A escuridão caiu. Há marcas estranhas nas paredes e o grupo precisa decidir como passar a noite.',
     choices: [
@@ -43,7 +47,7 @@ const SCENARIOS = [
   },
   {
     key: 'tower',
-    image: 'survival-tower.png',
+    image: 'survival-tower-banner.png',
     title: '📡 Rodada 3 — O sinal',
     text: 'A torre está acima da linha das árvores. Um último esforço pode fazer o sinal alcançar o continente.',
     choices: [
@@ -54,7 +58,7 @@ const SCENARIOS = [
   },
   {
     key: 'rescue',
-    image: 'survival-rescue.png',
+    image: 'survival-rescue-banner.png',
     title: '🚁 Rodada 4 — A última chance',
     text: 'Um helicóptero apareceu no horizonte. O grupo tem poucos minutos para escolher como será visto.',
     choices: [
@@ -119,29 +123,29 @@ function choiceButton(game, choice, counts) {
 }
 
 function buildLobbyPayload(game) {
-  const embed = new EmbedBuilder()
-    .setColor(0x1D9BF0)
-    .setTitle('🏕️ SOBREVIVÊNCIA: ILHA ZERO')
-    .setDescription(
-      'Um sinal de emergência foi detectado em uma ilha desconhecida.\n' +
-      'Entrem no grupo, tomem decisões juntos e tentem sobreviver até o resgate.\n\n' +
-      '**Como funciona:**\n' +
-      '• Todos votam em uma decisão por rodada.\n' +
-      '• A maioria muda o destino do grupo.\n' +
-      '• Riscos podem ferir ou eliminar sobreviventes.\n' +
-      '• A equipe precisa acumular sinal antes do último resgate.',
+  const panel = new ContainerBuilder()
+    .addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(
+        new MediaGalleryItemBuilder().setURL('attachment://survival-lobby-banner.png'),
+      ),
     )
-    .addFields(
-      { name: '👥 Participantes', value: playerList(game), inline: true },
-      { name: '🎯 Objetivo', value: 'Sobreviver a 4 rodadas e alcançar o resgate.', inline: true },
-    )
-    .setFooter({ text: `Partida criada por ${game.hostName} • Máximo de ${MAX_PLAYERS} jogadores` })
-    .setImage('attachment://survival-lobby.png');
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent([
+      '# 🏕️ SOBREVIVÊNCIA: ILHA ZERO',
+      'Um sinal de emergência foi detectado. Entrem no grupo e sobrevivam juntos até o resgate.',
+      '',
+      '**Como funciona**',
+      'Vote em uma decisão por rodada. A maioria define o caminho, enquanto os riscos podem ferir ou eliminar sobreviventes.',
+      '',
+      `**👥 Participantes** ${game.players.size}/${MAX_PLAYERS}`,
+      playerList(game),
+      '',
+      '**🎯 Objetivo** Sobreviver a 4 rodadas e alcançar o resgate.',
+      `_Criada por ${game.hostName}_`,
+    ].join('\n')));
 
   return {
-    embeds: [embed],
-    files: [new AttachmentBuilder(assetPath('survival-lobby.png'), { name: 'survival-lobby.png' })],
-    components: [
+    files: [new AttachmentBuilder(assetPath('survival-lobby-banner.png'), { name: 'survival-lobby-banner.png' })],
+    components: [panel,
       new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId(`survival_join:${game.id}`)
@@ -172,6 +176,7 @@ function buildLobbyPayload(game) {
           .setStyle(ButtonStyle.Danger),
       ),
     ],
+    flags: MessageFlags.IsComponentsV2,
   };
 }
 
@@ -184,21 +189,25 @@ function buildRoundPayload(game) {
     ? `\n\n**Último acontecimento:** ${game.history.at(-1)}`
     : '';
 
-  const embed = new EmbedBuilder()
-    .setColor(0xF59E0B)
-    .setTitle(`${scenario.title} • ${game.round + 1}/${SCENARIOS.length}`)
-    .setDescription(
-      `${scenario.text}${history}\n\n` +
-      `**Votação:** ${voted}/${alive.length} sobreviventes já escolheram.\n` +
-      `${formatStats(game)}`,
+  const panel = new ContainerBuilder()
+    .addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(
+        new MediaGalleryItemBuilder().setURL(`attachment://${scenario.image}`),
+      ),
     )
-    .addFields({
-      name: '🧭 Jogadores na expedição',
-      value: playerList(game),
-      inline: false,
-    })
-    .setFooter({ text: 'A decisão da maioria define o próximo capítulo • Você pode trocar seu voto' })
-    .setImage(`attachment://${scenario.image}`);
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent([
+      `# ${scenario.title} · ${game.round + 1}/${SCENARIOS.length}`,
+      scenario.text,
+      history ? `**Último acontecimento** ${game.history.at(-1)}` : '',
+      '',
+      `**Votação** ${voted}/${alive.length} sobreviventes já escolheram.`,
+      `**${formatStats(game)}**`,
+      '',
+      '**🧭 Expedição**',
+      playerList(game),
+      '',
+      '💬 Conversem no canal antes de votar. A rodada fecha em 30s ou quando todos escolherem.',
+    ].filter(Boolean).join('\n')));
 
   const rows = [];
   for (let i = 0; i < scenario.choices.length; i += 5) {
@@ -225,40 +234,40 @@ function buildRoundPayload(game) {
   ));
 
   return {
-    content:
-      '💬 **Conversem no chat deste canal antes de votar!** ' +
-      `A rodada fecha automaticamente em ${VOTE_TIMEOUT_MS / 1000}s, ou assim que todos escolherem.`,
-    embeds: [embed],
+    components: [panel, ...rows],
     files: [new AttachmentBuilder(assetPath(scenario.image), { name: scenario.image })],
-    components: rows,
+    flags: MessageFlags.IsComponentsV2,
   };
 }
 
 function buildFinishedPayload(game) {
   const won = game.result === 'won';
   const alive = activePlayers(game);
-  const embed = new EmbedBuilder()
-    .setColor(won ? 0x57F287 : 0xED4245)
-    .setTitle(won ? '🚁 RESGATE CONFIRMADO!' : '🌑 A ILHA VENCEU')
-    .setDescription(
+  const panel = new ContainerBuilder()
+    .addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(
+        new MediaGalleryItemBuilder().setURL(`attachment://${game.resultImage}`),
+      ),
+    )
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent([
+      `# ${won ? '🚁 RESGATE CONFIRMADO!' : '🌑 A ILHA VENCEU'}`,
       won
-        ? `O sinal finalmente alcançou o continente. **${alive.length}** sobrevivente(s) saíram da ilha!\n\n${game.history.join('\n')}`
-        : `O grupo perdeu o sinal e os últimos suprimentos. A expedição terminou com **${alive.length}** sobrevivente(s).\n\n${game.history.join('\n')}`,
-    )
-    .addFields(
-      { name: '🏆 Resultado', value: won ? 'Vitória cooperativa' : 'Derrota coletiva', inline: true },
-      { name: '🧰 Suprimentos finais', value: String(Math.max(0, game.supplies)), inline: true },
-      { name: '📡 Sinal final', value: String(Math.max(0, game.signal)), inline: true },
-      { name: '🎁 Recompensa', value: won ? '750 moedas para vivos • 250 para eliminados' : '150 moedas pela participação', inline: false },
-    )
-    .setFooter({ text: 'Uma nova expedição pode ser criada quando esta partida terminar.' })
-    .setImage(`attachment://${game.resultImage}`);
+        ? `O sinal alcançou o continente. **${alive.length}** sobrevivente(s) saíram da ilha!`
+        : `O grupo perdeu o sinal. A expedição terminou com **${alive.length}** sobrevivente(s).`,
+      '',
+      `**🏆 Resultado** ${won ? 'Vitória cooperativa' : 'Derrota coletiva'}`,
+      `**🧰 Suprimentos** ${Math.max(0, game.supplies)}  •  **📡 Sinal** ${Math.max(0, game.signal)}`,
+      `**🎁 Recompensa** ${won ? '750 moedas para vivos • 250 para eliminados' : '150 moedas pela participação'}`,
+      '',
+      `**Últimos acontecimentos**\n${game.history.slice(-4).join('\n')}`,
+      '',
+      'Uma nova expedição pode ser criada quando esta partida terminar.',
+    ].join('\n')));
 
   return {
-    content: '🏁 **Expedição encerrada.** Obrigado a todos que participaram da história.',
-    embeds: [embed],
+    components: [panel],
     files: [new AttachmentBuilder(assetPath(game.resultImage), { name: game.resultImage })],
-    components: [],
+    flags: MessageFlags.IsComponentsV2,
   };
 }
 
@@ -322,7 +331,7 @@ export function createSurvivalGame({ guildId, channelId, hostId, hostName, clien
     history: [],
     timer: null,
     result: null,
-    resultImage: 'survival-rescue.png',
+    resultImage: 'survival-rescue-banner.png',
     rewardsPaid: false,
     lastTagAt: 0,
   };
@@ -466,11 +475,11 @@ async function resolveRound(client, game) {
   if (!activePlayers(game).length) {
     game.stage = 'finished';
     game.result = 'lost';
-    game.resultImage = 'survival-storm.png';
+    game.resultImage = 'survival-storm-banner.png';
   } else if (game.round >= SCENARIOS.length - 1) {
     game.stage = 'finished';
     game.result = game.signal >= 3 || game.morale >= 5 ? 'won' : 'lost';
-    game.resultImage = game.result === 'won' ? 'survival-rescue.png' : 'survival-cave.png';
+    game.resultImage = game.result === 'won' ? 'survival-rescue-banner.png' : 'survival-cave-banner.png';
   } else {
     game.round += 1;
     scheduleRound(client, game);
