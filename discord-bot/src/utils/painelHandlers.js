@@ -19,6 +19,7 @@ import { buildTellonymConfigPayload } from './configPanels.js';
 import { buildPartnerConfigPayload } from './partnershipPanels.js';
 import { buildLojaAdminPayload } from './shopHandlers.js';
 import { buildVipConfigPayload } from '../commands/loja/vip.js';
+import { buildTriggerConfigPayload } from './messageTriggers.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -184,8 +185,8 @@ export function buildPainelFuncoes(guild, cfg) {
 
   c.addTextDisplayComponents(new TextDisplayBuilder().setContent([
     '**Ferramentas & Segurança**',
-    `${D(antiLinkOk)} Anti-Link · ${D(bumpOk)} Bump · ${D(presencedOk)} Presenced`,
-    'Status do bot, proteção contra links, lembretes e Rich Presence de consoles.',
+    `${D(antiLinkOk)} Anti-Link · ${D(bumpOk)} Bump · ${D(presencedOk)} Presenced · ⚪ Gatilhos`,
+    'Status do bot, proteção contra links, respostas automáticas e Rich Presence.',
   ].join('\n')));
   c.addActionRowComponents(new ActionRowBuilder().addComponents(
     moduleBtn('painel_cfg_status', 'Status'),
@@ -194,6 +195,7 @@ export function buildPainelFuncoes(guild, cfg) {
   ));
   c.addActionRowComponents(new ActionRowBuilder().addComponents(
     moduleBtn('painel_cfg_presenced', 'Presenced'),
+    moduleBtn('painel_cfg_gatilhos', 'Gatilhos'),
   ));
 
   return { components: [c, voltarRow()], flags: MessageFlags.IsComponentsV2 };
@@ -844,6 +846,9 @@ export async function handlePainelCfgBtn(interaction) {
       break;
     case 'bump':
       payload = buildBumpConfigPayload(cfg);
+      break;
+    case 'gatilhos':
+      payload = await buildTriggerConfigPayload(interaction.guildId);
       break;
     default:
       return interaction.reply({ content: '❌ Módulo desconhecido.', flags: 64 });

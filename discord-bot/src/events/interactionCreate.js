@@ -111,6 +111,7 @@ import {
   startGlobalMessageJob,
   buildGlobalMessageConfirmPayload,
 } from '../utils/globalMessage.js';
+import { handleTriggerButton, handleTriggerModal } from '../utils/messageTriggers.js';
 
 const tellonymSessions = new Map();
 const tellonymSessionKey = (interaction) => `${interaction.guildId}:${interaction.user.id}`;
@@ -577,6 +578,10 @@ export default {
 
       // ── STRING SELECT MENUS ────────────────────────────────────────────────
       if (interaction.isStringSelectMenu()) {
+        if (interaction.customId === 'trigger_delete_select') {
+          return handleTriggerButton(interaction);
+        }
+
         if (interaction.customId.startsWith('work_select:')) {
           return handleWorkInteraction(interaction);
         }
@@ -1400,6 +1405,11 @@ export default {
         }
         if (customId === 'painel_voltar') {
           return handlePainelVoltar(interaction);
+        }
+
+        if (customId.startsWith('trigger_')) {
+          if (customId === 'trigger_back') return handlePainelFuncoes(interaction);
+          return handleTriggerButton(interaction);
         }
 
         // ── PAINEL CENTRAL: Botões "Configurar" de cada módulo ───────────
@@ -3458,6 +3468,10 @@ export default {
 
       // ── MODALS ─────────────────────────────────────────────────────────────
       if (interaction.isModalSubmit()) {
+        if (interaction.customId === 'trigger_add_modal') {
+          return handleTriggerModal(interaction);
+        }
+
         if (interaction.customId.startsWith('bank_')) {
           return handleBankInteraction(interaction);
         }

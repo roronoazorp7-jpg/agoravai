@@ -225,6 +225,21 @@ model VipPlan {
   config   GuildConfig @relation(fields: [guildId], references: [guildId], onDelete: Cascade)
 }
 
+model MessageTrigger {
+  id             String   @id @default(cuid())
+  guildId        String
+  name           String   @default("")
+  keywords       String
+  responseUrl    String
+  responseName   String
+  responseType   String?
+  responseSize   Int?
+  storageKey     String?
+  createdAt      DateTime @default(now())
+
+  @@index([guildId])
+}
+
 model Partnership {
   id               String   @id @default(cuid())
   guildId          String

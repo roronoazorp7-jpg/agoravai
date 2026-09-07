@@ -26,6 +26,7 @@ import { clearAfkOnMessage, handleAfkMessage } from '../commands/general/afk.js'
 import { enforceAntiLink } from '../utils/antiLink.js';
 import { DISBOARD_BOT_ID, handleDisboardBump } from '../utils/bumpReminder.js';
 import { isCommandBlocked, COMMAND_BLOCK_COMMAND } from '../utils/commandBlock.js';
+import { findMatchingTrigger, getTriggerFile } from '../utils/messageTriggers.js';
 
 const PREFIXES = ['savage ', 's '];
 
@@ -159,6 +160,34 @@ export function invalidateGuildCfgCache(guildId) {
 
 const ticketAiInFlight = new Set();
 const ticketAiMissingKeyNotified = new Set();
+const triggerCooldowns = new Map();
+
+async function handleMessageTrigger(message) {
+  if (!message.guildId || !message.content?.trim()) return false;
+
+  const trigger = await findMatchingTrigger(message.guildId, message.content).catch(() => null);
+  if (!trigger) return false;
+
+  const cooldownKey = `${message.guildId}:${message.author.id}:${trigger.id}`;
+  const lastSentAt = triggerCooldowns.get(cooldownKey) ?? 0;
+  if (Date.now() - lastSentAt < 3_000) return true;
+  triggerCooldowns.set(cooldownKey, Date.now());
+  setTimeout(() => triggerCooldowns.delete(cooldownKey), 10_000);
+
+  try {
+    const filePath = await getTriggerFile(trigger);
+    if (!filePath) return false;
+    await message.channel.send({
+      files: [{ attachment: filePath, name: trigger.responseName }],
+    });
+  } catch (error) {
+    console.error('[MESSAGE TRIGGER]', error?.message ?? error);
+    await message.channel.send({
+      files: [{ attachment: trigger.responseUrl, name: trigger.responseName }],
+    }).catch(() => {});
+  }
+  return true;
+}
 
 function buildTicketServerContext(message, cfg) {
   const visibleChannels = [...(message.guild?.channels?.cache?.values() ?? [])]
@@ -295,6 +324,11 @@ export default {
     if (message.guildId) {
       const cfg = await getGuildCfg(message.guildId);
       const botMentioned = message.mentions.has(client.user);
+
+      // ── GATILHOS DE MENSAGEM ──────────────────────────────────────────────
+      // A consulta sempre usa o guildId da mensagem; um gatilho nunca vaza
+      // para outro servidor. Bots são filtrados no início deste handler.
+      if (!botMentioned && await handleMessageTrigger(message)) return;
 
       // ── ANTI-LINK AVANÇADO ───────────────────────────────────────────────
       if (await enforceAntiLink(message, cfg)) return;

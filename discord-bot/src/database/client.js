@@ -77,6 +77,26 @@ export async function ensureMarriageSchema() {
     $$;
   `);
 
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "MessageTrigger" (
+      "id" TEXT NOT NULL,
+      "guildId" TEXT NOT NULL,
+      "name" TEXT NOT NULL DEFAULT '',
+      "keywords" TEXT NOT NULL,
+      "responseUrl" TEXT NOT NULL,
+      "responseName" TEXT NOT NULL,
+      "responseType" TEXT,
+      "responseSize" INTEGER,
+      "storageKey" TEXT,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "MessageTrigger_pkey" PRIMARY KEY ("id")
+    )
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "MessageTrigger_guildId_idx"
+      ON "MessageTrigger" ("guildId")
+  `);
+
   // Mantém a economia de empresas compatível com bancos existentes. A criação
   // é aditiva e também é coberta pelo schema.prisma/db push no deploy.
   await prisma.$executeRawUnsafe(`
