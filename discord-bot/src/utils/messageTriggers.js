@@ -33,6 +33,22 @@ function normalizeKeyword(value) {
     .toLocaleLowerCase('pt-BR');
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export function matchesTriggerKeyword(content, keyword) {
+  const normalizedContent = normalizeKeyword(content);
+  const normalizedKeyword = normalizeKeyword(keyword);
+  if (!normalizedContent || !normalizedKeyword) return false;
+
+  const keywordPattern = new RegExp(
+    `(^|[^\\p{L}\\p{N}])${escapeRegExp(normalizedKeyword)}(?=$|[^\\p{L}\\p{N}])`,
+    'u',
+  );
+  return keywordPattern.test(normalizedContent);
+}
+
 export function parseTriggerKeywords(value) {
   return [...new Set(
     String(value ?? '')
@@ -82,7 +98,7 @@ export async function buildTriggerConfigPayload(guildId) {
       `**Gatilhos** — ${triggers.length} gatilho(s) ativo(s)`,
       'Painel › Funções › Gatilhos',
       '',
-      'Quando alguém digitar uma palavra-chave, o bot responde automaticamente com o arquivo salvo somente neste servidor.',
+      'Quando alguém escrever uma palavra ou frase que contenha uma palavra-chave, o bot responde automaticamente com o arquivo salvo somente neste servidor.',
       '',
       triggers.length
         ? triggers.map((trigger, index) => [
@@ -314,10 +330,9 @@ export async function handleTriggerModal(interaction) {
 }
 
 export async function findMatchingTrigger(guildId, content) {
-  const normalized = normalizeKeyword(content);
-  if (!normalized) return null;
+  if (!normalizeKeyword(content)) return null;
   const triggers = await listTriggers(guildId);
   return triggers.find(trigger => trigger.keywords
     .split('\n')
-    .some(keyword => normalizeKeyword(keyword) === normalized)) ?? null;
+    .some(keyword => matchesTriggerKeyword(content, keyword))) ?? null;
 }
