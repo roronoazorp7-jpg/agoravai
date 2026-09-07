@@ -45,6 +45,17 @@ function roleQueryText(value) {
     .trim();
 }
 
+function isRoleMention(value) {
+  return /^<@&\d+>$/.test(String(value ?? '').trim());
+}
+
+function displayRoleName(value) {
+  return String(value ?? '')
+    .replace(/[\p{Cc}\p{Cf}\p{M}\u00AD\u061C\u115F\u1160\u180E\u2800\u3164\uFFA0]/gu, '')
+    .replace(/\s+/gu, ' ')
+    .trim();
+}
+
 function normalizeRoleName(value) {
   return String(value ?? '')
     .replace(/[\p{Cc}\p{Cf}\p{M}\u00AD\u061C\u115F\u1160\u180E\u2800\u3164\uFFA0]/gu, '')
@@ -95,7 +106,7 @@ async function resolveRole(guild, value) {
   return { error: `❌ Não encontrei um cargo com o nome começando por **${query}**.` };
 }
 
-async function addRole(context, role, member) {
+async function addRole(context, role, member, { mentionRole = false } = {}) {
   if (!hasManageRoles(context)) {
     return context.reply('❌ Você precisa da permissão **Gerenciar Cargos** para usar este comando.');
   }
@@ -103,10 +114,20 @@ async function addRole(context, role, member) {
   const hierarchy = hierarchyError(context, role, member);
   if (hierarchy) return context.reply(`❌ ${hierarchy}`);
 
+  const roleLabel = mentionRole ? `<@&${role.id}>` : `**${displayRoleName(role.name)}**`;
+  const memberLabel = `<@${member.id}>`;
+  const allowedMentions = {
+    roles: mentionRole ? [role.id] : [],
+    users: [member.id],
+  };
+
   if (member.roles.cache.has(role.id)) {
     try {
       await member.roles.remove(role, `Cargo removido por ${context.user?.tag ?? context.author.tag}`);
-      return context.reply(`✅ O cargo ${role} foi removido de ${member}.`);
+      return context.reply({
+        content: `✅ O cargo ${roleLabel} foi removido de ${memberLabel}.`,
+        allowedMentions,
+      });
     } catch (error) {
       console.error('[CARGO REMOVE]', error);
       return context.reply('❌ Não consegui remover esse cargo. Verifique minhas permissões e a hierarquia dos cargos.');
@@ -115,7 +136,10 @@ async function addRole(context, role, member) {
 
   try {
     await member.roles.add(role, `Cargo atribuído por ${context.user?.tag ?? context.author.tag}`);
-    return context.reply(`✅ O cargo ${role} foi atribuído a ${member}.`);
+    return context.reply({
+      content: `✅ O cargo ${roleLabel} foi atribuído a ${memberLabel}.`,
+      allowedMentions,
+    });
   } catch (error) {
     console.error('[CARGO ADD]', error);
     return context.reply('❌ Não consegui atribuir esse cargo. Verifique minhas permissões e a hierarquia dos cargos.');
@@ -130,7 +154,7 @@ async function executeSlashAdd(interaction) {
   const user = interaction.options.getUser('membro');
   const member = await interaction.guild.members.fetch(user.id).catch(() => null);
   if (!member) return interaction.reply({ content: '❌ Esse membro não está neste servidor.', ephemeral: true });
-  return addRole(interaction, resolved.role, member);
+  return addRole(interaction, resolved.role, member, { mentionRole: isRoleMention(roleQuery) });
 }
 
 export default {
@@ -181,6 +205,6 @@ export default {
         .join(' ');
     const resolved = await resolveRole(message.guild, roleQuery);
     if (resolved.error) return message.reply(resolved.error);
-    return addRole(message, resolved.role, member);
+    return addRole(message, resolved.role, member, { mentionRole: Boolean(roleMention) });
   },
 };
