@@ -17,6 +17,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ASSET_DIR = join(__dirname, '../../assets/survival');
 const MAX_PLAYERS = 24;
 const MIN_PLAYERS = 2;
+const MAX_HP = 5;
 const VOTE_TIMEOUT_MS = 30_000;
 const GAME_TTL_MS = 60 * 60 * 1000;
 
@@ -25,6 +26,7 @@ const games = new Map();
 const SCENARIOS = [
   {
     key: 'storm',
+    biome: 'Costa da tempestade',
     image: 'survival-storm-banner.png',
     title: '🌩️ Rodada 1 — A tempestade',
     text: 'O céu ficou preto. A chuva está levando os suprimentos e um raio atingiu a velha torre de rádio.',
@@ -35,9 +37,22 @@ const SCENARIOS = [
     ],
   },
   {
+    key: 'mangrove',
+    biome: 'Manguezal',
+    image: 'survival-mangrove-banner.png',
+    title: '🌿 Rodada 2 — O manguezal',
+    text: 'A maré subiu e as raízes escondem passagens estreitas. Há água potável em algum lugar, mas o terreno está cheio de armadilhas.',
+    choices: [
+      { id: 'roots', label: 'Seguir pelas raízes', emoji: '🌱', detail: 'Procura frutas e um caminho seco.', supplies: 1, morale: 1, risk: 0.12 },
+      { id: 'tide', label: 'Seguir a maré', emoji: '🌊', detail: 'A corrente pode levar o sinal mais longe.', signal: 2, supplies: -1, risk: 0.2 },
+      { id: 'raft', label: 'Montar uma jangada', emoji: '🪵', detail: 'Cruza o mangue sem perder tempo.', supplies: 2, risk: 0.26 },
+    ],
+  },
+  {
     key: 'cave',
+    biome: 'Caverna',
     image: 'survival-cave-banner.png',
-    title: '🕯️ Rodada 2 — A noite na caverna',
+    title: '🕯️ Rodada 3 — A noite na caverna',
     text: 'A escuridão caiu. Há marcas estranhas nas paredes e o grupo precisa decidir como passar a noite.',
     choices: [
       { id: 'fire', label: 'Acender uma fogueira', emoji: '🔥', detail: 'Aquece o grupo e aumenta a confiança.', morale: 2, risk: 0.12 },
@@ -46,9 +61,22 @@ const SCENARIOS = [
     ],
   },
   {
+    key: 'volcano',
+    biome: 'Vulcão',
+    image: 'survival-volcano-banner.png',
+    title: '🌋 Rodada 4 — A encosta vulcânica',
+    text: 'O chão treme sob os pés. A fumaça cobre o céu e o calor abre uma rota perigosa até um antigo posto de observação.',
+    choices: [
+      { id: 'ash', label: 'Subir pela cinza', emoji: '🌋', detail: 'A altura pode revelar uma rota de resgate.', signal: 2, risk: 0.24 },
+      { id: 'shelter', label: 'Buscar abrigo', emoji: '🪨', detail: 'Protege o grupo e preserva a moral.', supplies: 1, morale: 2, risk: 0.1 },
+      { id: 'lava', label: 'Cortar caminho', emoji: '🔥', detail: 'É rápido, mas qualquer erro custa caro.', supplies: -1, signal: 1, risk: 0.34 },
+    ],
+  },
+  {
     key: 'tower',
+    biome: 'Montanha',
     image: 'survival-tower-banner.png',
-    title: '📡 Rodada 3 — O sinal',
+    title: '📡 Rodada 5 — O sinal',
     text: 'A torre está acima da linha das árvores. Um último esforço pode fazer o sinal alcançar o continente.',
     choices: [
       { id: 'climb', label: 'Subir até o rádio', emoji: '🧗', detail: 'Conserta a antena, mas a subida é perigosa.', signal: 2, risk: 0.25 },
@@ -58,8 +86,9 @@ const SCENARIOS = [
   },
   {
     key: 'rescue',
+    biome: 'Costa de resgate',
     image: 'survival-rescue-banner.png',
-    title: '🚁 Rodada 4 — A última chance',
+    title: '🚁 Rodada 6 — A última chance',
     text: 'Um helicóptero apareceu no horizonte. O grupo tem poucos minutos para escolher como será visto.',
     choices: [
       { id: 'flare', label: 'Acender o sinalizador', emoji: '🚨', detail: 'Um clarão pode ser visto de longe.', signal: 2, risk: 0.15 },
@@ -85,10 +114,28 @@ function playerName(player) {
   return String(player.displayName || player.username || player.userId).slice(0, 28);
 }
 
-function playerList(game) {
+function healthBar(hp, maxHp = MAX_HP) {
+  const current = Math.max(0, Math.min(maxHp, hp));
+  return `${'🟩'.repeat(current)}${'⬛'.repeat(maxHp - current)} ${current}/${maxHp}`;
+}
+
+function teamHealthBar(game) {
+  const players = [...game.players.values()];
+  if (!players.length) return '⬛⬛⬛⬛⬛ 0/0';
+  const total = players.reduce((sum, player) => sum + Math.max(0, player.hp), 0);
+  const maximum = players.length * MAX_HP;
+  const segments = 5;
+  const filled = Math.round((total / maximum) * segments);
+  return `${'🟩'.repeat(filled)}${'⬛'.repeat(segments - filled)} ${total}/${maximum}`;
+}
+
+function playerList(game, includeHealth = false) {
   const players = [...game.players.values()];
   if (!players.length) return 'Ainda ninguém entrou. Seja o primeiro!';
-  const visible = players.slice(0, 12).map(player => `${player.alive ? '🟢' : '⚫'} ${playerName(player)}`);
+  const visible = players.slice(0, 12).map(player => [
+    `${player.alive ? '🟢' : '⚫'} ${playerName(player)}`,
+    includeHealth ? `\`${healthBar(player.hp)}\`` : '',
+  ].filter(Boolean).join(' '));
   const remaining = players.length - visible.length;
   if (remaining > 0) visible.push(`… e mais ${remaining}`);
   return visible.join('\n');
@@ -98,6 +145,22 @@ function formatStats(game) {
   const alive = activePlayers(game).length;
   const streak = game.teamStreak > 0 ? `  •  🔥 **${game.teamStreak}** em sequência` : '';
   return `👥 **${alive}/${game.players.size}** vivos  •  🧰 **${Math.max(0, game.supplies)}** suprimentos  •  📡 **${Math.max(0, game.signal)}** sinal  •  🫶 **${Math.max(0, game.morale)}** moral${streak}`;
+}
+
+const PERSONAL_ACTIONS = [
+  { id: 'heal', label: 'Tratar ferida', emoji: '🩹' },
+  { id: 'scout', label: 'Explorar bioma', emoji: '🔎' },
+  { id: 'rally', label: 'Animar equipe', emoji: '📣' },
+];
+
+function personalActionButton(game, action) {
+  const used = game.actions?.has(game.viewerId);
+  return new ButtonBuilder()
+    .setCustomId(`survival_action:${game.id}:${action.id}`)
+    .setLabel(used ? 'Ação usada' : action.label)
+    .setEmoji(action.emoji)
+    .setStyle(used ? ButtonStyle.Success : ButtonStyle.Secondary)
+    .setDisabled(Boolean(used));
 }
 
 function scenarioFor(game) {
@@ -139,7 +202,7 @@ function buildLobbyPayload(game) {
       `**👥 Participantes** ${game.players.size}/${MAX_PLAYERS}`,
       playerList(game),
       '',
-      '**🎯 Objetivo** Sobreviver a 4 rodadas e alcançar o resgate.',
+      `**🎯 Objetivo** Sobreviver a ${SCENARIOS.length} rodadas e alcançar o resgate.`,
       `_Criada por ${game.hostName}_`,
     ].join('\n')));
 
@@ -185,9 +248,7 @@ function buildRoundPayload(game) {
   const counts = choiceCounts(game, scenario);
   const alive = activePlayers(game);
   const voted = game.votes.size;
-  const history = game.history.length
-    ? `\n\n**Último acontecimento:** ${game.history.at(-1)}`
-    : '';
+  const history = game.history.at(-1);
 
   const panel = new ContainerBuilder()
     .addMediaGalleryComponents(
@@ -197,16 +258,18 @@ function buildRoundPayload(game) {
     )
     .addTextDisplayComponents(new TextDisplayBuilder().setContent([
       `# ${scenario.title} · ${game.round + 1}/${SCENARIOS.length}`,
+      `**🗺️ Bioma:** ${scenario.biome}`,
       scenario.text,
       history ? `**Último acontecimento** ${game.history.at(-1)}` : '',
       '',
       `**Votação** ${voted}/${alive.length} sobreviventes já escolheram.`,
       `**${formatStats(game)}**`,
+      `**❤️ Vida da equipe** ${teamHealthBar(game)}`,
       '',
       '**🧭 Expedição**',
-      playerList(game),
+      playerList(game, true),
       '',
-      '💬 Conversem no canal antes de votar. A rodada fecha em 30s ou quando todos escolherem.',
+      '💬 Cada pessoa pode fazer uma ação e votar. A rodada fecha em 30s ou quando todos escolherem.',
     ].filter(Boolean).join('\n')));
 
   const rows = [];
@@ -215,6 +278,9 @@ function buildRoundPayload(game) {
       scenario.choices.slice(i, i + 5).map(choice => choiceButton(game, choice, counts)),
     ));
   }
+  rows.push(new ActionRowBuilder().addComponents(
+    PERSONAL_ACTIONS.map(action => personalActionButton(game, action)),
+  ));
   rows.push(new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`survival_status:${game.id}`)
@@ -258,6 +324,7 @@ function buildFinishedPayload(game) {
       `**🏆 Resultado** ${won ? 'Vitória cooperativa' : 'Derrota coletiva'}`,
       `**🧰 Suprimentos** ${Math.max(0, game.supplies)}  •  **📡 Sinal** ${Math.max(0, game.signal)}`,
       `**🎁 Recompensa** ${won ? '750 moedas para vivos • 250 para eliminados' : '150 moedas pela participação'}`,
+      `**❤️ Vida da equipe** ${teamHealthBar(game)}`,
       '',
       `**Últimos acontecimentos**\n${game.history.slice(-4).join('\n')}`,
       '',
@@ -328,6 +395,7 @@ export function createSurvivalGame({ guildId, channelId, hostId, hostName, clien
     signal: 0,
     morale: 2,
     teamStreak: 0,
+    actions: new Map(),
     history: [],
     timer: null,
     result: null,
@@ -443,6 +511,53 @@ async function applyChoice(game, scenario, choice) {
   game.history.push(events.join(' '));
 }
 
+function applyPersonalAction(game, player, actionId) {
+  game.actions ??= new Map();
+  if (game.actions.has(player.userId)) {
+    return { ok: false, message: 'Você já usou sua ação nesta rodada.' };
+  }
+
+  let message;
+  if (actionId === 'heal') {
+    if (game.supplies < 1) {
+      return { ok: false, message: 'Não há suprimentos para tratar feridas.' };
+    }
+    if (player.hp >= MAX_HP) {
+      return { ok: false, message: 'Sua vida já está cheia.' };
+    }
+    game.supplies -= 1;
+    player.hp = Math.min(MAX_HP, player.hp + 1);
+    message = `🩹 **${playerName(player)}** tratou seus ferimentos. \`${healthBar(player.hp)}\``;
+  } else if (actionId === 'scout') {
+    const scenario = scenarioFor(game);
+    const roll = Math.random();
+    if (roll < 0.4) {
+      game.supplies += 1;
+      message = `🔎 **${playerName(player)}** explorou o bioma **${scenario.biome}** e encontrou suprimentos.`;
+    } else if (roll < 0.75) {
+      game.signal += 1;
+      message = `🔎 **${playerName(player)}** encontrou um ponto alto no bioma **${scenario.biome}** e reforçou o sinal.`;
+    } else {
+      player.hp -= 1;
+      if (player.hp <= 0) {
+        player.alive = false;
+        message = `⚠️ **${playerName(player)}** se perdeu durante a exploração e foi eliminado.`;
+      } else {
+        message = `🩹 **${playerName(player)}** voltou ferido da exploração. \`${healthBar(player.hp)}\``;
+      }
+    }
+  } else if (actionId === 'rally') {
+    game.morale = Math.min(8, game.morale + 1);
+    message = `📣 **${playerName(player)}** animou a equipe. A moral subiu para **${game.morale}**.`;
+  } else {
+    return { ok: false, message: 'Ação inválida.' };
+  }
+
+  game.actions.set(player.userId, actionId);
+  game.history.push(message);
+  return { ok: true, message };
+}
+
 async function rewardPlayers(game) {
   if (game.rewardsPaid) return;
   game.rewardsPaid = true;
@@ -491,6 +606,7 @@ async function resolveRound(client, game) {
     game.timer = setTimeout(() => expireGame(game), 15 * 60 * 1000);
   }
 
+  game.actions.clear();
   await publishGameMessage(client, game);
 }
 
@@ -510,7 +626,7 @@ export async function handleSurvivalInteraction(interaction) {
       userId: interaction.user.id,
       username: interaction.user.username,
       displayName: interaction.member?.displayName ?? interaction.user.globalName ?? interaction.user.username,
-      hp: 3,
+      hp: MAX_HP,
       alive: true,
     };
     game.players.set(interaction.user.id, player);
@@ -548,19 +664,35 @@ export async function handleSurvivalInteraction(interaction) {
     game.stage = 'round';
     game.round = 0;
     game.votes.clear();
+    game.actions.clear();
     scheduleRound(interaction.client, game);
     await interaction.deferUpdate();
     await publishGameMessage(interaction.client, game);
     return;
   }
 
+  if (action === 'survival_action') {
+    if (game.stage !== 'round') return interaction.reply({ content: '❌ As ações só ficam disponíveis durante uma rodada.', ephemeral: true });
+    const player = game.players.get(interaction.user.id);
+    if (!player) return interaction.reply({ content: '❌ Você precisa clicar em **Participar** antes.', ephemeral: true });
+    if (!player.alive) return interaction.reply({ content: '❌ Você foi eliminado da expedição.', ephemeral: true });
+
+    const result = applyPersonalAction(game, player, choiceId);
+    if (!result.ok) return interaction.reply({ content: `❌ ${result.message}`, ephemeral: true });
+    if (!activePlayers(game).length) {
+      await interaction.deferUpdate();
+      return resolveRound(interaction.client, game);
+    }
+    return interaction.update(buildSurvivalPayload(game));
+  }
+
   if (action === 'survival_status') {
     const player = game.players.get(interaction.user.id);
     const status = player
-      ? `${player.alive ? '🟢 Vivo' : '⚫ Eliminado'} • ❤️ ${Math.max(0, player.hp)}/3 de vida`
+      ? `${player.alive ? '🟢 Vivo' : '⚫ Eliminado'} • ❤️ ${healthBar(player.hp)}`
       : 'Você está assistindo à expedição.';
     return interaction.reply({
-      content: `**📊 Situação da expedição**\n${status}\n${formatStats(game)}\n\n${playerList(game)}`,
+      content: `**📊 Situação da expedição**\n${status}\n${formatStats(game)}\n❤️ **Vida da equipe** ${teamHealthBar(game)}\n\n${playerList(game, true)}`,
       ephemeral: true,
     });
   }
