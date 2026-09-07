@@ -25,15 +25,15 @@ const games = new Map();
 
 const SCENARIOS = [
   {
-    key: 'storm',
-    biome: 'Costa da tempestade',
-    image: 'survival-storm-banner.png',
-    title: '🌩️ Rodada 1 — A tempestade',
-    text: 'O céu ficou preto. A chuva está levando os suprimentos e um raio atingiu a velha torre de rádio.',
+    key: 'crash',
+    biome: 'Destroços na nevasca',
+    image: 'survival-crash-banner.png',
+    title: '✈️ Rodada 1 — A queda',
+    text: 'Um avião com 30 passageiros caiu durante uma nevasca. Apenas 24 sobreviveram, e a temperatura está despencando entre os destroços.',
     choices: [
-      { id: 'cave', label: 'Abrigar na caverna', emoji: '🕳️', detail: 'Protege o grupo e encontra abrigo.', supplies: 1, morale: 1, risk: 0.08 },
-      { id: 'radio', label: 'Ligar o rádio', emoji: '📡', detail: 'Pode chamar ajuda, mas exige atravessar a chuva.', signal: 2, supplies: -1, risk: 0.18 },
-      { id: 'wreck', label: 'Vasculhar os destroços', emoji: '🧰', detail: 'A chance de encontrar recursos é grande.', supplies: 2, risk: 0.28 },
+      { id: 'cockpit', label: 'Vasculhar a cabine', emoji: '🧰', detail: 'Procura rádio, lanternas e o sinalizador.', supplies: 2, signal: 1, risk: 0.18, coldDamage: 1 },
+      { id: 'cargo', label: 'Abrir o compartimento', emoji: '📦', detail: 'Pode haver comida e equipamentos, mas a fuselagem está instável.', supplies: 3, risk: 0.26, coldDamage: 1 },
+      { id: 'clothes', label: 'Buscar roupas e cobertores', emoji: '🧥', detail: 'Protege os sobreviventes do frio e recupera a equipe.', morale: 1, healAll: 1, risk: 0.1 },
     ],
   },
   {
@@ -194,7 +194,7 @@ function buildLobbyPayload(game) {
     )
     .addTextDisplayComponents(new TextDisplayBuilder().setContent([
       '# 🏕️ SOBREVIVÊNCIA: ILHA ZERO',
-      'Um sinal de emergência foi detectado. Entrem no grupo e sobrevivam juntos até o resgate.',
+      'O voo caiu durante uma nevasca. Vocês são os 24 sobreviventes e precisam atravessar a ilha até o resgate.',
       '',
       '**Como funciona**',
       'Vote em uma decisão por rodada. A maioria define o caminho, enquanto os riscos podem ferir ou eliminar sobreviventes.',
@@ -460,6 +460,29 @@ async function applyChoice(game, scenario, choice) {
   const unanimous = alive.length > 0
     && alive.every(player => game.votes.get(player.userId) === choice.id);
 
+  if (choice.healAll) {
+    const healed = alive.filter(player => player.hp < MAX_HP);
+    healed.forEach(player => {
+      player.hp = Math.min(MAX_HP, player.hp + choice.healAll);
+    });
+    if (healed.length) {
+      events.push(`🧥 Roupas e cobertores protegeram **${healed.length}** sobrevivente(s) do frio.`);
+    } else {
+      events.push('🧥 O grupo já estava aquecido e guardou os cobertores para depois.');
+    }
+  }
+
+  if (choice.coldDamage && alive.length) {
+    const frozen = alive[Math.floor(Math.random() * alive.length)];
+    frozen.hp -= choice.coldDamage;
+    if (frozen.hp <= 0) {
+      frozen.alive = false;
+      events.push(`🥶 O frio venceu **${playerName(frozen)}**, que foi eliminado.`);
+    } else {
+      events.push(`🥶 Sem roupas adequadas, **${playerName(frozen)}** perdeu vida para o frio.`);
+    }
+  }
+
   if (unanimous) {
     game.teamStreak += 1;
     game.morale += 1;
@@ -590,7 +613,7 @@ async function resolveRound(client, game) {
   if (!activePlayers(game).length) {
     game.stage = 'finished';
     game.result = 'lost';
-    game.resultImage = 'survival-storm-banner.png';
+    game.resultImage = 'survival-crash-banner.png';
   } else if (game.round >= SCENARIOS.length - 1) {
     game.stage = 'finished';
     game.result = game.signal >= 3 || game.morale >= 5 ? 'won' : 'lost';
