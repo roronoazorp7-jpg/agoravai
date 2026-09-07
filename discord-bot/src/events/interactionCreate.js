@@ -46,6 +46,7 @@ import { buildProfilePayload } from '../commands/general/perfil.js';
 import { buildWalletCard, walletRefreshRow } from '../commands/economia/pf.js';
 import { handlePetButton } from '../commands/general/pet.js';
 import { handleModerationButton } from '../commands/admin/moderacao.js';
+import { handleBotLeaveInteraction } from '../commands/admin/bot.js';
 import { handleVipButton, handleVipConfigModal } from '../commands/loja/vip.js';
 import { handleFishingInteraction } from '../commands/economia/pescaria.js';
 import { handleWorkInteraction } from '../commands/economia/eco.js';
@@ -469,10 +470,18 @@ export default {
         || interaction.isChannelSelectMenu()
         || interaction.isUserSelectMenu()
         || interaction.isModalSubmit()
+        || interaction.isAutocomplete()
       ) {
         awardInteractionXp(interaction);
       }
       if (interaction.isButton() && await handleDeathEventInteraction(interaction, client)) return;
+
+      // ── AUTOCOMPLETE ────────────────────────────────────────────────────────
+      if (interaction.isAutocomplete()) {
+        const cmd = client.commands.get(interaction.commandName);
+        if (!cmd?.autocomplete) return interaction.respond([]);
+        return await cmd.autocomplete(interaction, client);
+      }
 
       // ── SLASH COMMANDS ─────────────────────────────────────────────────────
       if (interaction.isChatInputCommand()) {
@@ -1168,6 +1177,10 @@ export default {
       // ── BUTTONS ────────────────────────────────────────────────────────────
       if (interaction.isButton()) {
         const { customId } = interaction;
+
+        if (customId.startsWith('bot_leave_')) {
+          return handleBotLeaveInteraction(interaction, client);
+        }
 
         if (customId.startsWith('survival_')) {
           return handleSurvivalInteraction(interaction);
