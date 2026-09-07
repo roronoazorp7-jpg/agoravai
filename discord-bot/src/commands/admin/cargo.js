@@ -1,7 +1,7 @@
 import { PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 
 function usage() {
-  return 'Uso: `s cargo add @cargo @membro`';
+  return 'Uso: `s cargo add <id, nome ou começo do cargo> @membro`';
 }
 
 function hasManageRoles(context) {
@@ -33,6 +33,53 @@ function hierarchyError(message, role, member) {
   return null;
 }
 
+function roleQueryText(value) {
+  return String(value ?? '')
+    .trim()
+    .replace(/^["'`]+|["'`]+$/g, '')
+    .replace(/^<@&(\d+)>$/, '$1')
+    .trim();
+}
+
+async function resolveRole(guild, value) {
+  const query = roleQueryText(value);
+  if (!query) return { error: 'Você precisa informar o ID, o nome ou o começo do nome do cargo.' };
+
+  if (/^\d{5,25}$/.test(query)) {
+    const role = await guild.roles.fetch(query).catch(() => null);
+    if (!role || role.managed || role.id === guild.id) {
+      return { error: `❌ Não encontrei um cargo atribuível com o ID \`${query}\`.` };
+    }
+    return { role };
+  }
+
+  const roles = await guild.roles.fetch().catch(() => guild.roles.cache);
+  const manageableRoles = [...roles.values()].filter(role => !role.managed && role.id !== guild.id);
+  const normalized = query.toLocaleLowerCase('pt-BR');
+  const exactMatches = manageableRoles.filter(role => role.name.toLocaleLowerCase('pt-BR') === normalized);
+  if (exactMatches.length === 1) return { role: exactMatches[0] };
+  if (exactMatches.length > 1) {
+    return {
+      error: `❌ Existem vários cargos com o nome **${query}**. Use o ID do cargo para escolher exatamente um.`,
+    };
+  }
+
+  const matches = manageableRoles.filter(role => role.name.toLocaleLowerCase('pt-BR').startsWith(normalized));
+  if (matches.length === 1) return { role: matches[0] };
+  if (matches.length > 1) {
+    const names = matches
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+      .slice(0, 8)
+      .map(role => `\`${role.name}\``)
+      .join(', ');
+    return {
+      error: `❌ Mais de um cargo começa com **${query}**: ${names}. Digite mais letras ou use o ID.`,
+    };
+  }
+
+  return { error: `❌ Não encontrei um cargo com o nome começando por **${query}**.` };
+}
+
 async function addRole(context, role, member) {
   if (!hasManageRoles(context)) {
     return context.reply('❌ Você precisa da permissão **Gerenciar Cargos** para usar este comando.');
@@ -55,11 +102,14 @@ async function addRole(context, role, member) {
 }
 
 async function executeSlashAdd(interaction) {
-  const role = interaction.options.getRole('cargo');
+  const roleQuery = interaction.options.getString('cargo');
+  const resolved = await resolveRole(interaction.guild, roleQuery);
+  if (resolved.error) return interaction.reply({ content: resolved.error, ephemeral: true });
+
   const user = interaction.options.getUser('membro');
   const member = await interaction.guild.members.fetch(user.id).catch(() => null);
   if (!member) return interaction.reply({ content: '❌ Esse membro não está neste servidor.', ephemeral: true });
-  return addRole(interaction, role, member);
+  return addRole(interaction, resolved.role, member);
 }
 
 export default {
@@ -71,8 +121,11 @@ export default {
       sub
         .setName('add')
         .setDescription('Atribui um cargo a um membro')
-        .addRoleOption(option =>
-          option.setName('cargo').setDescription('Cargo que será atribuído').setRequired(true),
+        .addStringOption(option =>
+          option
+            .setName('cargo')
+            .setDescription('ID, nome completo ou começo do nome do cargo')
+            .setRequired(true),
         )
         .addUserOption(option =>
           option.setName('membro').setDescription('Membro que receberá o cargo').setRequired(true),
@@ -89,13 +142,21 @@ export default {
   async executePrefix(message, args) {
     if (args[0]?.toLowerCase() !== 'add') return message.reply(usage());
 
-    const role = message.mentions.roles.first();
     const member = message.mentions.members.first()
       ?? (message.mentions.users.first()
         ? await message.guild.members.fetch(message.mentions.users.first().id).catch(() => null)
         : null);
 
-    if (!role || !member) return message.reply(usage());
-    return addRole(message, role, member);
+    if (!member) return message.reply(usage());
+
+    const roleMention = message.mentions.roles.first();
+    const roleQuery = roleMention
+      ? roleMention.id
+      : args.slice(1)
+        .filter(token => !new RegExp(`^<@!?${member.id}>$`).test(token))
+        .join(' ');
+    const resolved = await resolveRole(message.guild, roleQuery);
+    if (resolved.error) return message.reply(resolved.error);
+    return addRole(message, resolved.role, member);
   },
 };
