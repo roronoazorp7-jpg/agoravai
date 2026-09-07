@@ -10,7 +10,7 @@ import { dirname, join } from 'path';
 import prisma from '../database/client.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ASSET_DIR = join(__dirname, '../assets/survival');
+const ASSET_DIR = join(__dirname, '../../assets/survival');
 const MAX_PLAYERS = 24;
 const MIN_PLAYERS = 2;
 const VOTE_TIMEOUT_MS = 30_000;
@@ -242,11 +242,37 @@ export function buildSurvivalPayload(game) {
   return buildRoundPayload(game);
 }
 
-export function createSurvivalGame({ guildId, channelId, hostId, hostName }) {
+async function deleteTemporaryChannel(game) {
+  if (!game.temporaryChannel || !game.client || !game.channelId) return;
+  try {
+    const channel = game.client.channels.cache.get(game.channelId)
+      ?? await game.client.channels.fetch(game.channelId).catch(() => null);
+    if (channel) await channel.delete('Expedição de sobrevivência encerrada');
+  } catch (error) {
+    console.error('[SURVIVAL] Falha ao remover canal temporário:', error.message);
+  }
+}
+
+function expireGame(game) {
+  if (!games.has(game.id)) return;
+  games.delete(game.id);
+  void deleteTemporaryChannel(game);
+}
+
+export function removeSurvivalGame(gameId) {
+  const game = games.get(gameId);
+  if (!game) return;
+  clearTimeout(game.timer);
+  games.delete(gameId);
+}
+
+export function createSurvivalGame({ guildId, channelId, hostId, hostName, client, temporaryChannel = false }) {
   const game = {
     id: gameToken(),
     guildId,
     channelId,
+    client,
+    temporaryChannel,
     messageId: null,
     hostId,
     hostName,
@@ -264,7 +290,7 @@ export function createSurvivalGame({ guildId, channelId, hostId, hostName }) {
     rewardsPaid: false,
   };
   games.set(game.id, game);
-  game.timer = setTimeout(() => games.delete(game.id), GAME_TTL_MS);
+  game.timer = setTimeout(() => expireGame(game), GAME_TTL_MS);
   return game;
 }
 
@@ -376,7 +402,7 @@ async function resolveRound(client, game) {
   if (game.stage === 'finished') {
     await rewardPlayers(game);
     clearTimeout(game.timer);
-    game.timer = setTimeout(() => games.delete(game.id), 15 * 60 * 1000);
+    game.timer = setTimeout(() => expireGame(game), 15 * 60 * 1000);
   }
 
   await updateGameMessage(client, game);
