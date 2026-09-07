@@ -422,18 +422,18 @@ export async function buildInteractionEmbed(
   const fromId   = fromUser.id ?? fromUser.user?.id;
   const toId     = toUser.id ?? toUser.user?.id;
 
-  const [gifData, count, mutualCount] = await Promise.all([
+  const [gifData, count] = await Promise.all([
     fetchGif(action.gif),
     incrementCount(type, fromId, toId),
-    getMutualCount(type, fromId, toId),
   ]);
+  const mutualCount = await getMutualCount(type, fromId, toId);
 
   if (type === 'gf') {
     return buildGfPayload(
       fromUser,
       toUser,
       gifData.url,
-      Math.max(1, mutualCount + 1),
+      Math.max(1, mutualCount),
       includeButton,
     );
   }

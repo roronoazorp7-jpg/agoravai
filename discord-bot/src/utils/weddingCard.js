@@ -1,13 +1,14 @@
 import {
   ActionRowBuilder,
   AttachmentBuilder,
+  EmbedBuilder,
   StringSelectMenuBuilder,
 } from 'discord.js';
 import { createCanvas, GlobalFonts, loadImage } from '@napi-rs/canvas';
 import path from 'path';
 import fs from 'fs';
 import prisma from '../database/client.js';
-import { v2Payload, v2Rich } from './embed.js';
+import { getActiveMarriageCallMinutes } from './marriageCallTracker.js';
 
 const FONTS_DIR = path.join(process.cwd(), 'fonts');
 const BACKGROUND_PATH = path.join(process.cwd(), 'assets', 'wedding-background.png');
@@ -136,6 +137,101 @@ function drawHeart(ctx, x, y, size, fill, stroke = null) {
   ctx.restore();
 }
 
+function drawRing(ctx, x, y, radius, color) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(3, radius * 0.24);
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawSparkle(ctx, x, y, size, color) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x, y - size);
+  ctx.lineTo(x, y + size);
+  ctx.moveTo(x - size, y);
+  ctx.lineTo(x + size, y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawCalendar(ctx, x, y, color) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.5;
+  roundRect(ctx, x - 11, y - 10, 22, 21, 4);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x - 11, y - 3);
+  ctx.lineTo(x + 11, y - 3);
+  ctx.moveTo(x - 5, y - 14);
+  ctx.lineTo(x - 5, y - 6);
+  ctx.moveTo(x + 5, y - 14);
+  ctx.lineTo(x + 5, y - 6);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawHeadphones(ctx, x, y, color) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(x, y, 12, Math.PI, 0);
+  ctx.stroke();
+  roundRect(ctx, x - 14, y - 1, 5, 12, 2);
+  ctx.fill();
+  roundRect(ctx, x + 9, y - 1, 5, 12, 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawKiss(ctx, x, y, color) {
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.bezierCurveTo(x - 10, y - 7, x - 12, y + 6, x, y + 2);
+  ctx.bezierCurveTo(x + 12, y + 6, x + 10, y - 7, x, y);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawHug(ctx, x, y, color) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(x - 6, y - 4, 5, 0, Math.PI * 2);
+  ctx.arc(x + 6, y - 4, 5, 0, Math.PI * 2);
+  ctx.moveTo(x - 12, y + 9);
+  ctx.quadraticCurveTo(x - 6, y + 1, x, y + 8);
+  ctx.quadraticCurveTo(x + 6, y + 1, x + 12, y + 9);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawStatIcon(ctx, kind, x, y, color) {
+  if (kind === 'calendar') return drawCalendar(ctx, x, y, color);
+  if (kind === 'call') return drawHeadphones(ctx, x, y, color);
+  if (kind === 'kiss') return drawKiss(ctx, x, y, color);
+  if (kind === 'hug') return drawHug(ctx, x, y, color);
+  if (kind === 'gf') {
+    drawHeart(ctx, x - 5, y + 2, 14, color);
+    return drawHeart(ctx, x + 7, y - 3, 12, color);
+  }
+  drawHeart(ctx, x, y, 17, color);
+}
+
 function drawCircleImage(ctx, image, centerX, centerY, radius) {
   ctx.save();
   ctx.beginPath();
@@ -162,7 +258,7 @@ function formatDate(date) {
   }).format(date instanceof Date ? date : new Date(date));
 }
 
-function drawStatBox(ctx, x, y, label, value, icon, iconColor = '#e93d73') {
+function drawStatBox(ctx, x, y, label, value, iconKind, iconColor = '#e93d73') {
   ctx.save();
   ctx.shadowColor = 'rgba(116, 39, 84, 0.09)';
   ctx.shadowBlur = 10;
@@ -177,11 +273,7 @@ function drawStatBox(ctx, x, y, label, value, icon, iconColor = '#e93d73') {
   roundRect(ctx, x, y, 260, 76, 22);
   ctx.stroke();
 
-  ctx.font = `24px ${FONT}, sans-serif`;
-  ctx.fillStyle = iconColor;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(icon, x + 35, y + 28);
+  drawStatIcon(ctx, iconKind, x + 35, y + 28, iconColor);
 
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
@@ -240,17 +332,18 @@ async function renderWeddingCard({ left, right, stats }) {
     ctx.fillStyle = bg;
     ctx.fillRect(30, 28, WIDTH - 60, HEIGHT - 56);
     ctx.globalAlpha = 0.45;
-    ctx.font = `28px ${FONT}, sans-serif`;
-    ctx.fillStyle = '#f8cfe2';
     for (const [x, y] of [[95, 88], [850, 93], [75, 325], [900, 350], [500, 310]]) {
-      ctx.fillText('♥', x, y);
+      drawHeart(ctx, x, y - 6, 20, '#f8cfe2');
     }
     ctx.restore();
 
     ctx.textAlign = 'center';
     ctx.fillStyle = DARK;
     ctx.font = `bold 30px ${FONT}, sans-serif`;
-    ctx.fillText('💍  CASAMENTO  ✨', WIDTH / 2, 82);
+    drawRing(ctx, WIDTH / 2 - 126, 74, 8, DARK);
+    drawRing(ctx, WIDTH / 2 - 115, 78, 8, DARK);
+    drawSparkle(ctx, WIDTH / 2 + 126, 75, 7, DARK);
+    ctx.fillText('CASAMENTO', WIDTH / 2, 82);
     ctx.font = `18px ${FONT}, sans-serif`;
     ctx.fillStyle = MUTED;
     ctx.fillText('cartão do casal', WIDTH / 2, 110);
@@ -321,12 +414,12 @@ async function renderWeddingCard({ left, right, stats }) {
     roundRect(ctx, 118, 484, Math.max(14, 764 * stats.progressPercent / 100), 14, 7);
     ctx.fill();
 
-    drawStatBox(ctx, 95, 538, 'Desde', formatDate(stats.marriedAt), '📅');
-    drawStatBox(ctx, 370, 538, 'Call juntos', `${stats.callMinutes}min`, '🎧', '#4f9fd1');
-    drawStatBox(ctx, 645, 538, 'Interações', stats.interactions, '♥');
-    drawStatBox(ctx, 95, 628, 'Beijos', stats.kisses, '😘', '#e58e16');
-    drawStatBox(ctx, 370, 628, 'Abraços', stats.hugs, '🤗', '#ee9939');
-    drawStatBox(ctx, 645, 628, 'GF', stats.gf, '💕');
+    drawStatBox(ctx, 95, 538, 'Desde', formatDate(stats.marriedAt), 'calendar');
+    drawStatBox(ctx, 370, 538, 'Call juntos', `${stats.callMinutes}min`, 'call', '#4f9fd1');
+    drawStatBox(ctx, 645, 538, 'Interações', stats.interactions, 'heart');
+    drawStatBox(ctx, 95, 628, 'Beijos', stats.kisses, 'kiss', '#e58e16');
+    drawStatBox(ctx, 370, 628, 'Abraços', stats.hugs, 'hug', '#ee9939');
+    drawStatBox(ctx, 645, 628, 'GF', stats.gf, 'gf');
 
     return canvas.toBuffer('image/png');
   } catch (error) {
@@ -336,7 +429,7 @@ async function renderWeddingCard({ left, right, stats }) {
   }
 }
 
-export async function getMarriageStats(leftId, rightId, marriedAt = new Date()) {
+export async function getMarriageStats(leftId, rightId, marriedAt = new Date(), guildId = null) {
   const rows = await prisma.interaction.findMany({
     where: {
       OR: [
@@ -353,7 +446,11 @@ export async function getMarriageStats(leftId, rightId, marriedAt = new Date()) 
   const kisses = countType('kiss');
   const hugs = countType('hug');
   const gf = countType('gf');
-  const interactions = rows.reduce((sum, row) => sum + row.count, 0);
+  const interactions = rows
+    .filter(row => row.type !== 'call')
+    .reduce((sum, row) => sum + row.count, 0);
+  const callMinutes = countType('call')
+    + (guildId ? getActiveMarriageCallMinutes(guildId, leftId, rightId) : 0);
   const xp = interactions * 36;
   const level = Math.floor(xp / 180) + 1;
   const currentXp = xp % 180;
@@ -367,7 +464,7 @@ export async function getMarriageStats(leftId, rightId, marriedAt = new Date()) 
     level,
     progressPercent: Math.round((currentXp / 180) * 100),
     xpMissing: 180 - currentXp,
-    callMinutes: 0,
+    callMinutes,
     marriedAt: marriedAt ?? new Date(),
   };
 }
@@ -395,17 +492,18 @@ export async function buildWeddingCardPayload({ left, right, stats }) {
       ),
   );
 
+  const embed = new EmbedBuilder()
+    .setColor(0xF44598)
+    .setDescription(
+      `**Cartão de casamento**\n` +
+      `<@${left.id}> e <@${right.id}> · nível ${stats.level} · ${stats.xp} XP\n\n` +
+      `*Use o menu abaixo para atualizar as estatísticas.*`,
+    )
+    .setImage('attachment://casamento-card.png');
+
   return {
     files: [attachment],
-    ...v2Payload(
-      v2Rich({
-        text:
-          `## 💍 Cartão de casamento\n` +
-          `<@${left.id}> e <@${right.id}> · nível ${stats.level} · ${stats.xp} XP\n\n` +
-          `*Use Atualizar para recalcular as estatísticas.*`,
-        imageUrl: 'attachment://casamento-card.png',
-      }),
-      controls,
-    ),
+    embeds: [embed],
+    components: [controls],
   };
 }

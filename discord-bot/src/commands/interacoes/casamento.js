@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from 'discord.js';
 import prisma from '../../database/client.js';
-import { v2Error } from '../../utils/embed.js';
+import { errorEmbed } from '../../utils/embed.js';
 import { buildWeddingCardPayload, getMarriageStats } from '../../utils/weddingCard.js';
 
 async function findMarriageProfile(userId) {
@@ -56,12 +56,12 @@ export default {
     const profile = await findMarriageProfile(interaction.user.id);
 
     if (!profile?.marriedTo) {
-      return interaction.editReply(v2Error('Você não está casado(a) com ninguém.'));
+      return interaction.editReply({ embeds: [errorEmbed('Você não está casado(a) com ninguém.')] });
     }
 
     const partner = await interaction.client.users.fetch(profile.marriedTo).catch(() => null);
     if (!partner) {
-      return interaction.editReply(v2Error('Não consegui encontrar a outra pessoa do casamento.'));
+      return interaction.editReply({ embeds: [errorEmbed('Não consegui encontrar a outra pessoa do casamento.')] });
     }
 
     const [member, partnerMember] = await Promise.all([
@@ -70,7 +70,7 @@ export default {
     ]);
     let stats;
     try {
-      stats = await getMarriageStats(interaction.user.id, partner.id, profile.marriedAt);
+      stats = await getMarriageStats(interaction.user.id, partner.id, profile.marriedAt, interaction.guildId);
     } catch (error) {
       // O card principal não depende da tabela de interações. Se ela estiver
       // atrasada no banco, mostramos o casamento com estatísticas zeradas.
@@ -106,10 +106,10 @@ export default {
 
   async executePrefix(message) {
     const profile = await findMarriageProfile(message.author.id);
-    if (!profile?.marriedTo) return message.reply(v2Error('Você não está casado(a) com ninguém.'));
+    if (!profile?.marriedTo) return message.reply({ embeds: [errorEmbed('Você não está casado(a) com ninguém.')] });
 
     const partner = await message.client.users.fetch(profile.marriedTo).catch(() => null);
-    if (!partner) return message.reply(v2Error('Não consegui encontrar a outra pessoa do casamento.'));
+    if (!partner) return message.reply({ embeds: [errorEmbed('Não consegui encontrar a outra pessoa do casamento.')] });
 
     const [member, partnerMember] = await Promise.all([
       message.guild.members.fetch(message.author.id).catch(() => null),
@@ -117,7 +117,7 @@ export default {
     ]);
     let stats;
     try {
-      stats = await getMarriageStats(message.author.id, partner.id, profile.marriedAt);
+      stats = await getMarriageStats(message.author.id, partner.id, profile.marriedAt, message.guildId);
     } catch (error) {
       console.error('[CASAMENTO] Falha ao ler estatísticas:', error);
       stats = emptyMarriageStats(profile.marriedAt);

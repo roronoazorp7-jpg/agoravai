@@ -300,7 +300,7 @@ async function handleWeddingCardAction(interaction, action, leftId, rightId) {
     interaction.guild.members.fetch(rightId).catch(() => null),
     prisma.userProfile.findUnique({ where: { userId: leftId } }),
   ]);
-  const stats = await getMarriageStats(leftId, rightId, leftProfile?.marriedAt);
+  const stats = await getMarriageStats(leftId, rightId, leftProfile?.marriedAt, interaction.guildId);
   return interaction.editReply(await buildWeddingCardPayload({
     left: {
       id: leftId,
@@ -1804,7 +1804,7 @@ export default {
             interaction.guild.members.fetch(proposerId).catch(() => null),
             interaction.guild.members.fetch(targetId).catch(() => null),
           ]);
-          const stats = await getMarriageStats(proposerId, targetId, marriedAt);
+          const stats = await getMarriageStats(proposerId, targetId, marriedAt, interaction.guildId);
           await interaction.message.edit({
             embeds: [
               new EmbedBuilder()

@@ -1,4 +1,5 @@
 import prisma from '../database/client.js';
+import { handleMarriageVoiceStateUpdate } from '../utils/marriageCallTracker.js';
 
 const voiceJoinTimes = new Map();
 
@@ -13,6 +14,8 @@ export default {
 
     const member = newState.member ?? oldState.member;
     if (member?.user?.bot) return;
+
+    await handleMarriageVoiceStateUpdate(oldState, newState);
 
     const key = `${userId}_${guildId}`;
 
