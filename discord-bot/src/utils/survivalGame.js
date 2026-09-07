@@ -96,6 +96,42 @@ const SCENARIOS = [
       { id: 'wait', label: 'Esperar em silêncio', emoji: '🤫', detail: 'Poupa forças, mas o resgate pode passar direto.', signal: -1, morale: 1, risk: 0.3 },
     ],
   },
+  {
+    key: 'jungle',
+    biome: 'Selva fechada',
+    image: 'survival-mangrove-banner.png',
+    title: '🌴 A selva fechada',
+    text: 'A copa das árvores bloqueia o céu e cada clareira parece igual à anterior. O grupo precisa deixar marcas antes de avançar.',
+    choices: [
+      { id: 'canopy_path', label: 'Abrir caminho pela copa', emoji: '🌴', detail: 'Evita os predadores no chão, mas exige força e equilíbrio.', progress: 2, risk: 0.3, fatigue: 1 },
+      { id: 'river_jungle', label: 'Seguir o rio', emoji: '🏞️', detail: 'Água e direção garantidas, com risco de correnteza.', signal: 1, progress: 1, risk: 0.2 },
+      { id: 'watch_trees', label: 'Montar uma torre de vigia', emoji: '🪜', detail: 'Permite enxergar fumaça acima da floresta.', signal: 2, supplies: -1, progress: 1, risk: 0.15 },
+    ],
+  },
+  {
+    key: 'ash_desert',
+    biome: 'Deserto de cinzas',
+    image: 'survival-volcano-banner.png',
+    title: '🏜️ O deserto de cinzas',
+    text: 'O solo quente se estende até o horizonte. A água é mais valiosa que qualquer sinalizador, e o vento muda as dunas sem aviso.',
+    choices: [
+      { id: 'night_walk', label: 'Caminhar durante a noite', emoji: '🌙', detail: 'Evita o calor, mas reduz a visibilidade.', progress: 2, morale: -1, risk: 0.18, fatigue: 1 },
+      { id: 'shade', label: 'Construir sombra', emoji: '⛱️', detail: 'Preserva as forças, mas consome materiais.', morale: 1, supplies: -1, risk: 0.08, fatigue: -2 },
+      { id: 'dunes', label: 'Subir a maior duna', emoji: '🏜️', detail: 'Do alto talvez seja possível localizar um posto antigo.', signal: 2, progress: 1, risk: 0.32, fatigue: 2 },
+    ],
+  },
+  {
+    key: 'ruins',
+    biome: 'Ruínas submersas',
+    image: 'survival-cave-banner.png',
+    title: '🏛️ As ruínas submersas',
+    text: 'A maré baixa expôs uma cidade antiga. Inscrições apontam para um caminho seguro, mas a água voltará antes do amanhecer.',
+    choices: [
+      { id: 'inscriptions', label: 'Decifrar as inscrições', emoji: '📜', detail: 'Pode revelar um mapa, mas demora horas preciosas.', progress: 2, signal: 1, risk: 0.12, fatigue: 1 },
+      { id: 'flooded_tunnel', label: 'Atravessar o túnel alagado', emoji: '🌊', detail: 'É o caminho mais curto e também o mais perigoso.', progress: 3, risk: 0.4, fatigue: 1 },
+      { id: 'bell_tower', label: 'Subir até o campanário', emoji: '🔔', detail: 'Um ponto alto pode transformar ruínas em um farol.', signal: 3, progress: 1, risk: 0.25 },
+    ],
+  },
 ];
 
 const EXTRA_CHOICES = {
@@ -135,6 +171,24 @@ const EXTRA_CHOICES = {
     { id: 'fireline', label: 'Manter uma fogueira', emoji: '🔥', detail: 'O fogo precisa ficar visível durante toda a noite.', signal: 2, supplies: -1, risk: 0.15 },
     { id: 'beach_search', label: 'Vasculhar a praia', emoji: '🧭', detail: 'Encontra destroços e talvez uma rota definitiva.', supplies: 1, progress: 1, risk: 0.2 },
   ],
+  jungle: [
+    { id: 'edible_leaves', label: 'Testar folhas com cuidado', emoji: '🍃', detail: 'Pode aliviar a fome ou causar uma intoxicação.', supplies: 2, risk: 0.24, morale: -1 },
+    { id: 'animal_tracks', label: 'Seguir rastros de animais', emoji: '🐾', detail: 'Os rastros podem levar à água ou ao território de um predador.', progress: 2, supplies: 1, risk: 0.3 },
+    { id: 'rain_catch', label: 'Coletar água da chuva', emoji: '🌧️', detail: 'Garante recursos e uma pausa segura.', supplies: 1, progress: 1, risk: 0.1, fatigue: -1 },
+    { id: 'signal_smoke', label: 'Soltar fumaça pela clareira', emoji: '💨', detail: 'Um sinal alto pode ser visto acima da copa.', signal: 3, supplies: -1, risk: 0.18 },
+  ],
+  ash_desert: [
+    { id: 'old_well', label: 'Cavar um poço antigo', emoji: '🪣', detail: 'A água pode estar logo abaixo da cinza.', supplies: 3, progress: 1, risk: 0.28, fatigue: 2 },
+    { id: 'mirror', label: 'Usar metal como espelho', emoji: '🪞', detail: 'Reflete o sol em direção a uma possível aeronave.', signal: 3, risk: 0.1 },
+    { id: 'stone_markers', label: 'Erguer marcos de pedra', emoji: '🪨', detail: 'Evita que as dunas escondam o caminho de volta.', progress: 2, supplies: -1, risk: 0.2, fatigue: 1 },
+    { id: 'storm_shelter', label: 'Entrar na cratera', emoji: '🌪️', detail: 'Protege da tempestade de cinzas, mas pode prender o grupo.', morale: 1, risk: 0.22, fatigue: -1 },
+  ],
+  ruins: [
+    { id: 'lever', label: 'Acionar o mecanismo', emoji: '⚙️', detail: 'Uma comporta antiga pode abrir uma saída.', progress: 3, risk: 0.34 },
+    { id: 'archive', label: 'Vasculhar o arquivo', emoji: '📚', detail: 'Mapas e ferramentas podem estar intactos.', supplies: 2, signal: 1, risk: 0.2 },
+    { id: 'tide_marks', label: 'Estudar a maré', emoji: '🌒', detail: 'Calcula a próxima janela segura para atravessar.', progress: 2, morale: 1, risk: 0.1 },
+    { id: 'water_gate', label: 'Segurar a comporta', emoji: '🛠️', detail: 'Dá mais tempo aos outros, mas exige força física.', progress: 1, supplies: 1, risk: 0.3, fatigue: 2 },
+  ],
 };
 
 for (const biome of SCENARIOS) {
@@ -164,6 +218,95 @@ const RANDOM_EVENTS = [
   { text: '🧱 Um abrigo abandonado ofereceu ferramentas úteis.', supplies: 2, morale: 1 },
   { text: '🦅 Aves seguiram o grupo na direção do litoral.', progress: 1, morale: 1 },
   { text: '💥 Um ruído distante assustou todos e consumiu tempo.', morale: -2, progress: -1 },
+  { text: '🌧️ Uma frente de chuva chegou sem aviso e encharcou parte da bagagem.', weather: 'Chuva intensa', supplies: -1, danger: 1, fatigue: 1 },
+  { text: '🌞 O calor abriu uma janela curta para avançar rapidamente.', weather: 'Calor extremo', progress: 1, fatigue: 2, danger: 1 },
+  { text: '🌬️ O vento mudou e deixou o ar mais respirável por algumas horas.', weather: 'Vento favorável', danger: -1, morale: 1 },
+  { text: '🌑 A noite chegou mais cedo; qualquer erro agora pode separar o grupo.', weather: 'Noite sem lua', danger: 2, fatigue: 1 },
+  { text: '🌈 O tempo abriu e revelou o relevo ao redor do acampamento.', weather: 'Céu aberto', signal: 1, progress: 1, morale: 1 },
+];
+
+const BIOME_EVENTS = {
+  crash: [
+    { key: 'crash_aftershock', text: '💥 Um novo tremor deslocou a fuselagem e abriu uma área antes inacessível.', progress: 2, supplies: 1, damage: 1 },
+    { key: 'crash_blackbox', text: '📦 A caixa-preta registrou uma coordenada antes da queda.', signal: 2, progress: 1 },
+    { key: 'crash_whiteout', text: '🌨️ Uma nevasca branca cobriu o acampamento e apagou as pegadas.', progress: -2, morale: -1, damage: 1 },
+    { key: 'crash_survivor', text: '🧤 O grupo encontrou um sobrevivente isolado com uma chave de emergência.', supplies: 1, progress: 2, morale: 2 },
+  ],
+  mangrove: [
+    { key: 'mangrove_tide', text: '🌊 A maré subiu mais cedo e separou uma parte do acampamento.', progress: -1, supplies: -1, damage: 1 },
+    { key: 'mangrove_fireflies', text: '✨ Vagalumes formaram uma linha até uma área seca.', progress: 2, morale: 1 },
+    { key: 'mangrove_crocodile', text: '🐊 Um predador cercou a passagem e obrigou o grupo a abandonar equipamentos.', supplies: -2, risk: 0.3 },
+    { key: 'mangrove_fisher', text: '🎣 Uma velha canoa presa nas raízes ainda pode ser consertada.', progress: 2, supplies: 1 },
+  ],
+  cave: [
+    { key: 'cave_collapse', text: '🪨 Parte do teto desabou atrás do grupo; voltar já não é uma opção.', progress: 2, damage: 1 },
+    { key: 'cave_bats', text: '🦇 Uma revoada revelou uma abertura no teto, mas espalhou pânico.', signal: 1, morale: -1, risk: 0.2 },
+    { key: 'cave_crystal', text: '🔮 Cristais refletiram uma luz azul vindo de uma galeria lateral.', progress: 2, signal: 1 },
+    { key: 'cave_storm', text: '💧 A chuva invadiu a caverna e transformou o rio em uma correnteza.', progress: -1, damage: 1, supplies: -1 },
+  ],
+  volcano: [
+    { key: 'volcano_ashfall', text: '🌋 Uma chuva de cinzas reduziu a visibilidade a poucos metros.', progress: -1, morale: -1, damage: 1 },
+    { key: 'volcano_obsidian', text: '🖤 Uma lâmina de obsidiana ajudou a cortar uma passagem.', progress: 2, supplies: 1, risk: 0.2 },
+    { key: 'volcano_gas', text: '☠️ Uma bolsa de gás tóxico obrigou todos a abandonar o abrigo.', damage: 1, supplies: -1, risk: 0.25 },
+    { key: 'volcano_cool', text: '❄️ O vento mudou e criou uma janela segura na encosta.', progress: 2, morale: 1 },
+  ],
+  tower: [
+    { key: 'tower_lightning', text: '⚡ Um raio atingiu a torre e queimou parte do rádio.', signal: -1, supplies: -1, damage: 1 },
+    { key: 'tower_beacon', text: '📡 Uma luz distante respondeu ao sinal por alguns segundos.', signal: 3, progress: 1 },
+    { key: 'tower_rockfall', text: '⛰️ Pedras rolaram pela trilha e bloquearam a subida mais fácil.', progress: -1, damage: 1 },
+    { key: 'tower_eagle', text: '🦅 Uma águia sobrevoou uma passagem escondida na encosta.', progress: 2, morale: 1 },
+  ],
+  rescue: [
+    { key: 'rescue_fog', text: '🌫️ O nevoeiro fechou a costa e fez o helicóptero desaparecer.', signal: -1, progress: -1, morale: -1 },
+    { key: 'rescue_flare', text: '🚨 Um sinalizador antigo foi encontrado dentro de uma boia.', signal: 3, supplies: 1 },
+    { key: 'rescue_whale', text: '🐋 O movimento de uma baleia indicou uma correnteza para mar aberto.', progress: 2, morale: 1, risk: 0.2 },
+    { key: 'rescue_storm', text: '🌊 Uma ressaca destruiu parte do abrigo e levou materiais.', supplies: -2, damage: 1 },
+  ],
+  jungle: [
+    { key: 'jungle_monkeys', text: '🐒 Macacos levaram o mapa e espalharam as provisões.', supplies: -2, morale: -1 },
+    { key: 'jungle_orchid', text: '🌺 Uma clareira de flores marcou o caminho para uma pedra alta.', progress: 2, signal: 1 },
+    { key: 'jungle_storm', text: '⛈️ Uma tempestade tropical derrubou árvores e abriu uma trilha.', progress: 2, damage: 1 },
+    { key: 'jungle_roar', text: '🐆 Um rugido próximo forçou o grupo a subir para as árvores.', progress: -1, risk: 0.35 },
+  ],
+  ash_desert: [
+    { key: 'desert_mirage', text: '🏜️ Uma miragem confundiu a direção e fez o grupo perder horas.', progress: -2, morale: -1, damage: 1 },
+    { key: 'desert_satellite', text: '🛰️ Uma antena de satélite abandonada ainda recebe energia.', signal: 3, progress: 1 },
+    { key: 'desert_wind', text: '🌪️ Uma parede de vento cobriu as marcas do caminho.', progress: -1, supplies: -1 },
+    { key: 'desert_oasis', text: '💧 Uma depressão na areia guardava água suficiente para continuar.', supplies: 3, morale: 2 },
+  ],
+  ruins: [
+    { key: 'ruins_guardian', text: '🗿 Um mecanismo antigo despertou quando alguém tocou nas inscrições.', progress: 2, damage: 1, risk: 0.25 },
+    { key: 'ruins_mosaic', text: '🧩 Um mosaico revelou a posição de uma saída acima da maré.', progress: 3, signal: 1 },
+    { key: 'ruins_flood', text: '🌊 A água voltou antes do esperado e invadiu as galerias.', progress: -1, supplies: -2, damage: 1 },
+    { key: 'ruins_compass', text: '🧭 Uma bússola de bronze ainda aponta para o norte verdadeiro.', signal: 2, progress: 1 },
+  ],
+};
+
+const ESCAPE_PLANS = [
+  {
+    id: 'escape_beacon',
+    label: 'Fugir pelo sinal de emergência',
+    emoji: '🚁',
+    detail: 'Usa o sinal e a altura para guiar um resgate aéreo.',
+    requirements: { signal: 4, morale: 3 },
+    bonus: 0.12,
+  },
+  {
+    id: 'escape_route',
+    label: 'Fugir pela rota encontrada',
+    emoji: '🧭',
+    detail: 'Atravessa a passagem construída pelo grupo até o litoral.',
+    requirements: { progress: ESCAPE_PROGRESS_TARGET, supplies: 2 },
+    bonus: 0.08,
+  },
+  {
+    id: 'escape_last_stand',
+    label: 'Fazer a última travessia',
+    emoji: '🏃',
+    detail: 'Uma tentativa desesperada que exige força e união.',
+    requirements: { morale: 7, supplies: 1 },
+    bonus: 0.16,
+  },
 ];
 
 function gameToken() {
@@ -212,13 +355,16 @@ function playerList(game, includeHealth = false) {
 function formatStats(game) {
   const alive = activePlayers(game).length;
   const streak = game.teamStreak > 0 ? `  •  🔥 **${game.teamStreak}** em sequência` : '';
-  return `👥 **${alive}/${game.players.size}** vivos  •  🧰 **${Math.max(0, game.supplies)}** suprimentos  •  📡 **${Math.max(0, game.signal)}** sinal  •  🫶 **${Math.max(0, game.morale)}** moral${streak}`;
+  const danger = game.danger >= 7 ? '🔴' : game.danger >= 4 ? '🟠' : '🟢';
+  return `👥 **${alive}/${game.players.size}** vivos  •  🧰 **${Math.max(0, game.supplies)}** suprimentos  •  📡 **${Math.max(0, game.signal)}** sinal  •  🫶 **${Math.max(0, game.morale)}** moral  •  ${danger} **Perigo ${game.danger}/10**  •  😮‍💨 **Fadiga ${game.fatigue}/10**${streak}`;
 }
 
 const PERSONAL_ACTIONS = [
   { id: 'heal', label: 'Tratar ferida', emoji: '🩹' },
   { id: 'scout', label: 'Explorar bioma', emoji: '🔎' },
   { id: 'rally', label: 'Animar equipe', emoji: '📣' },
+  { id: 'rest', label: 'Descansar', emoji: '😴' },
+  { id: 'guard', label: 'Montar guarda', emoji: '🛡️' },
 ];
 
 function scenarioFor(game) {
@@ -257,14 +403,12 @@ function nextChoices(game) {
   const choices = [...source].sort(() => Math.random() - 0.5).slice(0, 4);
 
   if (game.escapeProgress >= ESCAPE_PROGRESS_TARGET) {
+    const plan = ESCAPE_PLANS[game.escapeAttempts % ESCAPE_PLANS.length];
     choices.push({
-      id: 'escape',
-      label: 'Tentar fugir do bioma',
-      emoji: '🚁',
-      detail: 'A rota parece possível, mas uma fuga mal planejada pode deixar o grupo preso.',
+      ...plan,
       escape: true,
       progress: 0,
-      risk: 0.22,
+      risk: 0.22 + (game.escapeAttempts * 0.04),
     });
   }
 
@@ -357,7 +501,7 @@ function buildRoundPayload(game) {
   const voted = game.votes.size;
   const history = game.history.slice(-2).join('\n');
   const escapeStatus = game.escapeProgress >= ESCAPE_PROGRESS_TARGET
-    ? '🚁 A rota de fuga está pronta. A opção de fuga aparecerá no menu.'
+    ? `🚁 Rota pronta. Plano disponível: **${ESCAPE_PLANS[game.escapeAttempts % ESCAPE_PLANS.length].label}**`
     : `🧭 Progresso da rota: **${game.escapeProgress}/${ESCAPE_PROGRESS_TARGET}**`;
 
   const panel = new ContainerBuilder()
@@ -375,6 +519,7 @@ function buildRoundPayload(game) {
       `**Votação** ${voted}/${alive.length} sobreviventes já escolheram.`,
       `**${formatStats(game)}**`,
       `**❤️ Vida da equipe** ${teamHealthBar(game)}`,
+      `**🌦️ Ambiente** ${game.weather}  •  **🌡️ Perigo** ${game.danger}/10  •  **😮‍💨 Fadiga** ${game.fatigue}/10`,
       `**${escapeStatus}**`,
       '',
       '**🧭 Expedição**',
@@ -486,6 +631,11 @@ export function createSurvivalGame({ guildId, channelId, hostId, hostName, clien
     currentPrompt: null,
     escapeProgress: 0,
     recentChoices: [],
+    recentEvents: [],
+    escapeAttempts: 0,
+    danger: 0,
+    fatigue: 0,
+    weather: 'Estável',
     players: new Map(),
     votes: new Map(),
     supplies: 3,
@@ -562,11 +712,20 @@ function injureRandomPlayer(game, amount, events, reason) {
 
 function applyRandomEvent(game, events) {
   if (Math.random() > Math.min(0.8, 0.42 + (game.round * 0.018))) return;
-  const event = RANDOM_EVENTS[Math.floor(Math.random() * RANDOM_EVENTS.length)];
+  const generalEvents = RANDOM_EVENTS.map((event, index) => ({ ...event, key: `general-${index}` }));
+  const biomeEvents = BIOME_EVENTS[game.biomeKey] ?? [];
+  const available = [...generalEvents, ...biomeEvents].filter(event => !game.recentEvents.includes(event.key));
+  const pool = available.length ? available : [...generalEvents, ...biomeEvents];
+  const event = pool[Math.floor(Math.random() * pool.length)];
   game.supplies = Math.max(0, game.supplies + (event.supplies ?? 0));
   game.signal = Math.max(0, game.signal + (event.signal ?? 0));
   game.morale = Math.max(0, Math.min(MAX_MORALE, game.morale + (event.morale ?? 0)));
   game.escapeProgress = Math.max(0, Math.min(ESCAPE_PROGRESS_TARGET, game.escapeProgress + (event.progress ?? 0)));
+  game.danger = Math.max(0, Math.min(10, game.danger + (event.danger ?? 0)));
+  game.fatigue = Math.max(0, Math.min(10, game.fatigue + (event.fatigue ?? 0)));
+  if (event.weather) game.weather = event.weather;
+  game.recentEvents.push(event.key);
+  if (game.recentEvents.length > 8) game.recentEvents.shift();
   events.push(event.text);
   if (event.damage) injureRandomPlayer(game, event.damage, events, 'foi atingido pelo acontecimento');
   if (event.risk && Math.random() < event.risk) injureRandomPlayer(game, 1, events, 'se feriu no caos');
@@ -579,19 +738,32 @@ async function applyChoice(game, scenario, choice) {
     && aliveBefore.every(player => game.votes.get(player.userId) === choice.id);
 
   if (choice.escape) {
-    const readiness = Math.min(0.92, 0.35
+    game.escapeAttempts += 1;
+    const plan = ESCAPE_PLANS.find(item => item.id === choice.id) ?? ESCAPE_PLANS[0];
+    const requirements = plan.requirements ?? {};
+    const missing = [
+      ['signal', requirements.signal, game.signal],
+      ['supplies', requirements.supplies, game.supplies],
+      ['morale', requirements.morale, game.morale],
+      ['progress', requirements.progress, game.escapeProgress],
+    ].filter(([, required, current]) => required != null && current < required);
+    const readiness = Math.min(0.92, (missing.length ? 0.14 : 0.35)
       + (game.signal * 0.045)
       + (game.supplies * 0.025)
       + (game.morale * 0.03)
-      + (unanimous ? 0.12 : 0));
+      + (unanimous ? 0.12 : 0)
+      + (plan.bonus ?? 0)
+      - (game.danger * 0.018)
+      - (game.fatigue * 0.012));
     if (Math.random() < readiness) {
       game.result = 'won';
       game.resultImage = 'survival-rescue-banner.png';
-      events.push(`🚁 A fuga funcionou: o grupo alcançou uma rota segura e deixou o bioma após ${game.round + 1} rodada(s).`);
+      events.push(`🚁 A fuga funcionou: **${plan.label}** levou o grupo para fora do bioma após ${game.round + 1} rodada(s).`);
     } else {
       game.escapeProgress = Math.max(0, game.escapeProgress - 2);
       game.supplies = Math.max(0, game.supplies - 1);
-      events.push('🌊 A tentativa de fuga falhou. A rota desabou antes de o grupo conseguir sair; será preciso reconstruir o caminho.');
+      game.danger = Math.min(10, game.danger + 2);
+      events.push(`🌊 **${plan.label}** falhou${missing.length ? ` por falta de ${missing.map(([name]) => name).join(', ')}` : ''}. A rota desabou antes de o grupo conseguir sair; será preciso reconstruir o caminho.`);
       injureRandomPlayer(game, 1, events, 'se feriu na fuga frustrada');
     }
   } else {
@@ -599,6 +771,8 @@ async function applyChoice(game, scenario, choice) {
     game.signal = Math.max(0, game.signal + (choice.signal ?? 0));
     game.morale = Math.max(0, Math.min(MAX_MORALE, game.morale + (choice.morale ?? 0)));
     game.escapeProgress = Math.max(0, Math.min(ESCAPE_PROGRESS_TARGET, game.escapeProgress + (choice.progress ?? 0)));
+    game.danger = Math.max(0, Math.min(10, game.danger + 1 + (choice.danger ?? 0)));
+    game.fatigue = Math.max(0, Math.min(10, game.fatigue + 1 + (choice.fatigue ?? 0)));
 
     if (choice.healAll) {
       const healed = activePlayers(game).filter(player => player.hp < MAX_HP);
@@ -625,13 +799,27 @@ async function applyChoice(game, scenario, choice) {
       game.teamStreak = 0;
     }
 
-    const escalatingRisk = Math.min(0.86, (choice.risk ?? 0) + (game.round * 0.018) - (game.morale * 0.008));
+    const escalatingRisk = Math.min(0.9, (choice.risk ?? 0)
+      + (game.round * 0.018)
+      + (game.danger * 0.012)
+      + (game.fatigue * 0.01)
+      - (game.morale * 0.008));
     if (Math.random() < escalatingRisk) {
       injureRandomPlayer(game, 1, events, 'se feriu durante a decisão');
     }
 
     if (game.supplies === 0 && activePlayers(game).length) {
       injureRandomPlayer(game, 1, events, 'ficou sem forças por falta de suprimentos');
+    }
+
+    if (game.fatigue >= 7 && activePlayers(game).length) {
+      injureRandomPlayer(game, 1, events, 'desabou de exaustão');
+      events.push('😮‍💨 A equipe está exausta. Uma ação de abrigo ou recuperação pode reduzir a fadiga.');
+    }
+
+    if (game.danger >= 8 && activePlayers(game).length) {
+      game.morale = Math.max(0, game.morale - 1);
+      events.push('⚠️ O perigo acumulado deixou todos em alerta e a moral caiu.');
     }
 
     applyRandomEvent(game, events);
@@ -680,6 +868,14 @@ function applyPersonalAction(game, player, actionId) {
   } else if (actionId === 'rally') {
     game.morale = Math.min(MAX_MORALE, game.morale + 1);
     message = `📣 **${playerName(player)}** animou a equipe. A moral subiu para **${game.morale}**.`;
+  } else if (actionId === 'rest') {
+    game.fatigue = Math.max(0, game.fatigue - 2);
+    game.morale = Math.min(MAX_MORALE, game.morale + 1);
+    message = `😴 **${playerName(player)}** encontrou um lugar seguro para descansar. A fadiga da equipe caiu para **${game.fatigue}/10**.`;
+  } else if (actionId === 'guard') {
+    game.danger = Math.max(0, game.danger - 1);
+    game.fatigue = Math.min(10, game.fatigue + 1);
+    message = `🛡️ **${playerName(player)}** montou guarda durante a preparação. O perigo caiu para **${game.danger}/10**.`;
   } else {
     return { ok: false, message: 'Ação inválida.' };
   }
