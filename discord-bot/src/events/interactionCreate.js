@@ -85,6 +85,7 @@ import {
 import { handleDropClaim, handleDropItemSelect } from '../utils/dropHandlers.js';
 import { handleDeathEventInteraction } from '../utils/deathEvent.js';
 import { awardInteractionXp } from '../utils/reputation.js';
+import { handleSurvivalInteraction } from '../utils/survivalGame.js';
 import {
   handlePainelFuncoes,
   handlePainelVoltar,
@@ -1153,6 +1154,10 @@ export default {
       // ── BUTTONS ────────────────────────────────────────────────────────────
       if (interaction.isButton()) {
         const { customId } = interaction;
+
+        if (customId.startsWith('survival_')) {
+          return handleSurvivalInteraction(interaction);
+        }
 
         if (customId.startsWith('profile_refresh:') || customId.startsWith('wallet_refresh:')) {
           const isProfile = customId.startsWith('profile_refresh:');
