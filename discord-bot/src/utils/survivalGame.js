@@ -158,6 +158,17 @@ function buildLobbyPayload(game) {
           .setLabel('Iniciar partida')
           .setEmoji('🚀')
           .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId(`survival_tag:${game.id}`)
+          .setLabel('Marcar participantes')
+          .setEmoji('📣')
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(game.players.size === 0),
+        new ButtonBuilder()
+          .setCustomId(`survival_close:${game.id}`)
+          .setLabel('Fechar expedição')
+          .setEmoji('🛑')
+          .setStyle(ButtonStyle.Danger),
       ),
     ],
   };
@@ -200,6 +211,16 @@ function buildRoundPayload(game) {
       .setLabel('Ver situação')
       .setEmoji('📊')
       .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(`survival_tag:${game.id}`)
+      .setLabel('Marcar participantes')
+      .setEmoji('📣')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(`survival_close:${game.id}`)
+      .setLabel('Fechar expedição')
+      .setEmoji('🛑')
+      .setStyle(ButtonStyle.Danger),
   ));
 
   return {
@@ -242,12 +263,12 @@ export function buildSurvivalPayload(game) {
   return buildRoundPayload(game);
 }
 
-async function deleteTemporaryChannel(game) {
+async function deleteTemporaryChannel(game, reason = 'Expedição de sobrevivência encerrada') {
   if (!game.temporaryChannel || !game.client || !game.channelId) return;
   try {
     const channel = game.client.channels.cache.get(game.channelId)
       ?? await game.client.channels.fetch(game.channelId).catch(() => null);
-    if (channel) await channel.delete('Expedição de sobrevivência encerrada');
+    if (channel) await channel.delete(reason);
   } catch (error) {
     console.error('[SURVIVAL] Falha ao remover canal temporário:', error.message);
   }
@@ -264,6 +285,15 @@ export function removeSurvivalGame(gameId) {
   if (!game) return;
   clearTimeout(game.timer);
   games.delete(gameId);
+}
+
+export async function closeSurvivalGame(gameId, reason = 'Expedição fechada pelo organizador') {
+  const game = games.get(gameId);
+  if (!game) return false;
+  clearTimeout(game.timer);
+  games.delete(gameId);
+  await deleteTemporaryChannel(game, reason);
+  return true;
 }
 
 export function createSurvivalGame({ guildId, channelId, hostId, hostName, client, temporaryChannel = false }) {
@@ -288,6 +318,7 @@ export function createSurvivalGame({ guildId, channelId, hostId, hostName, clien
     result: null,
     resultImage: 'survival-rescue.png',
     rewardsPaid: false,
+    lastTagAt: 0,
   };
   games.set(game.id, game);
   game.timer = setTimeout(() => expireGame(game), GAME_TTL_MS);
@@ -420,13 +451,28 @@ export async function handleSurvivalInteraction(interaction) {
     if (game.players.has(interaction.user.id)) return interaction.reply({ content: '✅ Você já está na expedição.', ephemeral: true });
     if (game.players.size >= MAX_PLAYERS) return interaction.reply({ content: '❌ A expedição está lotada.', ephemeral: true });
 
-    game.players.set(interaction.user.id, {
+    const player = {
       userId: interaction.user.id,
       username: interaction.user.username,
       displayName: interaction.member?.displayName ?? interaction.user.globalName ?? interaction.user.username,
       hp: 3,
       alive: true,
-    });
+    };
+    game.players.set(interaction.user.id, player);
+    try {
+      await interaction.channel.permissionOverwrites.edit(interaction.user.id, {
+        ViewChannel: true,
+        ReadMessageHistory: true,
+        SendMessages: true,
+      });
+    } catch (error) {
+      game.players.delete(interaction.user.id);
+      console.error('[SURVIVAL] Falha ao liberar chat para participante:', error.message);
+      return interaction.reply({
+        content: '❌ Você entrou, mas não consegui liberar sua permissão de fala neste canal.',
+        ephemeral: true,
+      });
+    }
     return interaction.update(buildSurvivalPayload(game));
   }
 
@@ -434,6 +480,9 @@ export async function handleSurvivalInteraction(interaction) {
     if (game.stage !== 'lobby') return interaction.reply({ content: '❌ Depois que começa, não dá para abandonar a expedição.', ephemeral: true });
     if (interaction.user.id === game.hostId) return interaction.reply({ content: '❌ O organizador não pode sair. Cancele a mensagem ou inicie a partida.', ephemeral: true });
     if (!game.players.delete(interaction.user.id)) return interaction.reply({ content: '❌ Você ainda não entrou.', ephemeral: true });
+    await interaction.channel.permissionOverwrites.delete(interaction.user.id).catch(error => {
+      console.error('[SURVIVAL] Falha ao remover permissão do participante:', error.message);
+    });
     return interaction.update(buildSurvivalPayload(game));
   }
 
@@ -457,6 +506,33 @@ export async function handleSurvivalInteraction(interaction) {
       content: `**📊 Situação da expedição**\n${status}\n${formatStats(game)}\n\n${playerList(game)}`,
       ephemeral: true,
     });
+  }
+
+  if (action === 'survival_tag') {
+    if (interaction.user.id !== game.hostId) {
+      return interaction.reply({ content: '❌ Apenas quem criou a expedição pode marcar os participantes.', ephemeral: true });
+    }
+    if (!game.players.size) return interaction.reply({ content: '❌ Ainda não há participantes para marcar.', ephemeral: true });
+    if (Date.now() - game.lastTagAt < 30_000) {
+      return interaction.reply({ content: '⏳ Espere alguns segundos antes de marcar o grupo novamente.', ephemeral: true });
+    }
+
+    const userIds = [...game.players.keys()];
+    game.lastTagAt = Date.now();
+    await interaction.reply({ content: '📣 Participantes marcados no canal.', ephemeral: true });
+    return interaction.channel.send({
+      content: `📣 **Expedição ${game.stage === 'lobby' ? 'aguardando começar' : 'em andamento'}!** ${userIds.map(userId => `<@${userId}>`).join(' ')}`,
+      allowedMentions: { users: userIds },
+    });
+  }
+
+  if (action === 'survival_close') {
+    if (interaction.user.id !== game.hostId) {
+      return interaction.reply({ content: '❌ Apenas quem criou a expedição pode fechá-la.', ephemeral: true });
+    }
+    await interaction.reply({ content: '🛑 Expedição fechada. O canal temporário será removido.', ephemeral: true });
+    await closeSurvivalGame(game.id);
+    return;
   }
 
   if (action === 'survival_choice') {
