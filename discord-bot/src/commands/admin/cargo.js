@@ -45,6 +45,17 @@ function roleQueryText(value) {
     .trim();
 }
 
+function normalizeRoleName(value) {
+  return String(value ?? '')
+    .replace(/[\p{Cc}\p{Cf}\p{M}\u00AD\u061C\u115F\u1160\u180E\u2800\u3164\uFFA0]/gu, '')
+    .normalize('NFKD')
+    // Remove caracteres invisíveis/formatadores usados como prefixo de cargos.
+    .replace(/[\p{Cc}\p{Cf}\p{M}\u00AD\u061C\u115F\u1160\u180E\u2800\u3164\uFFA0]/gu, '')
+    .replace(/\s+/gu, ' ')
+    .trim()
+    .toLocaleLowerCase('pt-BR');
+}
+
 async function resolveRole(guild, value) {
   const query = roleQueryText(value);
   if (!query) return { error: 'Você precisa informar o ID, o nome ou o começo do nome do cargo.' };
@@ -59,8 +70,8 @@ async function resolveRole(guild, value) {
 
   const roles = await guild.roles.fetch().catch(() => guild.roles.cache);
   const manageableRoles = [...roles.values()].filter(role => !role.managed && role.id !== guild.id);
-  const normalized = query.toLocaleLowerCase('pt-BR');
-  const exactMatches = manageableRoles.filter(role => role.name.toLocaleLowerCase('pt-BR') === normalized);
+  const normalized = normalizeRoleName(query);
+  const exactMatches = manageableRoles.filter(role => normalizeRoleName(role.name) === normalized);
   if (exactMatches.length === 1) return { role: exactMatches[0] };
   if (exactMatches.length > 1) {
     return {
@@ -68,7 +79,7 @@ async function resolveRole(guild, value) {
     };
   }
 
-  const matches = manageableRoles.filter(role => role.name.toLocaleLowerCase('pt-BR').startsWith(normalized));
+  const matches = manageableRoles.filter(role => normalizeRoleName(role.name).startsWith(normalized));
   if (matches.length === 1) return { role: matches[0] };
   if (matches.length > 1) {
     const names = matches
