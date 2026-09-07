@@ -92,7 +92,8 @@ function playerList(game) {
 
 function formatStats(game) {
   const alive = activePlayers(game).length;
-  return `👥 **${alive}/${game.players.size}** vivos  •  🧰 **${Math.max(0, game.supplies)}** suprimentos  •  📡 **${Math.max(0, game.signal)}** sinal`;
+  const streak = game.teamStreak > 0 ? `  •  🔥 **${game.teamStreak}** em sequência` : '';
+  return `👥 **${alive}/${game.players.size}** vivos  •  🧰 **${Math.max(0, game.supplies)}** suprimentos  •  📡 **${Math.max(0, game.signal)}** sinal  •  🫶 **${Math.max(0, game.morale)}** moral${streak}`;
 }
 
 function scenarioFor(game) {
@@ -185,7 +186,7 @@ function buildRoundPayload(game) {
 
   const embed = new EmbedBuilder()
     .setColor(0xF59E0B)
-    .setTitle(scenario.title)
+    .setTitle(`${scenario.title} • ${game.round + 1}/${SCENARIOS.length}`)
     .setDescription(
       `${scenario.text}${history}\n\n` +
       `**Votação:** ${voted}/${alive.length} sobreviventes já escolheram.\n` +
@@ -224,6 +225,9 @@ function buildRoundPayload(game) {
   ));
 
   return {
+    content:
+      '💬 **Conversem no chat deste canal antes de votar!** ' +
+      `A rodada fecha automaticamente em ${VOTE_TIMEOUT_MS / 1000}s, ou assim que todos escolherem.`,
     embeds: [embed],
     files: [new AttachmentBuilder(assetPath(scenario.image), { name: scenario.image })],
     components: rows,
@@ -251,6 +255,7 @@ function buildFinishedPayload(game) {
     .setImage(`attachment://${game.resultImage}`);
 
   return {
+    content: '🏁 **Expedição encerrada.** Obrigado a todos que participaram da história.',
     embeds: [embed],
     files: [new AttachmentBuilder(assetPath(game.resultImage), { name: game.resultImage })],
     components: [],
@@ -313,6 +318,7 @@ export function createSurvivalGame({ guildId, channelId, hostId, hostName, clien
     supplies: 2,
     signal: 0,
     morale: 2,
+    teamStreak: 0,
     history: [],
     timer: null,
     result: null,
@@ -331,16 +337,27 @@ function getGame(id) {
   return game;
 }
 
-async function updateGameMessage(client, game) {
+async function publishGameMessage(client, game) {
   try {
     const channel = client.channels.cache.get(game.channelId)
       ?? await client.channels.fetch(game.channelId).catch(() => null);
-    const message = channel
-      ? await channel.messages.fetch(game.messageId).catch(() => null)
-      : null;
-    if (message) await message.edit(buildSurvivalPayload(game));
+    if (!channel) return null;
+
+    if (game.messageId) {
+      const previousMessage = await channel.messages.fetch(game.messageId).catch(() => null);
+      if (previousMessage) {
+        await previousMessage.edit({ components: [] }).catch(error => {
+          console.error('[SURVIVAL] Falha ao arquivar painel anterior:', error.message);
+        });
+      }
+    }
+
+    const message = await channel.send(buildSurvivalPayload(game));
+    game.messageId = message.id;
+    return message;
   } catch (error) {
-    console.error('[SURVIVAL] Falha ao atualizar painel:', error.message);
+    console.error('[SURVIVAL] Falha ao publicar capítulo:', error.message);
+    return null;
   }
 }
 
@@ -363,6 +380,21 @@ async function applyChoice(game, scenario, choice) {
 
   const events = [`A maioria escolheu **${choice.label}**.`];
   const alive = activePlayers(game);
+  const unanimous = alive.length > 0
+    && alive.every(player => game.votes.get(player.userId) === choice.id);
+
+  if (unanimous) {
+    game.teamStreak += 1;
+    game.morale += 1;
+    events.push(`🤝 Decisão unânime! A equipe ganhou confiança (${game.teamStreak} em sequência).`);
+    if (game.teamStreak >= 2) {
+      game.supplies += 1;
+      events.push('🔥 A sintonia do grupo rendeu um suprimento extra.');
+    }
+  } else {
+    if (game.teamStreak > 0) events.push('💔 O grupo se dividiu e perdeu a sequência de cooperação.');
+    game.teamStreak = 0;
+  }
 
   if (choice.risk && Math.random() < choice.risk && alive.length) {
     const victim = alive[Math.floor(Math.random() * alive.length)];
@@ -383,6 +415,20 @@ async function applyChoice(game, scenario, choice) {
       hungry.alive = false;
       events.push(`💀 **${playerName(hungry)}** ficou sem forças.`);
     }
+  }
+
+  const twists = [
+    { text: '🗺️ Um mapa antigo apareceu entre os destroços.', supplies: 1 },
+    { text: '📻 Um ruído estranho veio do rádio e revelou uma direção.', signal: 1 },
+    { text: '🌫️ Uma névoa pesada desorientou o grupo.', morale: -1 },
+    { text: '🍃 A ilha escondeu frutas seguras perto do acampamento.', supplies: 1, morale: 1 },
+  ];
+  if (Math.random() < 0.3) {
+    const twist = twists[Math.floor(Math.random() * twists.length)];
+    game.supplies = Math.max(0, game.supplies + (twist.supplies ?? 0));
+    game.signal = Math.max(0, game.signal + (twist.signal ?? 0));
+    game.morale = Math.max(0, game.morale + (twist.morale ?? 0));
+    events.push(twist.text);
   }
 
   game.history.push(events.join(' '));
@@ -436,7 +482,7 @@ async function resolveRound(client, game) {
     game.timer = setTimeout(() => expireGame(game), 15 * 60 * 1000);
   }
 
-  await updateGameMessage(client, game);
+  await publishGameMessage(client, game);
 }
 
 export async function handleSurvivalInteraction(interaction) {
@@ -494,7 +540,9 @@ export async function handleSurvivalInteraction(interaction) {
     game.round = 0;
     game.votes.clear();
     scheduleRound(interaction.client, game);
-    return interaction.update(buildSurvivalPayload(game));
+    await interaction.deferUpdate();
+    await publishGameMessage(interaction.client, game);
+    return;
   }
 
   if (action === 'survival_status') {
