@@ -1,7 +1,11 @@
 import { PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 
 function usage() {
-  return 'Uso: `s cargo add <id, nome ou começo do cargo> @membro`';
+  return [
+    'Uso:',
+    '`s cargo add <id, nome ou começo do cargo> @membro`',
+    '`s cargo add @membro <id, nome ou começo do cargo>`',
+  ].join('\n');
 }
 
 function hasManageRoles(context) {
@@ -89,7 +93,13 @@ async function addRole(context, role, member) {
   if (hierarchy) return context.reply(`❌ ${hierarchy}`);
 
   if (member.roles.cache.has(role.id)) {
-    return context.reply(`ℹ️ ${member} já possui o cargo ${role}.`);
+    try {
+      await member.roles.remove(role, `Cargo removido por ${context.user?.tag ?? context.author.tag}`);
+      return context.reply(`✅ O cargo ${role} foi removido de ${member}.`);
+    } catch (error) {
+      console.error('[CARGO REMOVE]', error);
+      return context.reply('❌ Não consegui remover esse cargo. Verifique minhas permissões e a hierarquia dos cargos.');
+    }
   }
 
   try {
@@ -142,18 +152,21 @@ export default {
   async executePrefix(message, args) {
     if (args[0]?.toLowerCase() !== 'add') return message.reply(usage());
 
-    const member = message.mentions.members.first()
-      ?? (message.mentions.users.first()
-        ? await message.guild.members.fetch(message.mentions.users.first().id).catch(() => null)
+    const mentionedMember = message.mentions.members.first();
+    const mentionedUser = message.mentions.users.first();
+    const member = mentionedMember
+      ?? (mentionedUser
+        ? await message.guild.members.fetch(mentionedUser.id).catch(() => null)
         : null);
 
     if (!member) return message.reply(usage());
 
     const roleMention = message.mentions.roles.first();
-    const roleQuery = roleMention
-      ? roleMention.id
-      : args.slice(1)
-        .filter(token => !new RegExp(`^<@!?${member.id}>$`).test(token))
+    const memberMentionPattern = new RegExp(`^<@!?${member.id}>$`);
+    const roleQuery = roleMention?.id
+      ?? args
+        .slice(1)
+        .filter(token => !memberMentionPattern.test(token))
         .join(' ');
     const resolved = await resolveRole(message.guild, roleQuery);
     if (resolved.error) return message.reply(resolved.error);
