@@ -88,18 +88,14 @@ export async function ensureMarriageSchema() {
       "responseType" TEXT,
       "responseSize" INTEGER,
       "storageKey" TEXT,
-      "storageChannelId" TEXT,
-      "storageMessageId" TEXT,
-      "storageAttachmentId" TEXT,
+      "responseData" BYTEA,
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT "MessageTrigger_pkey" PRIMARY KEY ("id")
     )
   `);
   await prisma.$executeRawUnsafe(`
     ALTER TABLE "MessageTrigger"
-      ADD COLUMN IF NOT EXISTS "storageChannelId" TEXT,
-      ADD COLUMN IF NOT EXISTS "storageMessageId" TEXT,
-      ADD COLUMN IF NOT EXISTS "storageAttachmentId" TEXT
+      ADD COLUMN IF NOT EXISTS "responseData" BYTEA
   `);
   await prisma.$executeRawUnsafe(`
     CREATE INDEX IF NOT EXISTS "MessageTrigger_guildId_idx"
