@@ -21,3 +21,4 @@
 - [Renderização de GIF no perfil](profile-gif-rendering.md) — nunca inicie fallback enquanto uma renderização nativa não cancelável ainda estiver rodando.
 - [Painel de call VIP](vip-call-panel.md) — `/vip` publica o painel no chat e gerencia uma única call configurável por membro via tópico do canal.
 - [Parcerias em Components V2](partnership-components-v2.md) — publicação sem cor lateral e sem mensagem automática; campos vazios ocultam o bloco e variáveis são resolvidas antes do envio.
+- [Mídia dos gatilhos](trigger-media-storage.md) — links do Discord expiram e o cache local pode sumir em deploys; respostas precisam de armazenamento persistente.
