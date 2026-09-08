@@ -100,32 +100,14 @@ export function buildPartnerConfigPayload(cfg = {}) {
     `📄 **Descrição:** ${cfg.partnerDescription ? cfg.partnerDescription.slice(0, 80) : '*(nenhuma)*'}`,
     `👥 **Mínimo de membros:** ${cfg.partnerMinMembers ? cfg.partnerMinMembers.toLocaleString('pt-BR') : 'Desativado'}`,
     '',
+    '👑 Eu valido os convites enviados pelo cargo responsável, notifico o cargo de ping e entrego o cargo de parceiro ao representante.',
+    '👑 Selecione novamente o canal de parcerias para trocar ou desativar o sistema.',
     '',
     '-# Envie o convite do servidor no canal configurado para registrar uma parceria.',
   ].join('\n');
 
-  const guide = [
-    '👑 Eu notifico o cargo de ping, valido parcerias feitas pelo cargo responsável no canal escolhido e entrego o cargo de parceiro ao representante.',
-    '👑 Envie o texto da parceria com um convite e identifique o representante como `Rep: @membro` ou `Representante: @membro`.',
-    '👑 Use `${null}` para remover imagem/thumbnail ou restaurar textos; `${default}` restaura o visual padrão.',
-    '',
-    '**Variáveis disponíveis em Mensagem e Descrição:**',
-    '`${promoter}` — menção do promoter.',
-    '`${rep}` — menção do representante.',
-    '`${rep.id}` — ID do representante.',
-    '`${rep.username}` — nome de usuário do representante.',
-    '`${promoterPartnership}` — quantidade de parcerias do promoter.',
-    '`${promoter.id}` — ID do promoter.',
-    '`${promoter.username}` — nome de usuário do promoter.',
-    '`${rank}` — posição/rank do promoter.',
-    '`${guild}` — nome do servidor onde a parceria foi registrada.',
-    '👑 Selecione novamente o canal de parcerias para desativar o sistema.',
-  ].join('\n');
-
   const container = new ContainerBuilder();
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(info));
-  container.addSeparatorComponents(new SeparatorBuilder());
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(guide));
 
   return { components: [container, ...partnerConfigButtons(cfg)], flags: MessageFlags.IsComponentsV2 };
 }
