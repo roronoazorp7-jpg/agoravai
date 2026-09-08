@@ -325,6 +325,22 @@ function callPermissionOverwrites(interaction, isPrivate) {
   return base;
 }
 
+function getVipVoiceOptions(interaction, form, extra = {}) {
+  const maximumBitrate = Number(interaction.guild.maximumBitrate) || 96_000;
+  const bitrate = Math.min(form.bitrate, maximumBitrate);
+  const options = {
+    ...extra,
+    userLimit: form.userLimit,
+    bitrate,
+    permissionOverwrites: callPermissionOverwrites(interaction, form.isPrivate),
+  };
+
+  // "auto" deve deixar o Discord escolher a região. Enviar null em alguns
+  // endpoints/versões pode causar uma rejeição desnecessária na criação.
+  if (form.rtcRegion) options.rtcRegion = form.rtcRegion;
+  return options;
+}
+
 async function refreshVipPanelMessage(interaction) {
   if (!interaction.message) return;
   const [cfg, grants] = await Promise.all([
@@ -416,10 +432,7 @@ export async function handleVipCallModal(interaction) {
 
       await call.edit({
         name: form.name,
-        userLimit: form.userLimit,
-        bitrate: form.bitrate,
-        rtcRegion: form.rtcRegion,
-        permissionOverwrites: callPermissionOverwrites(interaction, form.isPrivate),
+        ...getVipVoiceOptions(interaction, form),
       }, 'Configuração da call VIP atualizada pelo proprietário');
     } else {
       const parentId = interaction.channel?.parent?.type === ChannelType.GuildCategory
@@ -430,10 +443,7 @@ export async function handleVipCallModal(interaction) {
         type: ChannelType.GuildVoice,
         parent: parentId,
         topic: vipCallTopic(interaction.guildId, userId),
-        userLimit: form.userLimit,
-        bitrate: form.bitrate,
-        rtcRegion: form.rtcRegion,
-        permissionOverwrites: callPermissionOverwrites(interaction, form.isPrivate),
+        ...getVipVoiceOptions(interaction, form),
       });
     }
 
@@ -444,7 +454,7 @@ export async function handleVipCallModal(interaction) {
   } catch (error) {
     console.error('[VIP] Falha ao configurar call VIP:', error);
     return interaction.editReply(
-      '❌ Não consegui configurar essa call. Confira o limite de bitrate permitido pelo servidor e minhas permissões de **Gerenciar Canais**.',
+      '❌ Não consegui configurar essa call. Confira se minhas permissões de **Gerenciar Canais** estão ativas.',
     );
   }
 }
