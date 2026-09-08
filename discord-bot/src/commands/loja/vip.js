@@ -95,9 +95,11 @@ function findVipCall(guild, userId) {
   ));
 }
 
-function getVipBotMember(interaction) {
-  return interaction.guild.members.me
-    ?? interaction.guild.members.fetch(interaction.client.user.id).catch(() => null);
+async function getVipBotMember(interaction) {
+  // Atualiza cargos e permissões no Discord antes da checagem. O membro em
+  // cache pode continuar sem ManageChannels mesmo depois de uma alteração.
+  return interaction.guild.members.fetchMe()
+    .catch(() => interaction.guild.members.me ?? null);
 }
 
 function buildVipMemberPanel(cfg, grants, call, userId) {
@@ -409,9 +411,11 @@ export async function handleVipCallModal(interaction) {
   }
 
   const botMember = await getVipBotMember(interaction);
-  if (!botMember?.permissions.has(PermissionFlagsBits.ManageChannels)) {
+  const canManageChannels = botMember?.permissions.has(PermissionFlagsBits.ManageChannels);
+  if (!canManageChannels) {
     return interaction.reply({
-      content: '❌ Eu preciso da permissão **Gerenciar Canais** para criar e configurar sua call VIP.',
+      content: '❌ Não consegui confirmar a permissão **Gerenciar Canais** do bot neste servidor. ' +
+        'Atualize as permissões do bot e tente novamente.',
       ephemeral: true,
     });
   }
