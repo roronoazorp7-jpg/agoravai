@@ -181,40 +181,68 @@ function extractMediaCandidates(text) {
   return candidates.slice(0, 8);
 }
 
+function getTriggerUrlCandidates(value) {
+  const original = cleanUrlCandidate(value);
+  if (!original) return [];
+
+  const candidates = [original];
+  try {
+    const parsed = new URL(original);
+    const isDiscordAttachment = /(?:^|\.)discord(?:app)?\.com$/i.test(parsed.hostname)
+      && parsed.pathname.includes('/attachments/');
+    if (isDiscordAttachment && parsed.search) {
+      parsed.search = '';
+      candidates.push(parsed.toString());
+    }
+  } catch {
+    // The fetch below will reject malformed URLs.
+  }
+  return candidates;
+}
+
 async function resolveTriggerMediaSource(url, expectedType, depth = 0, visited = new Set()) {
-  if (!url || depth > 2 || visited.has(url)) return null;
-  visited.add(url);
+  if (!url || depth > 2) return null;
 
-  const response = await fetch(url, {
-    headers: {
-      'user-agent': 'Mozilla/5.0 (compatible; SavageBot/1.0)',
-      accept: '*/*',
-    },
-  }).catch(() => null);
-  if (!response?.ok || !response.body) return null;
-
-  const responseType = String(response.headers.get('content-type') ?? '')
-    .split(';', 1)[0]
-    .toLowerCase();
   const fallbackType = String(expectedType ?? '').split(';', 1)[0].toLowerCase();
-  const urlType = getMediaTypeFromUrl(url);
-  if (ALLOWED_TYPES.test(responseType)) {
-    return { url, contentType: responseType };
-  }
-  if (responseType === 'application/octet-stream' && ALLOWED_TYPES.test(fallbackType)) {
-    return { url, contentType: fallbackType };
-  }
-  if ((!responseType || responseType === 'application/octet-stream' || responseType === 'text/plain')
-    && ALLOWED_TYPES.test(urlType)) {
-    return { url, contentType: urlType };
-  }
+  for (const candidateUrl of getTriggerUrlCandidates(url)) {
+    if (visited.has(candidateUrl)) continue;
+    visited.add(candidateUrl);
 
-  const length = Number(response.headers.get('content-length') ?? 0);
-  if (length > 2 * 1024 * 1024) return null;
-  const body = await response.text().catch(() => '');
-  for (const candidate of extractMediaCandidates(body)) {
-    const resolved = await resolveTriggerMediaSource(candidate, fallbackType, depth + 1, visited);
-    if (resolved) return resolved;
+    const response = await fetch(candidateUrl, {
+      headers: {
+        'user-agent': 'Mozilla/5.0 (compatible; SavageBot/1.0)',
+        accept: '*/*',
+      },
+    }).catch(() => null);
+    if (!response?.ok || !response.body) continue;
+
+    const responseType = String(response.headers.get('content-type') ?? '')
+      .split(';', 1)[0]
+      .toLowerCase();
+    const urlType = getMediaTypeFromUrl(candidateUrl);
+    if (ALLOWED_TYPES.test(responseType)) {
+      return { url: candidateUrl, contentType: responseType };
+    }
+    if (responseType === 'application/octet-stream' && ALLOWED_TYPES.test(fallbackType)) {
+      return { url: candidateUrl, contentType: fallbackType };
+    }
+    if ((!responseType || responseType === 'application/octet-stream' || responseType === 'text/plain')
+      && ALLOWED_TYPES.test(urlType)) {
+      return { url: candidateUrl, contentType: urlType };
+    }
+
+    const length = Number(response.headers.get('content-length') ?? 0);
+    if (length > 2 * 1024 * 1024) continue;
+    const body = await response.text().catch(() => '');
+    for (const nestedCandidate of extractMediaCandidates(body)) {
+      const resolved = await resolveTriggerMediaSource(
+        nestedCandidate,
+        fallbackType,
+        depth + 1,
+        visited,
+      );
+      if (resolved) return resolved;
+    }
   }
   return null;
 }
