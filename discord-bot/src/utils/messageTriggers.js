@@ -2,6 +2,7 @@ import { createWriteStream } from 'fs';
 import { mkdir, readFile, rename, stat, unlink, writeFile } from 'fs/promises';
 import { basename, dirname, extname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { randomUUID } from 'crypto';
 import { Readable, Transform } from 'stream';
 import { pipeline } from 'stream/promises';
 import {
@@ -23,8 +24,8 @@ import prisma from '../database/client.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TRIGGER_DIR = join(__dirname, '../assets/triggers');
-const MAX_FILE_SIZE = 500 * 1024 * 1024;
 const MAX_DATABASE_MEDIA_SIZE = 100 * 1024 * 1024;
+const MAX_FILE_SIZE = MAX_DATABASE_MEDIA_SIZE;
 const ALLOWED_TYPES = /^(image|video|audio)\//i;
 const TYPE_EXTENSIONS = {
   'video/mp4': '.mp4',
@@ -373,7 +374,7 @@ export function buildTriggerModal() {
         .setTextInputComponent(keywordsInput),
       new LabelBuilder()
         .setLabel('Arquivo de resposta')
-        .setDescription('Vídeo, gif, imagem ou áudio. Limite de 500 MB.')
+        .setDescription('Vídeo, gif, imagem ou áudio. Limite de 100 MB.')
         .setFileUploadComponent(fileInput),
     );
 }
@@ -381,7 +382,7 @@ export function buildTriggerModal() {
 async function saveAttachment(guildId, triggerId, attachment, fileName) {
   if (!attachment?.url) throw new Error('Arquivo não encontrado.');
   if (attachment.size && attachment.size > MAX_FILE_SIZE) {
-    throw new Error('O arquivo excede o limite de 500 MB.');
+    throw new Error('O arquivo excede o limite de 100 MB.');
   }
   if (attachment.contentType && !ALLOWED_TYPES.test(attachment.contentType)) {
     throw new Error('O arquivo precisa ser um vídeo, gif, imagem ou áudio.');
@@ -402,7 +403,7 @@ async function saveAttachment(guildId, triggerId, attachment, fileName) {
       transform(chunk, encoding, callback) {
         total += chunk.length;
         if (total > MAX_FILE_SIZE) {
-          callback(new Error('O arquivo excede o limite de 500 MB.'));
+          callback(new Error('O arquivo excede o limite de 100 MB.'));
           return;
         }
         callback(null, chunk);
@@ -516,46 +517,44 @@ export async function handleTriggerModal(interaction) {
     return interaction.editReply('❌ Envie um arquivo de resposta.');
   }
   if (attachment.size > MAX_FILE_SIZE) {
-    return interaction.editReply('❌ O arquivo excede o limite de 500 MB.');
+    return interaction.editReply('❌ O arquivo excede o limite de 100 MB.');
   }
   if (attachment.contentType && !ALLOWED_TYPES.test(attachment.contentType)) {
     return interaction.editReply('❌ O arquivo precisa ser um vídeo, gif, imagem ou áudio.');
   }
 
-  const trigger = await prisma.messageTrigger.create({
-    data: {
-      guildId: interaction.guildId,
-      name,
-      keywords: keywords.join('\n'),
-      responseUrl: attachment.url,
-      responseName: safeFileName(attachment.name),
-      responseType: attachment.contentType || null,
-      responseSize: attachment.size || null,
-    },
-  });
-
   let saved = null;
   try {
+    // O disco local é somente uma área temporária para montar o Bytes.
+    // O registro do gatilho só é criado depois que o arquivo inteiro foi
+    // baixado, para nunca deixar um gatilho novo apontando para uma URL
+    // temporária sem o conteúdo persistido no banco.
+    const triggerId = randomUUID();
     saved = await saveAttachment(
       interaction.guildId,
-      trigger.id,
+      triggerId,
       attachment,
       attachment.name,
     );
-    if (saved.size > MAX_DATABASE_MEDIA_SIZE) {
-      throw new Error('Para armazenamento dentro do bot, o arquivo deve ter no máximo 100 MB.');
-    }
-    await prisma.messageTrigger.update({
-      where: { id: trigger.id },
+    const responseData = await readFile(join(TRIGGER_DIR, saved.storageKey));
+    await prisma.messageTrigger.create({
       data: {
-        storageKey: saved.storageKey,
-        responseData: await readFile(join(TRIGGER_DIR, saved.storageKey)),
+        id: triggerId,
+        guildId: interaction.guildId,
+        name,
+        keywords: keywords.join('\n'),
+        // Mantido somente para compatibilidade com registros antigos. Para
+        // gatilhos novos, responseData é a fonte permanente.
+        responseUrl: attachment.url,
+        responseName: safeFileName(attachment.name),
+        responseType: attachment.contentType || null,
         responseSize: saved.size,
+        storageKey: saved.storageKey,
+        responseData,
       },
     });
   } catch (error) {
     if (saved?.storageKey) await unlink(join(TRIGGER_DIR, saved.storageKey)).catch(() => {});
-    await prisma.messageTrigger.delete({ where: { id: trigger.id } }).catch(() => {});
     return interaction.editReply(
       `❌ Não consegui guardar o arquivo dentro do bot: ${error.message}`,
     );
