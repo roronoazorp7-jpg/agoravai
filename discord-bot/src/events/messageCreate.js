@@ -26,7 +26,7 @@ import { clearAfkOnMessage, handleAfkMessage } from '../commands/general/afk.js'
 import { enforceAntiLink } from '../utils/antiLink.js';
 import { DISBOARD_BOT_ID, handleDisboardBump } from '../utils/bumpReminder.js';
 import { isCommandBlocked, COMMAND_BLOCK_COMMAND } from '../utils/commandBlock.js';
-import { findMatchingTrigger, getTriggerFile } from '../utils/messageTriggers.js';
+import { findMatchingTrigger, getTriggerFile, getTriggerFileName } from '../utils/messageTriggers.js';
 import {
   checkMessageSpam,
   formatRetryAfter,
@@ -183,12 +183,12 @@ async function handleMessageTrigger(message) {
     const filePath = await getTriggerFile(trigger);
     if (!filePath) return false;
     await message.channel.send({
-      files: [{ attachment: filePath, name: trigger.responseName }],
+      files: [{ attachment: filePath, name: getTriggerFileName(trigger) }],
     });
   } catch (error) {
     console.error('[MESSAGE TRIGGER]', error?.message ?? error);
     await message.channel.send({
-      files: [{ attachment: trigger.responseUrl, name: trigger.responseName }],
+      files: [{ attachment: trigger.responseUrl, name: getTriggerFileName(trigger) }],
     }).catch(() => {});
   }
   return true;

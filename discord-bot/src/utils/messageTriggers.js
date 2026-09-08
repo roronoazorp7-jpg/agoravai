@@ -1,6 +1,6 @@
 import { createWriteStream } from 'fs';
 import { mkdir, rename, stat, unlink } from 'fs/promises';
-import { basename, dirname, join } from 'path';
+import { basename, dirname, extname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { Readable, Transform } from 'stream';
 import { pipeline } from 'stream/promises';
@@ -25,6 +25,18 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const TRIGGER_DIR = join(__dirname, '../assets/triggers');
 const MAX_FILE_SIZE = 500 * 1024 * 1024;
 const ALLOWED_TYPES = /^(image|video|audio)\//i;
+const TYPE_EXTENSIONS = {
+  'video/mp4': '.mp4',
+  'video/webm': '.webm',
+  'video/quicktime': '.mov',
+  'video/x-matroska': '.mkv',
+  'image/gif': '.gif',
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'audio/mpeg': '.mp3',
+  'audio/ogg': '.ogg',
+  'audio/wav': '.wav',
+};
 
 function normalizeKeyword(value) {
   return String(value ?? '')
@@ -63,6 +75,23 @@ function safeFileName(value) {
     .replace(/[^a-zA-Z0-9._-]/g, '_')
     .slice(0, 100);
   return clean || 'resposta.bin';
+}
+
+export function getTriggerFileName(trigger) {
+  const name = safeFileName(trigger?.responseName);
+  const mimeType = String(trigger?.responseType ?? '').split(';', 1)[0].toLowerCase();
+  const extension = TYPE_EXTENSIONS[mimeType] ?? '';
+  if (extension && (!extname(name) || extname(name).toLowerCase() === '.bin')) {
+    return `${name.replace(/\.bin$/i, '')}${extension}`;
+  }
+  return extname(name) ? name : `${name}${extension}`;
+}
+
+function shouldRefreshStoredFile(trigger, size) {
+  if (!size || size <= 64) return true;
+  if (String(trigger?.responseType ?? '').startsWith('video/') && size < 1024) return true;
+  if (trigger?.responseSize && trigger.responseSize > size && size < trigger.responseSize * 0.9) return true;
+  return false;
 }
 
 function displayName(trigger) {
@@ -215,6 +244,9 @@ async function saveAttachment(guildId, triggerId, attachment, fileName) {
     });
     await pipeline(Readable.fromWeb(response.body), limiter, createWriteStream(temp));
     await rename(temp, target);
+    if (String(attachment.contentType ?? '').startsWith('video/') && total < 1024) {
+      throw new Error('O download retornou um vídeo inválido ou incompleto.');
+    }
     return { storageKey, size: total };
   } catch (error) {
     await unlink(temp).catch(() => {});
@@ -225,7 +257,11 @@ async function saveAttachment(guildId, triggerId, attachment, fileName) {
 export async function getTriggerFile(trigger) {
   if (trigger.storageKey) {
     const storedPath = join(TRIGGER_DIR, trigger.storageKey);
-    if (await stat(storedPath).then(() => true).catch(() => false)) return storedPath;
+    const storedSize = await stat(storedPath)
+      .then(fileStat => fileStat.size)
+      .catch(() => null);
+    if (storedSize !== null && !shouldRefreshStoredFile(trigger, storedSize)) return storedPath;
+    if (storedSize !== null) await unlink(storedPath).catch(() => {});
   }
 
   if (!trigger.responseUrl) return null;
@@ -241,7 +277,7 @@ export async function getTriggerFile(trigger) {
   );
   await prisma.messageTrigger.update({
     where: { id: trigger.id },
-    data: { storageKey: saved.storageKey, responseSize: saved.size },
+    data: { storageKey: saved.storageKey },
   }).catch(() => {});
   return join(TRIGGER_DIR, saved.storageKey);
 }
