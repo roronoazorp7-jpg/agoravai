@@ -180,6 +180,10 @@ model GuildConfig {
   partnerImage           String?
   partnerThumbnail       String?
   partnerFooter          String?
+  partnerJoinButtonText  String?
+  partnerJoinButtonEmoji String?
+  partnerMessageButtonText  String?
+  partnerMessageButtonEmoji String?
   partnerColor           String?
   partnerRemoveOnLeave   Boolean @default(false)
   partnerMinMembers      Int?

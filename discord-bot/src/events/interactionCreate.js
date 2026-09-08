@@ -461,6 +461,21 @@ const PARTNER_MODAL_FIELDS = {
   min_membros: { label: 'Mínimo de membros',     db: 'partnerMinMembers', isUrl: false, isLong: false, isInteger: true, placeholder: 'Ex: 100 (vazio para desativar)' },
 };
 
+const PARTNER_BUTTON_FIELDS = {
+  btn_entrar: {
+    title: 'Botão Entrar no Servidor',
+    textDb: 'partnerJoinButtonText',
+    emojiDb: 'partnerJoinButtonEmoji',
+    defaultText: 'Entrar no servidor',
+  },
+  btn_mensagem: {
+    title: 'Botão Ver Mensagem',
+    textDb: 'partnerMessageButtonText',
+    emojiDb: 'partnerMessageButtonEmoji',
+    defaultText: 'Ver mensagem',
+  },
+};
+
 // ─── Handler principal ────────────────────────────────────────────────────────
 
 export default {
@@ -2693,6 +2708,40 @@ export default {
             return interaction.showModal(modal);
           }
 
+          const buttonDef = PARTNER_BUTTON_FIELDS[field];
+          if (buttonDef) {
+            const cfg = await getCfg(interaction.guildId);
+            const modal = new ModalBuilder()
+              .setCustomId(`pcfg_modal_${field}`)
+              .setTitle(`🔘 ${buttonDef.title}`);
+
+            const labelInput = new TextInputBuilder()
+              .setCustomId('label')
+              .setLabel('Texto do botão (opcional)')
+              .setStyle(TextInputStyle.Short)
+              .setPlaceholder(`${buttonDef.defaultText} — vazio + emoji = só emoji`)
+              .setRequired(false)
+              .setMaxLength(80);
+            if (cfg[buttonDef.textDb] !== null && cfg[buttonDef.textDb] !== undefined && cfg[buttonDef.textDb] !== '') {
+              labelInput.setValue(String(cfg[buttonDef.textDb]));
+            }
+
+            const emojiInput = new TextInputBuilder()
+              .setCustomId('emoji')
+              .setLabel('Emoji Unicode ou personalizado (opcional)')
+              .setStyle(TextInputStyle.Short)
+              .setPlaceholder('Ex: 🔗 ou <:meu_emoji:123456789012345678>')
+              .setRequired(false)
+              .setMaxLength(100);
+            if (cfg[buttonDef.emojiDb]) emojiInput.setValue(String(cfg[buttonDef.emojiDb]));
+
+            modal.addComponents(
+              new ActionRowBuilder().addComponents(labelInput),
+              new ActionRowBuilder().addComponents(emojiInput),
+            );
+            return interaction.showModal(modal);
+          }
+
           if (field === 'toggle_enabled') {
             const cfg = await getCfg(interaction.guildId);
             const next = !cfg.partnerEnabled;
@@ -4165,6 +4214,34 @@ export default {
             where:  { guildId: interaction.guildId },
             create: { guildId: interaction.guildId, partnerRole: raw || null },
             update: { partnerRole: raw || null },
+          });
+          const cfg = await getCfg(interaction.guildId);
+          return interaction.editReply({ ...buildPartnerConfigPayload(cfg), content: null });
+        }
+
+        if (interaction.customId.startsWith('pcfg_modal_btn_')) {
+          const field = interaction.customId.replace('pcfg_modal_', '');
+          const buttonDef = PARTNER_BUTTON_FIELDS[field];
+          if (!buttonDef) return;
+
+          await interaction.deferUpdate();
+          const rawText = interaction.fields.getTextInputValue('label')?.trim() ?? '';
+          const rawEmoji = interaction.fields.getTextInputValue('emoji')?.trim() ?? '';
+          const text = rawText === '${null}' || rawText === '${default}' ? '' : rawText;
+          const emoji = rawEmoji === '${null}' || rawEmoji === '${default}' ? '' : rawEmoji;
+          const hasContent = Boolean(text || emoji);
+
+          await prisma.guildConfig.upsert({
+            where: { guildId: interaction.guildId },
+            create: {
+              guildId: interaction.guildId,
+              [buttonDef.textDb]: hasContent ? text : null,
+              [buttonDef.emojiDb]: hasContent && emoji ? emoji : null,
+            },
+            update: {
+              [buttonDef.textDb]: hasContent ? text : null,
+              [buttonDef.emojiDb]: hasContent && emoji ? emoji : null,
+            },
           });
           const cfg = await getCfg(interaction.guildId);
           return interaction.editReply({ ...buildPartnerConfigPayload(cfg), content: null });

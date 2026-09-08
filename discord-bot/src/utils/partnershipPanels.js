@@ -42,6 +42,42 @@ function renderPartnerText(template, {
     .replaceAll('${guild}', guildName ?? guildId ?? '');
 }
 
+function parsePartnerEmoji(raw) {
+  if (!raw) return null;
+  const value = String(raw).trim();
+  const custom = value.match(/^<(a?):([^:>\s]+):(\d+)>$/);
+  if (custom) {
+    const id = custom[3];
+    if (id.length < 17 || id.length > 20) return null;
+    return { animated: custom[1] === 'a', name: custom[2], id };
+  }
+  return value || null;
+}
+
+function applyButtonContent(button, {
+  text,
+  emoji,
+  defaultText,
+}) {
+  const hasCustomText = text !== null && text !== undefined;
+  const customText = hasCustomText ? String(text).trim() : '';
+  const parsedEmoji = parsePartnerEmoji(emoji);
+
+  // null means "use the default"; an empty string is intentional when the
+  // administrator wants an emoji-only button.
+  if (customText || !hasCustomText || !parsedEmoji) {
+    button.setLabel(customText || defaultText);
+  }
+  if (parsedEmoji) {
+    try {
+      button.setEmoji(parsedEmoji);
+    } catch {
+      if (!customText) button.setLabel(defaultText);
+    }
+  }
+  return button;
+}
+
 export function partnerConfigButtons(cfg = {}) {
   const enabled      = cfg.partnerEnabled     ?? false;
   const dmActive     = cfg.partnerNotifyDm    ?? false;
@@ -65,6 +101,8 @@ export function partnerConfigButtons(cfg = {}) {
     { value: 'footer', label: 'Rodapé', description: 'Altere o rodapé da publicação', emoji: '📝' },
     { value: 'mensagem', label: 'Mensagem', description: 'Altere o texto de agradecimento', emoji: '✏️' },
     { value: 'descricao', label: 'Descrição', description: 'Adicione uma descrição à publicação', emoji: '📄' },
+    { value: 'btn_entrar', label: 'Botão Entrar', description: 'Texto ou emoji do botão do convite', emoji: '🔗' },
+    { value: 'btn_mensagem', label: 'Botão Mensagem', description: 'Texto ou emoji do botão da mensagem', emoji: '💬' },
     { value: 'toggle_remove', label: `Remover ao sair: ${removeActive ? 'Ativado' : 'Desativado'}`, description: 'Remove o cargo quando o representante sai', emoji: '❌' },
     { value: 'min_membros', label: 'Mínimo de membros', description: 'Bloqueia servidores abaixo da quantidade definida', emoji: '👥' },
   ].map(option => new StringSelectMenuOptionBuilder()
@@ -98,6 +136,8 @@ export function buildPartnerConfigPayload(cfg = {}) {
     `👇 **Rodapé:** ${cfg.partnerFooter ? cfg.partnerFooter.slice(0, 60) : '*(nenhum)*'}`,
     `✏️ **Mensagem:** ${cfg.partnerMessage ? cfg.partnerMessage.slice(0, 80) : '*(nenhuma)*'}`,
     `📄 **Descrição:** ${cfg.partnerDescription ? cfg.partnerDescription.slice(0, 80) : '*(nenhuma)*'}`,
+    `🔗 **Botão Entrar:** ${cfg.partnerJoinButtonText !== null && cfg.partnerJoinButtonText !== undefined ? (cfg.partnerJoinButtonText || '*(somente emoji)*') : 'Entrar no servidor'}${cfg.partnerJoinButtonEmoji ? ` ${cfg.partnerJoinButtonEmoji}` : ''}`,
+    `💬 **Botão Mensagem:** ${cfg.partnerMessageButtonText !== null && cfg.partnerMessageButtonText !== undefined ? (cfg.partnerMessageButtonText || '*(somente emoji)*') : 'Ver mensagem'}${cfg.partnerMessageButtonEmoji ? ` ${cfg.partnerMessageButtonEmoji}` : ''}`,
     `👥 **Mínimo de membros:** ${cfg.partnerMinMembers ? cfg.partnerMinMembers.toLocaleString('pt-BR') : 'Desativado'}`,
     '',
     '👑 Eu valido os convites enviados pelo cargo responsável, notifico o cargo de ping e entrego o cargo de parceiro ao representante.',
@@ -167,13 +207,6 @@ export function buildPartnershipPost({
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent('**✦ • Parceria Realizada**'));
   }
 
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
-    `🎖️ **Promoter:** <@${promoterId}>\n` +
-    `🏅 **Rank:** #${rank}\n` +
-    `🤝 **Parcerias feitas:** ${partnershipCount}\n` +
-    `↳ **Servidor parceiro:** ${partnerName}`,
-  ));
-
   container.addSeparatorComponents(new SeparatorBuilder());
   if (descriptionText) {
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(descriptionText));
@@ -181,6 +214,9 @@ export function buildPartnershipPost({
   if (messageText) {
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(messageText));
   }
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent('Obrigado por fortalecer nossa comunidade!'),
+  );
 
   if (imageUrl) {
     container.addMediaGalleryComponents(
@@ -194,10 +230,26 @@ export function buildPartnershipPost({
 
   const inviteLink = `https://discord.gg/${inviteCode}`;
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setLabel('Entrar no servidor').setURL(inviteLink).setStyle(ButtonStyle.Link),
+    applyButtonContent(
+      new ButtonBuilder().setURL(inviteLink).setStyle(ButtonStyle.Link),
+      {
+        text: cfg?.partnerJoinButtonText,
+        emoji: cfg?.partnerJoinButtonEmoji,
+        defaultText: 'Entrar no servidor',
+      },
+    ),
   );
   if (messageUrl) {
-    row.addComponents(new ButtonBuilder().setLabel('Ver mensagem').setURL(messageUrl).setStyle(ButtonStyle.Link));
+    row.addComponents(
+      applyButtonContent(
+        new ButtonBuilder().setURL(messageUrl).setStyle(ButtonStyle.Link),
+        {
+          text: cfg?.partnerMessageButtonText,
+          emoji: cfg?.partnerMessageButtonEmoji,
+          defaultText: 'Ver mensagem',
+        },
+      ),
+    );
   }
 
   return { components: [container, row], flags: MessageFlags.IsComponentsV2 };
