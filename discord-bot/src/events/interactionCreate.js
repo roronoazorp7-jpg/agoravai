@@ -113,6 +113,11 @@ import {
   buildGlobalMessageConfirmPayload,
 } from '../utils/globalMessage.js';
 import { handleTriggerButton, handleTriggerModal } from '../utils/messageTriggers.js';
+import {
+  checkInteractionSpam,
+  formatRetryAfter,
+  shouldSendNotice,
+} from '../utils/antiSpam.js';
 
 const tellonymSessions = new Map();
 const tellonymSessionKey = (interaction) => `${interaction.guildId}:${interaction.user.id}`;
@@ -462,6 +467,30 @@ export default {
 
   async execute(interaction, client) {
     try {
+      const spamCheck = checkInteractionSpam(interaction);
+      if (!spamCheck.allowed) {
+        const retryAfter = formatRetryAfter(spamCheck.retryAfterMs);
+        const notify = shouldSendNotice(
+          `interaction:${spamCheck.scope}`,
+          interaction.guildId,
+          interaction.user.id,
+        );
+        const content = notify
+          ? `🚦 Você está usando o bot muito rápido. Aguarde **${retryAfter}** antes de tentar novamente.`
+          : `⏳ Aguarde **${retryAfter}**.`;
+
+        if (interaction.isAutocomplete?.()) {
+          return interaction.respond([]);
+        }
+        if (interaction.isButton?.() || interaction.isStringSelectMenu?.() ||
+            interaction.isRoleSelectMenu?.() || interaction.isChannelSelectMenu?.() ||
+            interaction.isUserSelectMenu?.()) {
+          if (notify) return interaction.reply({ content, ephemeral: true });
+          return interaction.deferUpdate();
+        }
+        return interaction.reply({ content, ephemeral: true });
+      }
+
       if (
         interaction.isChatInputCommand()
         || interaction.isButton()

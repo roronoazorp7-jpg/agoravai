@@ -27,6 +27,11 @@ import { enforceAntiLink } from '../utils/antiLink.js';
 import { DISBOARD_BOT_ID, handleDisboardBump } from '../utils/bumpReminder.js';
 import { isCommandBlocked, COMMAND_BLOCK_COMMAND } from '../utils/commandBlock.js';
 import { findMatchingTrigger, getTriggerFile } from '../utils/messageTriggers.js';
+import {
+  checkMessageSpam,
+  formatRetryAfter,
+  shouldSendNotice,
+} from '../utils/antiSpam.js';
 
 const PREFIXES = ['savage ', 's '];
 
@@ -632,6 +637,18 @@ export default {
     const commandName = args.shift().toLowerCase();
     const cmd         = client.prefixCmds.get(commandName);
     if (!cmd?.executePrefix) return;
+
+    const spamCheck = checkMessageSpam(message);
+    if (!spamCheck.allowed) {
+      if (shouldSendNotice('message', message.guildId, message.author.id)) {
+        const warning = await message.reply({
+          content: `🚦 Você está usando os comandos muito rápido. Aguarde **${formatRetryAfter(spamCheck.retryAfterMs)}** antes de tentar novamente.`,
+        }).catch(() => null);
+        if (warning) setTimeout(() => warning.delete().catch(() => {}), 6_000);
+      }
+      return;
+    }
+
     if (commandName !== COMMAND_BLOCK_COMMAND && message.guildId) {
       const blocked = await isCommandBlocked(message, commandName);
       if (blocked) {
