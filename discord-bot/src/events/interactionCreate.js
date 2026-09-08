@@ -47,7 +47,7 @@ import { buildWalletCard, walletRefreshRow } from '../commands/economia/pf.js';
 import { handlePetButton } from '../commands/general/pet.js';
 import { handleModerationButton } from '../commands/admin/moderacao.js';
 import { handleBotLeaveInteraction } from '../commands/admin/bot.js';
-import { handleVipButton, handleVipConfigModal, handleVipPanelClose } from '../commands/loja/vip.js';
+import { handleVipButton, handleVipConfigModal, handleVipCallModal } from '../commands/loja/vip.js';
 import { handleFishingInteraction } from '../commands/economia/pescaria.js';
 import { handleWorkInteraction } from '../commands/economia/eco.js';
 import { handleBankInteraction } from '../utils/bankHandlers.js';
@@ -1403,10 +1403,6 @@ export default {
         }
 
         // ── VIP ────────────────────────────────────────────────────────────
-        if (customId.startsWith('vip_panel_close:')) {
-          return handleVipPanelClose(interaction);
-        }
-
         if (customId.startsWith('vip_')) {
           return handleVipButton(interaction);
         }
@@ -3599,6 +3595,10 @@ export default {
         }
 
         // ── VIP: Modais de configuração ─────────────────────────────────
+        if (interaction.customId.startsWith('vip_call_modal_')) {
+          return handleVipCallModal(interaction);
+        }
+
         if (interaction.customId.startsWith('vip_cfg_modal_')) {
           return handleVipConfigModal(interaction);
         }

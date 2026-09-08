@@ -14,7 +14,6 @@ import {
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
-  EmbedBuilder,
   PermissionFlagsBits,
   MessageFlags,
 } from 'discord.js';
@@ -29,23 +28,26 @@ const VIP_TAG = '⭐'; // emoji unicode padrão (substitua por getEmoji se criar
 const VIP_COLOR = 0x5865F2;
 const DEFAULT_VIP_TITLE = `${VIP_TAG} Painel VIP`;
 const DEFAULT_VIP_INTRO = 'Compre VIP com carrinho publico e libere bonus reais na economia.';
-const DEFAULT_VIP_TEXT  = () => [
-  `${COIN()} +35% em recompensas`,
-  `🕒 Cooldowns reduzidos`,
-  `🛡️ Mais proteção contra roubos`,
-  `🌿 Bonus extra na mineração`,
-  `🎣 Bonus na pesca`,
-  `🏹 Bonus na caça`,
-  `🌾 Bonus na fazenda`,
-  `🏛️ Banco 2.5x maior`,
-  `💵 Juros 50% maiores`,
-].join('\n');
+const DEFAULT_VIP_TEXT  = () => '🎙️ Call VIP — crie e configure sua call exclusiva.';
 const DEFAULT_VIP_PRICE_LABEL = 'R$ 20/mes';
 const DEFAULT_VIP_BTN_ESCOLHER  = 'Escolher VIP';
 const DEFAULT_VIP_BTN_CARRINHO  = 'Meu carrinho';
-const VIP_TEMP_CHANNEL_TTL_MS = 60 * 60 * 1000;
-const VIP_PANEL_TOPIC_PREFIX = 'vip-panel-temporario:';
-const vipPanelTimers = new Map();
+const VIP_CALL_TOPIC_PREFIX = 'vip-call:';
+const VIP_CALL_REGIONS = new Set([
+  'brazil',
+  'hongkong',
+  'india',
+  'japan',
+  'rotterdam',
+  'russia',
+  'singapore',
+  'southafrica',
+  'sydney',
+  'us-central',
+  'us-east',
+  'us-south',
+  'us-west',
+]);
 
 async function getCfg(guildId) {
   return prisma.guildConfig.upsert({ where: { guildId }, create: { guildId }, update: {} });
@@ -71,11 +73,11 @@ async function getActiveVipGrants(guildId, userId) {
   });
 }
 
-function vipPanelTopic(userId) {
-  return `${VIP_PANEL_TOPIC_PREFIX}${userId}`;
+function vipCallTopic(guildId, userId) {
+  return `${VIP_CALL_TOPIC_PREFIX}${guildId}:${userId}`;
 }
 
-function vipChannelName(member, userId) {
+function vipCallName(member) {
   const base = (member?.displayName ?? member?.user?.username ?? 'membro')
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -83,28 +85,22 @@ function vipChannelName(member, userId) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 18) || 'membro';
-  return `vip-${base}-${userId.slice(-4)}`;
+  return `call-${base}`;
 }
 
-function clearVipPanelTimer(channelId) {
-  const timer = vipPanelTimers.get(channelId);
-  if (timer) clearTimeout(timer);
-  vipPanelTimers.delete(channelId);
+function findVipCall(guild, userId) {
+  const topic = vipCallTopic(guild.id, userId);
+  return guild.channels.cache.find(channel => (
+    channel.type === ChannelType.GuildVoice && channel.topic === topic
+  ));
 }
 
-function scheduleVipPanelDeletion(channel, delay = VIP_TEMP_CHANNEL_TTL_MS) {
-  clearVipPanelTimer(channel.id);
-  const timer = setTimeout(async () => {
-    vipPanelTimers.delete(channel.id);
-    await channel.delete('Painel VIP temporário expirado').catch(error => {
-      console.warn(`[VIP] Não foi possível remover o canal temporário ${channel.id}:`, error.message);
-    });
-  }, delay);
-  timer.unref?.();
-  vipPanelTimers.set(channel.id, timer);
+function getVipBotMember(interaction) {
+  return interaction.guild.members.me
+    ?? interaction.guild.members.fetch(interaction.client.user.id).catch(() => null);
 }
 
-function buildVipMemberPanel(cfg, grants, channelId, userId) {
+function buildVipMemberPanel(cfg, grants, call, userId) {
   const container = new ContainerBuilder();
   if (cfg.vipColor) {
     const parsed = parseInt(cfg.vipColor, 16);
@@ -113,8 +109,6 @@ function buildVipMemberPanel(cfg, grants, channelId, userId) {
 
   const expiration = Math.floor(grants[0].expiresAt.getTime() / 1000);
   const intro = cfg.vipIntro || 'Este é o seu espaço exclusivo para aproveitar os benefícios VIP.';
-  const benefits = cfg.vipText || DEFAULT_VIP_TEXT();
-
   if (cfg.vipBanner) {
     container.addMediaGalleryComponents(
       new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(cfg.vipBanner)),
@@ -137,21 +131,44 @@ function buildVipMemberPanel(cfg, grants, channelId, userId) {
 
   container.addSeparatorComponents(new SeparatorBuilder());
   container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(`### ⭐ Seus benefícios\n${benefits}`),
+    new TextDisplayBuilder().setContent('### ⭐ Seu benefício VIP\n🎙️ Call VIP configurável'),
   );
   container.addSeparatorComponents(new SeparatorBuilder());
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
       `✅ **VIP ativo**\nSeu acesso está liberado até <t:${expiration}:F> (<t:${expiration}:R>).\n` +
-      'Este canal é temporário e será removido automaticamente após 1 hora.',
+      'Gerencie aqui o benefício disponível no servidor:',
     ),
   );
-  container.addActionRowComponents(new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`vip_panel_close:${userId}:${channelId}`)
-      .setLabel('Fechar meu painel')
-      .setStyle(ButtonStyle.Danger),
-  ));
+
+  if (call) {
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`🎙️ **Call VIP:** ${call}\nNome: **${call.name}**`),
+    );
+    container.addActionRowComponents(new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`vip_call_edit:${userId}:${call.id}`)
+        .setLabel('Configurar call')
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId(`vip_call_delete:${userId}:${call.id}`)
+        .setLabel('Excluir call')
+        .setStyle(ButtonStyle.Danger),
+    ));
+  } else {
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        '🎙️ **Call VIP**\nCrie uma call exclusiva e configure nome, limite, bitrate, região e visibilidade.',
+      ),
+    );
+    container.addActionRowComponents(new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`vip_call_create:${userId}`)
+        .setLabel('Criar call')
+        .setEmoji('🎙️')
+        .setStyle(ButtonStyle.Success),
+    ));
+  }
 
   return { components: [container], flags: MessageFlags.IsComponentsV2 };
 }
@@ -175,99 +192,261 @@ async function openVipMemberPanel(interaction) {
     });
   }
 
-  const topic = vipPanelTopic(interaction.user.id);
-  const existing = interaction.guild.channels.cache.find(channel => (
-    channel.type === ChannelType.GuildText && channel.topic === topic
-  ));
-  if (existing) {
-    scheduleVipPanelDeletion(existing);
-    return interaction.reply({
-      content: `✅ Seu painel VIP já está aberto em ${existing}.`,
-      ephemeral: true,
-    });
+  const [cfg, call] = await Promise.all([
+    getCfg(interaction.guildId),
+    Promise.resolve(findVipCall(interaction.guild, interaction.user.id)),
+  ]);
+  return interaction.reply(buildVipMemberPanel(cfg, grants, call, interaction.user.id));
+}
+
+function buildVipCallModal({ mode, userId, call, member }) {
+  const modal = new ModalBuilder()
+    .setCustomId(
+      mode === 'edit'
+        ? `vip_call_modal_edit:${userId}:${call.id}`
+        : `vip_call_modal_create:${userId}`,
+    )
+    .setTitle(mode === 'edit' ? 'Configurar call VIP' : 'Criar call VIP');
+
+  const name = new TextInputBuilder()
+    .setCustomId('name')
+    .setLabel('Nome da call')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setMaxLength(100)
+    .setValue(call?.name ?? vipCallName(member));
+
+  const limit = new TextInputBuilder()
+    .setCustomId('limit')
+    .setLabel('Limite de usuários (0 = ilimitado)')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(false)
+    .setMaxLength(2)
+    .setValue(String(call?.userLimit ?? 0));
+
+  const bitrate = new TextInputBuilder()
+    .setCustomId('bitrate')
+    .setLabel('Bitrate em kbps (8 a 384)')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(false)
+    .setMaxLength(3)
+    .setValue(String(Math.round((call?.bitrate ?? 64000) / 1000)));
+
+  const region = new TextInputBuilder()
+    .setCustomId('region')
+    .setLabel('Região (auto, brazil, us-east...)')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(false)
+    .setMaxLength(20)
+    .setValue(call?.rtcRegion ?? 'auto');
+
+  const visibility = new TextInputBuilder()
+    .setCustomId('visibility')
+    .setLabel('Visibilidade: privada ou publica')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(false)
+    .setMaxLength(8)
+    .setValue(call?.permissionOverwrites?.cache?.get(call.guild.roles.everyone.id)
+      ?.deny?.has(PermissionFlagsBits.ViewChannel) ? 'privada' : 'publica');
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(name),
+    new ActionRowBuilder().addComponents(limit),
+    new ActionRowBuilder().addComponents(bitrate),
+    new ActionRowBuilder().addComponents(region),
+    new ActionRowBuilder().addComponents(visibility),
+  );
+  return modal;
+}
+
+function parseVipCallForm(interaction) {
+  const name = interaction.fields.getTextInputValue('name').trim();
+  const limit = Number(interaction.fields.getTextInputValue('limit').trim() || 0);
+  const bitrate = Number(interaction.fields.getTextInputValue('bitrate').trim() || 64);
+  const regionRaw = interaction.fields.getTextInputValue('region').trim().toLowerCase() || 'auto';
+  const visibility = interaction.fields.getTextInputValue('visibility').trim().toLowerCase() || 'privada';
+
+  if (!name) return { error: 'Informe um nome para a call.' };
+  if (!Number.isInteger(limit) || limit < 0 || limit > 99) {
+    return { error: 'O limite deve ser um número inteiro entre 0 e 99.' };
   }
-
-  const botMember = interaction.guild.members.me
-    ?? await interaction.guild.members.fetch(interaction.client.user.id).catch(() => null);
-  if (!botMember?.permissions.has(PermissionFlagsBits.ManageChannels)) {
-    return interaction.reply({
-      content: '❌ Eu preciso da permissão **Gerenciar Canais** para criar seu painel VIP.',
-      ephemeral: true,
-    });
+  if (!Number.isInteger(bitrate) || bitrate < 8 || bitrate > 384) {
+    return { error: 'O bitrate deve ser um número inteiro entre 8 e 384 kbps.' };
   }
+  if (regionRaw !== 'auto' && !VIP_CALL_REGIONS.has(regionRaw)) {
+    return { error: 'Região inválida. Use `auto`, `brazil`, `us-east`, `us-west` ou outra região oficial do Discord.' };
+  }
+  if (!['privada', 'publica'].includes(visibility)) {
+    return { error: 'A visibilidade deve ser `privada` ou `publica`.' };
+  }
+  return {
+    name,
+    userLimit: limit,
+    bitrate: bitrate * 1000,
+    rtcRegion: regionRaw === 'auto' ? null : regionRaw,
+    isPrivate: visibility === 'privada',
+  };
+}
 
-  const parentId = interaction.channel?.parent?.type === ChannelType.GuildCategory
-    ? interaction.channel.parentId
-    : undefined;
-  let channel;
-
-  try {
-    channel = await interaction.guild.channels.create({
-      name: vipChannelName(interaction.member, interaction.user.id),
-      type: ChannelType.GuildText,
-      parent: parentId,
-      topic,
-      permissionOverwrites: [
-        {
-          id: interaction.guild.roles.everyone.id,
-          deny: [PermissionFlagsBits.ViewChannel],
-        },
-        {
-          id: interaction.user.id,
-          allow: [
-            PermissionFlagsBits.ViewChannel,
-            PermissionFlagsBits.SendMessages,
-            PermissionFlagsBits.ReadMessageHistory,
-            PermissionFlagsBits.AttachFiles,
-            PermissionFlagsBits.EmbedLinks,
-          ],
-        },
-        {
-          id: interaction.client.user.id,
-          allow: [
-            PermissionFlagsBits.ViewChannel,
-            PermissionFlagsBits.SendMessages,
-            PermissionFlagsBits.ReadMessageHistory,
-            PermissionFlagsBits.ManageChannels,
-            PermissionFlagsBits.AttachFiles,
-            PermissionFlagsBits.EmbedLinks,
-          ],
-        },
+function callPermissionOverwrites(interaction, isPrivate) {
+  const botId = interaction.client.user.id;
+  const base = [
+    {
+      id: botId,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.Connect,
+        PermissionFlagsBits.ManageChannels,
+        PermissionFlagsBits.MoveMembers,
       ],
+    },
+    {
+      id: interaction.user.id,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.Connect,
+        PermissionFlagsBits.Speak,
+        PermissionFlagsBits.Stream,
+        PermissionFlagsBits.UseVAD,
+      ],
+    },
+  ];
+  if (isPrivate) {
+    base.unshift({
+      id: interaction.guild.roles.everyone.id,
+      deny: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect],
     });
+  } else {
+    base.unshift({
+      id: interaction.guild.roles.everyone.id,
+      allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect],
+    });
+  }
+  return base;
+}
 
-    const cfg = await getCfg(interaction.guildId);
-    await channel.send(buildVipMemberPanel(cfg, grants, channel.id, interaction.user.id));
-    scheduleVipPanelDeletion(channel);
+async function refreshVipPanelMessage(interaction) {
+  if (!interaction.message) return;
+  const [cfg, grants] = await Promise.all([
+    getCfg(interaction.guildId),
+    getActiveVipGrants(interaction.guildId, interaction.user.id),
+  ]);
+  const call = findVipCall(interaction.guild, interaction.user.id);
+  await interaction.message.edit(buildVipMemberPanel(cfg, grants, call, interaction.user.id)).catch(() => {});
+}
 
-    return interaction.reply({
-      content: `✅ Seu painel VIP foi aberto em ${channel} e ficará disponível por 1 hora.`,
-      ephemeral: true,
-    });
-  } catch (error) {
-    console.error('[VIP] Falha ao criar painel VIP temporário:', error);
-    if (channel) await channel.delete('Falha ao publicar o painel VIP').catch(() => {});
-    return interaction.reply({
-      content: '❌ Não consegui criar seu canal VIP. Verifique se tenho **Gerenciar Canais**, **Ver Canal** e **Enviar Mensagens**.',
-      ephemeral: true,
-    });
+async function handleVipCallButton(interaction) {
+  const [action, userId, channelId] = interaction.customId.split(':');
+  if (interaction.user.id !== userId) {
+    return interaction.reply({ content: '❌ Apenas o dono deste VIP pode gerenciar esta call.', ephemeral: true });
+  }
+  if ((await getActiveVipGrants(interaction.guildId, userId)).length === 0) {
+    return interaction.reply({ content: '❌ Seu VIP não está mais ativo neste servidor.', ephemeral: true });
+  }
+
+  const existing = findVipCall(interaction.guild, userId);
+  if (action === 'vip_call_create') {
+    if (existing) {
+      return interaction.reply({ content: `❌ Você já possui uma call VIP: ${existing}`, ephemeral: true });
+    }
+    return interaction.showModal(buildVipCallModal({
+      mode: 'create',
+      userId,
+      member: interaction.member,
+    }));
+  }
+
+  const call = existing?.id === channelId
+    ? existing
+    : await interaction.guild.channels.fetch(channelId).catch(() => null);
+  if (!call || call.type !== ChannelType.GuildVoice) {
+    return interaction.reply({ content: '❌ Essa call VIP não existe mais. Use **Criar call** para criar outra.', ephemeral: true });
+  }
+
+  if (action === 'vip_call_edit') {
+    return interaction.showModal(buildVipCallModal({ mode: 'edit', userId, call }));
+  }
+
+  if (action === 'vip_call_delete') {
+    await interaction.deferUpdate();
+    await call.delete('Call VIP excluída pelo proprietário').catch(() => {});
+    return refreshVipPanelMessage(interaction);
   }
 }
 
-export async function handleVipPanelClose(interaction) {
-  const [, userId, channelId] = interaction.customId.split(':');
-  if (interaction.user.id !== userId || interaction.channelId !== channelId) {
+export async function handleVipCallModal(interaction) {
+  const parts = interaction.customId.split(':');
+  const mode = parts[0].replace('vip_call_modal_', '');
+  const userId = parts[1];
+  const channelId = parts[2];
+
+  if (interaction.user.id !== userId) {
+    return interaction.reply({ content: '❌ Apenas o dono deste VIP pode configurar esta call.', ephemeral: true });
+  }
+  if ((await getActiveVipGrants(interaction.guildId, userId)).length === 0) {
+    return interaction.reply({ content: '❌ Seu VIP não está mais ativo neste servidor.', ephemeral: true });
+  }
+
+  const form = parseVipCallForm(interaction);
+  if (form.error) {
+    return interaction.reply({ content: `❌ ${form.error}`, ephemeral: true });
+  }
+
+  const botMember = await getVipBotMember(interaction);
+  if (!botMember?.permissions.has(PermissionFlagsBits.ManageChannels)) {
     return interaction.reply({
-      content: '❌ Apenas o dono deste painel pode fechá-lo.',
+      content: '❌ Eu preciso da permissão **Gerenciar Canais** para criar e configurar sua call VIP.',
       ephemeral: true,
     });
   }
 
-  clearVipPanelTimer(channelId);
-  await interaction.deferUpdate();
-  await interaction.channel?.delete('Painel VIP fechado pelo membro').catch(error => {
-    console.warn(`[VIP] Não foi possível fechar o canal ${channelId}:`, error.message);
-  });
+  await interaction.deferReply({ ephemeral: true });
+
+  try {
+    let call;
+    if (mode === 'edit') {
+      call = await interaction.guild.channels.fetch(channelId).catch(() => null);
+      if (
+        !call ||
+        call.type !== ChannelType.GuildVoice ||
+        call.topic !== vipCallTopic(interaction.guildId, userId)
+      ) {
+        return interaction.editReply('❌ Essa call VIP não existe mais. Use o botão **Criar call**.');
+      }
+
+      await call.edit({
+        name: form.name,
+        userLimit: form.userLimit,
+        bitrate: form.bitrate,
+        rtcRegion: form.rtcRegion,
+        permissionOverwrites: callPermissionOverwrites(interaction, form.isPrivate),
+      }, 'Configuração da call VIP atualizada pelo proprietário');
+    } else {
+      const parentId = interaction.channel?.parent?.type === ChannelType.GuildCategory
+        ? interaction.channel.parentId
+        : undefined;
+      call = await interaction.guild.channels.create({
+        name: form.name || vipCallName(interaction.member),
+        type: ChannelType.GuildVoice,
+        parent: parentId,
+        topic: vipCallTopic(interaction.guildId, userId),
+        userLimit: form.userLimit,
+        bitrate: form.bitrate,
+        rtcRegion: form.rtcRegion,
+        permissionOverwrites: callPermissionOverwrites(interaction, form.isPrivate),
+      });
+    }
+
+    await refreshVipPanelMessage(interaction);
+    return interaction.editReply(
+      `✅ Call VIP ${mode === 'edit' ? 'atualizada' : 'criada'} com sucesso: ${call}`,
+    );
+  } catch (error) {
+    console.error('[VIP] Falha ao configurar call VIP:', error);
+    return interaction.editReply(
+      '❌ Não consegui configurar essa call. Confira o limite de bitrate permitido pelo servidor e minhas permissões de **Gerenciar Canais**.',
+    );
+  }
 }
 
 const VIP_TIME_UNITS = {
@@ -384,105 +563,6 @@ async function grantVip(interaction) {
       `**Expira:** <t:${expiration}:F> (<t:${expiration}:R>)`,
     ephemeral: false,
   });
-}
-
-function safeEmoji(raw) {
-  if (!raw) return null;
-  const s = raw.trim();
-  const match = s.match(/^<(a?):([^:>\s]+):(\d+)>$/);
-  if (match) {
-    const id = match[3];
-    if (id.length < 17 || id.length > 20) return null;
-    return { animated: match[1] === 'a', name: match[2], id };
-  }
-  return s || null;
-}
-
-// ─── Build do painel VIP em Components V2 (sem barra lateral por padrão) ─────
-export function buildVipPanel(cfg = {}, plans = []) {
-  const container = new ContainerBuilder();
-
-  // Sem cor = sem barra lateral
-  if (cfg.vipColor) {
-    const parsed = parseInt(cfg.vipColor, 16);
-    if (!isNaN(parsed)) container.setAccentColor(parsed);
-  }
-
-  const coin  = cfg.vipEmojiCoin || COIN();
-  const tag   = cfg.vipEmojiTag  || VIP_TAG;
-  const title = cfg.vipTitle     || DEFAULT_VIP_TITLE;
-  const intro = cfg.vipIntro     || DEFAULT_VIP_INTRO;
-  const introText = `## ${title}\n${intro}`;
-
-  // Banner no topo
-  if (cfg.vipBanner) {
-    container.addMediaGalleryComponents(
-      new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(cfg.vipBanner)),
-    );
-  }
-
-  if (cfg.vipThumb) {
-    container.addSectionComponents(
-      new SectionBuilder()
-        .addTextDisplayComponents(new TextDisplayBuilder().setContent(introText))
-        .setThumbnailAccessory(new ThumbnailBuilder().setURL(cfg.vipThumb)),
-    );
-  } else {
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(introText));
-  }
-
-  container.addSeparatorComponents(new SeparatorBuilder());
-
-  // Benefícios
-  const beneficios = cfg.vipText || DEFAULT_VIP_TEXT();
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(`### ⭐ Beneficios VIP\n${beneficios}`),
-  );
-
-  container.addSeparatorComponents(new SeparatorBuilder());
-
-  // Planos
-  if (plans && plans.length > 0) {
-    container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`### ${coin} Planos disponíveis`),
-    );
-    // Máx 5 botões por row — divide em grupos de 5
-    for (let i = 0; i < Math.min(plans.length, 10); i += 5) {
-      const slice = plans.slice(i, i + 5);
-      const btns = slice.map(p => {
-        const b = new ButtonBuilder()
-          .setCustomId(`vip_escolher_plano:${p.id}`)
-          .setLabel(`${p.name} · ${p.price}`)
-          .setStyle(ButtonStyle.Primary);
-        const e = safeEmoji(p.emoji);
-        if (e) { try { b.setEmoji(e); } catch {} }
-        return b;
-      });
-      container.addActionRowComponents(new ActionRowBuilder().addComponents(...btns));
-    }
-  } else {
-    const priceLabel = cfg.vipPriceLabel || DEFAULT_VIP_PRICE_LABEL;
-    container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`### ${coin} Plano principal\n${tag} **${priceLabel}**`),
-    );
-    const escolherBtn = new ButtonBuilder()
-      .setCustomId('vip_escolher')
-      .setLabel(cfg.vipBtnEscolherLabel || DEFAULT_VIP_BTN_ESCOLHER)
-      .setStyle(ButtonStyle.Primary);
-    const e1 = safeEmoji(cfg.vipEmojiBtn1);
-    if (e1) { try { escolherBtn.setEmoji(e1); } catch {} }
-
-    const carrinhoBtn = new ButtonBuilder()
-      .setCustomId('vip_carrinho')
-      .setLabel(cfg.vipBtnCarrinhoLabel || DEFAULT_VIP_BTN_CARRINHO)
-      .setStyle(ButtonStyle.Secondary);
-    const e2 = safeEmoji(cfg.vipEmojiBtn2);
-    if (e2) { try { carrinhoBtn.setEmoji(e2); } catch {} }
-
-    container.addActionRowComponents(new ActionRowBuilder().addComponents(escolherBtn, carrinhoBtn));
-  }
-
-  return { components: [container], flags: MessageFlags.IsComponentsV2 };
 }
 
 // ─── Configuração (admin) ─────────────────────────────────────────────────────
@@ -669,6 +749,7 @@ export async function handleVipConfigModal(interaction) {
 export async function handleVipButton(interaction) {
   const id = interaction.customId;
 
+  if (id.startsWith('vip_call_')) return handleVipCallButton(interaction);
   if (id.startsWith('vip_cfg_')) return handleVipCfgBtn(interaction);
   if (id === 'vip_admin_config')  return handleVipConfig(interaction);
 
@@ -744,73 +825,44 @@ export default {
   data: new SlashCommandBuilder()
     .setName('vip')
     .setDescription('🏷️ Sistema VIP do servidor')
-    .addSubcommand(s =>
-      s.setName('painel').setDescription('📢 Envia o painel VIP no canal atual'),
+    .addStringOption(option =>
+      option
+        .setName('acao')
+        .setDescription('Ação administrativa opcional')
+        .addChoices(
+          { name: 'Abrir configuração (admin)', value: 'config' },
+          { name: 'Conceder VIP (admin)', value: 'dar' },
+        ),
     )
-    .addSubcommand(s =>
-      s.setName('config').setDescription('⚙️ Abre o painel de configuração do VIP (apenas admins)'),
+    .addUserOption(option =>
+      option.setName('membro').setDescription('Membro que receberá o VIP (ação: conceder)'),
     )
-    .addSubcommand(s =>
-      s
-        .setName('dar')
-        .setDescription('👑 Concede um cargo VIP por tempo determinado')
-        .addUserOption(option =>
-          option.setName('membro').setDescription('Membro que receberá o VIP').setRequired(true),
-        )
-        .addIntegerOption(option =>
-          option
-            .setName('tempo')
-            .setDescription('Quantidade de tempo do VIP')
-            .setMinValue(1)
-            .setMaxValue(3650)
-            .setRequired(true),
-        )
-        .addStringOption(option =>
-          option
-            .setName('unidade')
-            .setDescription('Unidade de tempo')
-            .setRequired(true)
-            .addChoices(
-              { name: 'Minutos', value: 'minutos' },
-              { name: 'Horas', value: 'horas' },
-              { name: 'Dias', value: 'dias' },
-              { name: 'Meses (30 dias)', value: 'meses' },
-            ),
-        )
-        .addRoleOption(option =>
-          option.setName('cargo').setDescription('Cargo opcional que também dará acesso ao VIP'),
-        )
+    .addIntegerOption(option =>
+      option
+        .setName('tempo')
+        .setDescription('Quantidade de tempo do VIP (ação: conceder)')
+        .setMinValue(1)
+        .setMaxValue(3650),
+    )
+    .addStringOption(option =>
+      option
+        .setName('unidade')
+        .setDescription('Unidade de tempo (ação: conceder)')
+        .addChoices(
+          { name: 'Minutos', value: 'minutos' },
+          { name: 'Horas', value: 'horas' },
+          { name: 'Dias', value: 'dias' },
+          { name: 'Meses (30 dias)', value: 'meses' },
+        ),
+    )
+    .addRoleOption(option =>
+      option.setName('cargo').setDescription('Cargo opcional que também dará acesso ao VIP'),
     ),
 
   async execute(interaction) {
-    const sub = interaction.options.getSubcommand();
+    const action = interaction.options.getString('acao');
 
-    if (sub === 'painel') {
-      let hasVip = false;
-      try {
-        hasVip = (await getActiveVipGrants(interaction.guildId, interaction.user.id)).length > 0;
-      } catch (error) {
-        console.error('[VIP] Erro ao verificar acesso ao painel:', error);
-        return interaction.reply({
-          content: '❌ Não consegui verificar seu VIP agora. Tente novamente em instantes.',
-          ephemeral: true,
-        });
-      }
-      if (hasVip) return openVipMemberPanel(interaction);
-
-      const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
-      if (!isAdmin) {
-        return interaction.reply({
-          content: '❌ Este painel é exclusivo para membros VIP. Administradores podem publicá-lo para divulgar os planos.',
-          ephemeral: true,
-        });
-      }
-
-      const cfg = await getCfgWithPlans(interaction.guildId);
-      return interaction.reply(buildVipPanel(cfg, cfg.vipPlans));
-    }
-
-    if (sub === 'config') {
+    if (action === 'config') {
       const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
       if (!isAdmin) {
         return interaction.reply({ content: '❌ Apenas administradores podem acessar as configurações do VIP.', ephemeral: true });
@@ -819,11 +871,12 @@ export default {
       return interaction.reply({ ...buildVipConfigPayload(cfg), ephemeral: true });
     }
 
-    if (sub === 'dar') return grantVip(interaction);
+    if (action === 'dar') return grantVip(interaction);
+    return openVipMemberPanel(interaction);
   },
 
   async executePrefix(message, args) {
-    const sub = args[0]?.toLowerCase() ?? 'painel';
+    const sub = args[0]?.toLowerCase();
 
     if (sub === 'config' || sub === 'c' || sub === 'cfg') {
       const isAdmin = message.member?.permissions.has(PermissionFlagsBits.Administrator);
@@ -832,7 +885,14 @@ export default {
       return message.reply({ ...buildVipConfigPayload(cfg) });
     }
 
-    const cfg = await getCfgWithPlans(message.guildId);
-    return message.reply(buildVipPanel(cfg, cfg.vipPlans));
+    const fakeInteraction = {
+      guildId: message.guildId,
+      guild: message.guild,
+      user: message.author,
+      member: message.member,
+      client: message.client,
+      reply: payload => message.reply(payload),
+    };
+    return openVipMemberPanel(fakeInteraction);
   },
 };
