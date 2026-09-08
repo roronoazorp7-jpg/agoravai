@@ -407,6 +407,10 @@ export default {
                 where: { guildId: message.guildId, promoterId: message.author.id },
               });
               const partnershipCount = prevCount + 1;
+              const representativeMember = representativeId
+                ? (message.guild.members.cache.get(representativeId)
+                  ?? await message.guild.members.fetch(representativeId).catch(() => null))
+                : null;
 
               const allPromoterCounts = await prisma.partnership.groupBy({
                 by: ['promoterId'],
@@ -427,10 +431,8 @@ export default {
                 },
               }).catch(() => {});
 
-              if (cfg.partnerRole && representativeId) {
-                const rep = message.guild.members.cache.get(representativeId)
-                  ?? await message.guild.members.fetch(representativeId).catch(() => null);
-                if (rep) rep.roles.add(cfg.partnerRole).catch(() => {});
+              if (cfg.partnerRole && representativeMember) {
+                representativeMember.roles.add(cfg.partnerRole).catch(() => {});
               }
 
               const thumbUrl = cfg.partnerThumbnail || invite.guild?.iconURL?.({ size: 256 })    || null;
@@ -439,10 +441,15 @@ export default {
               const post = buildPartnershipPost({
                 cfg,
                 promoterId: message.author.id,
+                promoterUsername: message.author.username,
+                representativeId,
+                representativeUsername: representativeMember?.user?.username,
                 partnerName,
                 inviteCode,
                 partnershipCount,
                 rank,
+                guildId: message.guildId,
+                guildName: message.guild.name,
                 thumbUrl,
                 imageUrl,
                 messageUrl: message.url,
@@ -455,10 +462,8 @@ export default {
 
               if (cfg.partnerNotifyDm && representativeId) {
                 const accentColor = cfg.partnerColor ? (parseInt(cfg.partnerColor, 16) || 0xA020F0) : 0xA020F0;
-                const rep = message.guild.members.cache.get(representativeId)
-                  ?? await message.guild.members.fetch(representativeId).catch(() => null);
-                if (rep) {
-                  rep.user.send({
+                if (representativeMember) {
+                  representativeMember.user.send({
                     embeds: [new EmbedBuilder()
                       .setColor(accentColor)
                       .setTitle('🤝 Parceria Realizada!')

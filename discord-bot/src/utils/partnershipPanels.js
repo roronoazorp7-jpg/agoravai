@@ -14,6 +14,34 @@ import {
   MessageFlags,
 } from 'discord.js';
 
+const DEFAULT_PARTNER_MESSAGE = '★ Obrigado por fortalecer nossa comunidade!';
+
+function renderPartnerText(template, {
+  promoterId,
+  promoterUsername,
+  representativeId,
+  representativeUsername,
+  partnershipCount,
+  rank,
+  guildId,
+  guildName,
+  defaultText = '',
+} = {}) {
+  const promoterMention = promoterId ? `<@${promoterId}>` : '';
+  const representativeMention = representativeId ? `<@${representativeId}>` : '';
+  return String(template ?? '')
+    .replaceAll('${default}', defaultText)
+    .replaceAll('${promoter}', promoterMention)
+    .replaceAll('${rep}', representativeMention)
+    .replaceAll('${rep.id}', representativeId ?? '')
+    .replaceAll('${rep.username}', representativeUsername ?? '')
+    .replaceAll('${promoterPartnership}', String(partnershipCount ?? 0))
+    .replaceAll('${promoter.id}', promoterId ?? '')
+    .replaceAll('${promoter.username}', promoterUsername ?? '')
+    .replaceAll('${rank}', String(rank ?? 0))
+    .replaceAll('${guild}', guildName ?? guildId ?? '');
+}
+
 export function partnerConfigButtons(cfg = {}) {
   const enabled      = cfg.partnerEnabled     ?? false;
   const dmActive     = cfg.partnerNotifyDm    ?? false;
@@ -72,21 +100,70 @@ export function buildPartnerConfigPayload(cfg = {}) {
     `📄 **Descrição:** ${cfg.partnerDescription ? cfg.partnerDescription.slice(0, 80) : '*(nenhuma)*'}`,
     `👥 **Mínimo de membros:** ${cfg.partnerMinMembers ? cfg.partnerMinMembers.toLocaleString('pt-BR') : 'Desativado'}`,
     '',
-    '👑 Eu valido os convites enviados pelo cargo responsável, notifico o cargo de ping e entrego o cargo de parceiro ao representante.',
-    '👑 Selecione novamente o canal de parcerias para trocar ou desativar o sistema.',
     '',
     '-# Envie o convite do servidor no canal configurado para registrar uma parceria.',
   ].join('\n');
 
+  const guide = [
+    '👑 Eu notifico o cargo de ping, valido parcerias feitas pelo cargo responsável no canal escolhido e entrego o cargo de parceiro ao representante.',
+    '👑 Envie o texto da parceria com um convite e identifique o representante como `Rep: @membro` ou `Representante: @membro`.',
+    '👑 Use `${null}` para remover imagem/thumbnail ou restaurar textos; `${default}` restaura o visual padrão. Mensagens aceitam `${promoter}`, `${rep}`, `${rep.id}`, `${rep.username}`, `${promoterPartnership}`, `${promoter.id}`, `${promoter.username}`, `${rank}` e `${guild}`.',
+    '👑 Selecione novamente o canal de parcerias para desativar o sistema.',
+  ].join('\n');
+
   const container = new ContainerBuilder();
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(info));
+  container.addSeparatorComponents(new SeparatorBuilder());
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(guide));
 
   return { components: [container, ...partnerConfigButtons(cfg)], flags: MessageFlags.IsComponentsV2 };
 }
 
-export function buildPartnershipPost({ cfg, promoterId, partnerName, inviteCode, partnershipCount, rank, thumbUrl, imageUrl, messageUrl }) {
+export function buildPartnershipPost({
+  cfg,
+  promoterId,
+  promoterUsername,
+  representativeId,
+  representativeUsername,
+  partnerName,
+  inviteCode,
+  partnershipCount,
+  rank,
+  guildId,
+  guildName,
+  thumbUrl,
+  imageUrl,
+  messageUrl,
+}) {
   const accentColor = cfg?.partnerColor ? (parseInt(cfg.partnerColor, 16) || 0xA020F0) : 0xA020F0;
-  const defaultMsg  = cfg?.partnerMessage || '★ Obrigado por fortalecer nossa comunidade!';
+  const defaultMsg  = DEFAULT_PARTNER_MESSAGE;
+  const messageText = renderPartnerText(
+    cfg?.partnerMessage || defaultMsg,
+    {
+      promoterId,
+      promoterUsername,
+      representativeId,
+      representativeUsername,
+      partnershipCount,
+      rank,
+      guildId,
+      guildName,
+      defaultText: defaultMsg,
+    },
+  );
+  const descriptionText = cfg?.partnerDescription
+    ? renderPartnerText(cfg.partnerDescription, {
+        promoterId,
+        promoterUsername,
+        representativeId,
+        representativeUsername,
+        partnershipCount,
+        rank,
+        guildId,
+        guildName,
+        defaultText: '',
+      })
+    : '';
 
   const container = new ContainerBuilder().setAccentColor(accentColor);
 
@@ -108,10 +185,10 @@ export function buildPartnershipPost({ cfg, promoterId, partnerName, inviteCode,
   ));
 
   container.addSeparatorComponents(new SeparatorBuilder());
-  if (cfg?.partnerDescription) {
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(cfg.partnerDescription));
+  if (descriptionText) {
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(descriptionText));
   }
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(defaultMsg));
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(messageText));
 
   if (imageUrl) {
     container.addMediaGalleryComponents(

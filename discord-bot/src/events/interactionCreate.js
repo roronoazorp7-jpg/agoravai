@@ -4178,7 +4178,7 @@ export default {
 
           const rawValue = interaction.fields.getTextInputValue('value');
           let value = rawValue?.trim() ?? '';
-          const isEmpty = value === '';
+          const isEmpty = value === '' || value === '${null}' || value === '${default}';
 
           if (def.isUrl) {
             await interaction.deferUpdate();
