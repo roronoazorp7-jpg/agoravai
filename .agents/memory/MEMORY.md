@@ -20,3 +20,4 @@
 - [Empresas e renda passiva](business-economy.md) — ao alterar a taxa de uma empresa, liquide o lucro acumulado antes para evitar ganhos retroativos.
 - [Renderização de GIF no perfil](profile-gif-rendering.md) — nunca inicie fallback enquanto uma renderização nativa não cancelável ainda estiver rodando.
 - [Painel de call VIP](vip-call-panel.md) — `/vip` publica o painel no chat e gerencia uma única call configurável por membro via tópico do canal.
+- [Parcerias em Components V2](partnership-components-v2.md) — publicação sem cor lateral e sem mensagem automática; campos vazios ocultam o bloco e variáveis são resolvidas antes do envio.
