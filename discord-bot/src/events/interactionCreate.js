@@ -456,8 +456,8 @@ const PARTNER_MODAL_FIELDS = {
   imagem:   { label: 'URL da imagem/banner',      db: 'partnerImage',     isUrl: true,  isLong: false, placeholder: 'https://... (deixe vazio para padrão)' },
   thumb:    { label: 'URL da thumbnail',          db: 'partnerThumbnail', isUrl: true,  isLong: false, placeholder: 'https://... (deixe vazio para padrão)' },
   footer:   { label: 'Rodapé do embed',           db: 'partnerFooter',    isUrl: false, isLong: false, placeholder: 'Savage Bot · Parcerias' },
-  mensagem: { label: 'Mensagem de agradecimento', db: 'partnerMessage',   isUrl: false, isLong: true,  placeholder: '★ Obrigado por fortalecer nossa comunidade!' },
-  descricao:{ label: 'Descrição da parceria',    db: 'partnerDescription', isUrl: false, isLong: true, placeholder: 'Texto exibido antes da mensagem de agradecimento' },
+  mensagem: { label: 'Mensagem da parceria',     db: 'partnerMessage',   isUrl: false, isLong: true,  placeholder: 'Digite a mensagem (deixe vazio para não exibir)' },
+  descricao:{ label: 'Descrição da parceria',    db: 'partnerDescription', isUrl: false, isLong: true, placeholder: 'Digite a descrição (deixe vazio para não exibir)' },
   min_membros: { label: 'Mínimo de membros',     db: 'partnerMinMembers', isUrl: false, isLong: false, isInteger: true, placeholder: 'Ex: 100 (vazio para desativar)' },
 };
 

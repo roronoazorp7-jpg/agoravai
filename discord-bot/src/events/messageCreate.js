@@ -449,7 +449,7 @@ export default {
                 partnershipCount,
                 rank,
                 guildId: message.guildId,
-                guildName: message.guild.name,
+                guildName: partnerName,
                 thumbUrl,
                 imageUrl,
                 messageUrl: message.url,

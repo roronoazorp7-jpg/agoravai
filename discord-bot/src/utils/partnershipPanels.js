@@ -14,8 +14,6 @@ import {
   MessageFlags,
 } from 'discord.js';
 
-const DEFAULT_PARTNER_MESSAGE = '★ Obrigado por fortalecer nossa comunidade!';
-
 function renderPartnerText(template, {
   promoterId,
   promoterUsername,
@@ -30,6 +28,8 @@ function renderPartnerText(template, {
   const promoterMention = promoterId ? `<@${promoterId}>` : '';
   const representativeMention = representativeId ? `<@${representativeId}>` : '';
   return String(template ?? '')
+    // These control values can remain in older saved configurations.
+    .replaceAll('${null}', '')
     .replaceAll('${default}', defaultText)
     .replaceAll('${promoter}', promoterMention)
     .replaceAll('${rep}', representativeMention)
@@ -96,7 +96,7 @@ export function buildPartnerConfigPayload(cfg = {}) {
     `📩 **Notif. DM:** ${cfg.partnerNotifyDm ? 'Ativado' : 'Desativado'}   🚪 **Remover ao Sair:** ${cfg.partnerRemoveOnLeave ? 'Ativado' : 'Desativado'}`,
     `🎨 **Cor:** \`#${cfg.partnerColor || 'A020F0'}\`   💣 **Imagem:** ${cfg.partnerImage ? '✅' : '*(padrão)*'}   🖼️ **Thumb:** ${cfg.partnerThumbnail ? '✅' : '*(padrão)*'}`,
     `👇 **Rodapé:** ${cfg.partnerFooter ? cfg.partnerFooter.slice(0, 60) : '*(nenhum)*'}`,
-    `✏️ **Mensagem:** ${cfg.partnerMessage ? cfg.partnerMessage.slice(0, 80) : '*(padrão)*'}`,
+    `✏️ **Mensagem:** ${cfg.partnerMessage ? cfg.partnerMessage.slice(0, 80) : '*(nenhuma)*'}`,
     `📄 **Descrição:** ${cfg.partnerDescription ? cfg.partnerDescription.slice(0, 80) : '*(nenhuma)*'}`,
     `👥 **Mínimo de membros:** ${cfg.partnerMinMembers ? cfg.partnerMinMembers.toLocaleString('pt-BR') : 'Desativado'}`,
     '',
@@ -128,11 +128,8 @@ export function buildPartnershipPost({
   imageUrl,
   messageUrl,
 }) {
-  const accentColor = cfg?.partnerColor ? (parseInt(cfg.partnerColor, 16) || 0xA020F0) : 0xA020F0;
-  const defaultMsg  = DEFAULT_PARTNER_MESSAGE;
-  const messageText = renderPartnerText(
-    cfg?.partnerMessage || defaultMsg,
-    {
+  const messageText = cfg?.partnerMessage?.trim()
+    ? renderPartnerText(cfg.partnerMessage, {
       promoterId,
       promoterUsername,
       representativeId,
@@ -141,10 +138,10 @@ export function buildPartnershipPost({
       rank,
       guildId,
       guildName,
-      defaultText: defaultMsg,
-    },
-  );
-  const descriptionText = cfg?.partnerDescription
+      defaultText: '',
+    })
+    : '';
+  const descriptionText = cfg?.partnerDescription?.trim()
     ? renderPartnerText(cfg.partnerDescription, {
         promoterId,
         promoterUsername,
@@ -158,7 +155,7 @@ export function buildPartnershipPost({
       })
     : '';
 
-  const container = new ContainerBuilder().setAccentColor(accentColor);
+  const container = new ContainerBuilder();
 
   if (thumbUrl) {
     container.addSectionComponents(
@@ -181,7 +178,9 @@ export function buildPartnershipPost({
   if (descriptionText) {
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(descriptionText));
   }
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(messageText));
+  if (messageText) {
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(messageText));
+  }
 
   if (imageUrl) {
     container.addMediaGalleryComponents(
