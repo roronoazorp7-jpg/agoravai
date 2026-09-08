@@ -849,27 +849,40 @@ export default {
           const extraPings = [pingRoleMentions, pingUserMentions].filter(Boolean).join(' ');
           const pingLine = extraPings ? `<@${interaction.user.id}> ${extraPings}` : `<@${interaction.user.id}>`;
 
-          const pingDisplay    = new TextDisplayBuilder().setContent(pingLine);
           const openText       = config?.ticketOpenText || 'Aguarde um instante, em breve um promotor irá lhe atender.';
-           const ticketContainer = ticketActionContainer({
-             channelId: channel.id,
-             title: `# ${option.label} - ${memberName}`,
-             avatar: memberAvatar,
-             claimedBy: null,
-             text: openText,
-           });
+          const ticketContainer = ticketActionContainer({
+            channelId: channel.id,
+            title: `# ${option.label} - ${memberName}`,
+            avatar: memberAvatar,
+            claimedBy: null,
+            text: openText,
+          });
+          const pingRoleIds = idList(pingRole);
+          const pingUserIds = idList(pingUser);
+          const pingAllowedMentions = {
+            roles: pingRoleIds,
+            users: [interaction.user.id, ...pingUserIds],
+          };
 
           try {
-            await channel.send({ components: [pingDisplay, ticketContainer], flags: MessageFlags.IsComponentsV2 });
-             if (partnershipTicket) {
-               await channel.send({
-                 content: `${pingRoleMentions || '<@&' + guild.roles.everyone.id + '>'}\n🤝 **Atendimento de parceria solicitado.** Um atendente responsável foi chamado para analisar este ticket.`,
-                 allowedMentions: {
-                   roles: idList(pingRole),
-                 },
-               });
-             }
-             if (config?.ticketAiEnabled) {
+            const pingMessage = await channel.send({
+              content: pingLine,
+              allowedMentions: pingAllowedMentions,
+            });
+            setTimeout(() => pingMessage.delete().catch(() => {}), 1_000);
+
+            await channel.send({ components: [ticketContainer], flags: MessageFlags.IsComponentsV2 });
+
+            if (partnershipTicket) {
+              const partnershipPingMessage = await channel.send({
+                content: `${pingRoleMentions || `<@&${guild.roles.everyone.id}>`}\n🤝 **Atendimento de parceria solicitado.** Um atendente responsável foi chamado para analisar este ticket.`,
+                allowedMentions: {
+                  roles: pingRoleIds.length > 0 ? pingRoleIds : [guild.roles.everyone.id],
+                },
+              });
+              setTimeout(() => partnershipPingMessage.delete().catch(() => {}), 1_000);
+            }
+            if (config?.ticketAiEnabled) {
               await channel.send(
                 '🤖 **Atendimento automático ativado.**\n' +
                 'Olá! Sou o suporte oficial do servidor e posso ajudar com dúvidas gerais, regras, moderação e denúncias. ' +
@@ -941,10 +954,11 @@ export default {
               });
             }
 
-            await interaction.channel.send({
+            const notificationMessage = await interaction.channel.send({
               content: `🔔 ${mentions.join(' ')}\n<@${ticket.userId}> solicitou a atenção da equipe neste ticket.`,
               allowedMentions: { roles: roleIds, users: [...userIds, ticket.userId] },
             });
+            setTimeout(() => notificationMessage.delete().catch(() => {}), 1_000);
             return interaction.editReply({ content: '✅ Atendentes notificados.' });
           }
 
@@ -1645,8 +1659,6 @@ export default {
             ? `<@${interaction.user.id}> ${extraPings}`
             : `<@${interaction.user.id}>`;
 
-          const pingDisplay = new TextDisplayBuilder().setContent(pingLine);
-
           const ticketContainer = ticketActionContainer({
             channelId: channel.id,
             title: `# Ticket - ${memberName}`,
@@ -1656,7 +1668,18 @@ export default {
           });
 
           try {
-            await channel.send({ components: [pingDisplay, ticketContainer], flags: MessageFlags.IsComponentsV2 });
+            const pingRoleIds = idList(config?.ticketPingRole);
+            const pingUserIds = idList(config?.ticketPingUser);
+            const pingMessage = await channel.send({
+              content: pingLine,
+              allowedMentions: {
+                roles: pingRoleIds,
+                users: [interaction.user.id, ...pingUserIds],
+              },
+            });
+            setTimeout(() => pingMessage.delete().catch(() => {}), 1_000);
+
+            await channel.send({ components: [ticketContainer], flags: MessageFlags.IsComponentsV2 });
           } catch (err) {
             console.error('[TICKET SEND ERROR]', err?.message ?? err);
             await channel.delete().catch(() => {});
