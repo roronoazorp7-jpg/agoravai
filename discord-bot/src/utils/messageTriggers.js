@@ -40,6 +40,8 @@ const TYPE_EXTENSIONS = {
 
 function normalizeKeyword(value) {
   return String(value ?? '')
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
     .trim()
     .replace(/\s+/g, ' ')
     .toLocaleLowerCase('pt-BR');
@@ -70,6 +72,26 @@ export function parseTriggerKeywords(value) {
   )].slice(0, 50);
 }
 
+function getStoredTriggerKeywords(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return [];
+
+  // Accept records created by older versions that stored the keywords as JSON.
+  if (raw.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parseTriggerKeywords(parsed.join('\n'));
+    } catch {
+      // Fall through to the regular line-based parser.
+    }
+  }
+
+  // The current panel saves one keyword per line. Keep compatibility with
+  // older records that used comma or semicolon separated keywords.
+  const legacySeparated = raw.includes('\n') ? raw : raw.replace(/[;,]\s+/g, '\n');
+  return parseTriggerKeywords(legacySeparated);
+}
+
 function safeFileName(value) {
   const clean = basename(String(value || 'resposta.bin'))
     .replace(/[^a-zA-Z0-9._-]/g, '_')
@@ -90,8 +112,26 @@ export function getTriggerFileName(trigger) {
 function shouldRefreshStoredFile(trigger, size) {
   if (!size || size <= 64) return true;
   if (String(trigger?.responseType ?? '').startsWith('video/') && size < 1024) return true;
-  if (trigger?.responseSize && trigger.responseSize > size && size < trigger.responseSize * 0.9) return true;
   return false;
+}
+
+function getMediaTypeFromUrl(value) {
+  try {
+    const pathname = new URL(value).pathname.toLowerCase();
+    if (pathname.endsWith('.mp4')) return 'video/mp4';
+    if (pathname.endsWith('.webm')) return 'video/webm';
+    if (pathname.endsWith('.mov')) return 'video/quicktime';
+    if (pathname.endsWith('.mkv')) return 'video/x-matroska';
+    if (pathname.endsWith('.gif')) return 'image/gif';
+    if (pathname.endsWith('.jpg') || pathname.endsWith('.jpeg')) return 'image/jpeg';
+    if (pathname.endsWith('.png')) return 'image/png';
+    if (pathname.endsWith('.mp3')) return 'audio/mpeg';
+    if (pathname.endsWith('.ogg')) return 'audio/ogg';
+    if (pathname.endsWith('.wav')) return 'audio/wav';
+  } catch {
+    // Invalid URLs are rejected by the fetch path.
+  }
+  return '';
 }
 
 function cleanUrlCandidate(value) {
@@ -136,11 +176,16 @@ async function resolveTriggerMediaSource(url, expectedType, depth = 0, visited =
     .split(';', 1)[0]
     .toLowerCase();
   const fallbackType = String(expectedType ?? '').split(';', 1)[0].toLowerCase();
+  const urlType = getMediaTypeFromUrl(url);
   if (ALLOWED_TYPES.test(responseType)) {
     return { url, contentType: responseType };
   }
   if (responseType === 'application/octet-stream' && ALLOWED_TYPES.test(fallbackType)) {
     return { url, contentType: fallbackType };
+  }
+  if ((!responseType || responseType === 'application/octet-stream' || responseType === 'text/plain')
+    && ALLOWED_TYPES.test(urlType)) {
+    return { url, contentType: urlType };
   }
 
   const length = Number(response.headers.get('content-length') ?? 0);
@@ -191,7 +236,7 @@ export async function buildTriggerConfigPayload(guildId) {
       triggers.length
         ? triggers.map((trigger, index) => [
           `**${index + 1}. ${displayName(trigger)}**`,
-          `Palavras-chave: ${trigger.keywords.split('\n').join(', ')}`,
+          `Palavras-chave: ${getStoredTriggerKeywords(trigger.keywords).join(', ')}`,
           `Arquivo: ${trigger.responseName} · ${formatSize(trigger.responseSize)}`,
         ].join('\n')).join('\n\n')
         : '*Nenhum gatilho. Adicione o primeiro abaixo.*',
@@ -203,7 +248,7 @@ export async function buildTriggerConfigPayload(guildId) {
     const options = triggers.slice(0, 25).map(trigger =>
       new StringSelectMenuOptionBuilder()
         .setLabel(displayName(trigger).slice(0, 100))
-        .setDescription(trigger.keywords.split('\n').join(', ').slice(0, 100))
+        .setDescription(getStoredTriggerKeywords(trigger.keywords).join(', ').slice(0, 100))
         .setValue(trigger.id),
     );
     rows.push(new ActionRowBuilder().addComponents(
@@ -437,6 +482,6 @@ export async function findMatchingTrigger(guildId, content) {
   if (!normalizeKeyword(content)) return null;
   const triggers = await listTriggers(guildId);
   return triggers.find(trigger => trigger.keywords
-    .split('\n')
+    && getStoredTriggerKeywords(trigger.keywords)
     .some(keyword => matchesTriggerKeyword(content, keyword))) ?? null;
 }

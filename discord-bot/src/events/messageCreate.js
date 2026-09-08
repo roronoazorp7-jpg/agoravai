@@ -181,17 +181,30 @@ async function handleMessageTrigger(message) {
 
   try {
     const filePath = await getTriggerFile(trigger);
-    if (!filePath) return false;
-    await message.channel.send({
-      files: [{ attachment: filePath, name: getTriggerFileName(trigger) }],
-    });
+    if (filePath) {
+      await message.channel.send({
+        files: [{ attachment: filePath, name: getTriggerFileName(trigger) }],
+      });
+      return true;
+    }
+
+    // Legacy records can still have a valid Discord CDN URL even when their
+    // local cache was lost after a restart or deployment.
+    if (trigger.responseUrl) {
+      await message.channel.send({
+        files: [{ attachment: trigger.responseUrl, name: getTriggerFileName(trigger) }],
+      });
+      return true;
+    }
   } catch (error) {
     console.error('[MESSAGE TRIGGER]', error?.message ?? error);
-    await message.channel.send({
-      files: [{ attachment: trigger.responseUrl, name: getTriggerFileName(trigger) }],
-    }).catch(() => {});
+    if (trigger.responseUrl) {
+      await message.channel.send({
+        files: [{ attachment: trigger.responseUrl, name: getTriggerFileName(trigger) }],
+      }).catch(() => {});
+    }
   }
-  return true;
+  return false;
 }
 
 function buildTicketServerContext(message, cfg) {
