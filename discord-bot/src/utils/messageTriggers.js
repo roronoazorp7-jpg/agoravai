@@ -94,6 +94,65 @@ function shouldRefreshStoredFile(trigger, size) {
   return false;
 }
 
+function cleanUrlCandidate(value) {
+  return String(value ?? '')
+    .replaceAll('\\/', '/')
+    .replaceAll('\\u002F', '/')
+    .replaceAll('&amp;', '&')
+    .trim()
+    .replace(/[),.;]+$/g, '');
+}
+
+function extractMediaCandidates(text) {
+  const source = String(text ?? '');
+  const candidates = [];
+  const add = value => {
+    const url = cleanUrlCandidate(value);
+    if (/^https?:\/\//i.test(url) && !candidates.includes(url)) candidates.push(url);
+  };
+
+  for (const match of source.matchAll(/(?:downloadAddr|playAddr|videoUrl|contentUrl|og:video(?::url)?)["'\s:=]+["']([^"']+)["']/gi)) {
+    add(match[1]);
+  }
+  for (const match of source.matchAll(/https?:\/\/[^\s"'<>]+/gi)) {
+    add(match[0]);
+  }
+  return candidates.slice(0, 8);
+}
+
+async function resolveTriggerMediaSource(url, expectedType, depth = 0, visited = new Set()) {
+  if (!url || depth > 2 || visited.has(url)) return null;
+  visited.add(url);
+
+  const response = await fetch(url, {
+    headers: {
+      'user-agent': 'Mozilla/5.0 (compatible; SavageBot/1.0)',
+      accept: '*/*',
+    },
+  }).catch(() => null);
+  if (!response?.ok || !response.body) return null;
+
+  const responseType = String(response.headers.get('content-type') ?? '')
+    .split(';', 1)[0]
+    .toLowerCase();
+  const fallbackType = String(expectedType ?? '').split(';', 1)[0].toLowerCase();
+  if (ALLOWED_TYPES.test(responseType)) {
+    return { url, contentType: responseType };
+  }
+  if (responseType === 'application/octet-stream' && ALLOWED_TYPES.test(fallbackType)) {
+    return { url, contentType: fallbackType };
+  }
+
+  const length = Number(response.headers.get('content-length') ?? 0);
+  if (length > 2 * 1024 * 1024) return null;
+  const body = await response.text().catch(() => '');
+  for (const candidate of extractMediaCandidates(body)) {
+    const resolved = await resolveTriggerMediaSource(candidate, fallbackType, depth + 1, visited);
+    if (resolved) return resolved;
+  }
+  return null;
+}
+
 function displayName(trigger) {
   return trigger.name?.trim() || trigger.responseName || 'Sem apelido';
 }
@@ -265,19 +324,28 @@ export async function getTriggerFile(trigger) {
   }
 
   if (!trigger.responseUrl) return null;
+  const source = await resolveTriggerMediaSource(
+    trigger.responseUrl,
+    trigger.responseType,
+  );
+  if (!source) return null;
   const saved = await saveAttachment(
     trigger.guildId,
     trigger.id,
     {
-      url: trigger.responseUrl,
+      url: source.url,
       size: trigger.responseSize,
-      contentType: trigger.responseType,
+      contentType: source.contentType,
     },
     trigger.responseName,
   );
   await prisma.messageTrigger.update({
     where: { id: trigger.id },
-    data: { storageKey: saved.storageKey },
+    data: {
+      storageKey: saved.storageKey,
+      responseType: source.contentType,
+      responseSize: saved.size,
+    },
   }).catch(() => {});
   return join(TRIGGER_DIR, saved.storageKey);
 }
