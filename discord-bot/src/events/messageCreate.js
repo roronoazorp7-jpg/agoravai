@@ -364,7 +364,7 @@ export default {
 
             let invite = null;
             let fetchError = null;
-            try { invite = await message.client.fetchInvite(inviteCode); } catch (e) { fetchError = e; }
+            try { invite = await message.client.fetchInvite(inviteCode, { withCounts: true }); } catch (e) { fetchError = e; }
 
             if (!invite || !invite.guild) {
               const warn = await message.reply({ content: `⚠️ Não consegui buscar o convite \`${inviteCode}\`. Verifique se ele é válido e não expirou.` }).catch(() => null);
@@ -373,6 +373,25 @@ export default {
               const warn = await message.reply({ content: '⚠️ O convite enviado é do próprio servidor. Envie o convite do **servidor parceiro**.' }).catch(() => null);
               if (warn) setTimeout(() => warn.delete().catch(() => {}), 8_000);
             } else {
+              const minimumMembers = Number(cfg.partnerMinMembers ?? 0);
+              const approximateMemberCount = invite.approximateMemberCount
+                ?? invite.guild.approximateMemberCount
+                ?? invite.guild.memberCount
+                ?? null;
+              if (minimumMembers > 0 && (
+                approximateMemberCount === null
+                || approximateMemberCount < minimumMembers
+              )) {
+                const currentCount = approximateMemberCount === null
+                  ? 'não disponível'
+                  : approximateMemberCount.toLocaleString('pt-BR');
+                const warn = await message.reply({
+                  content: `⚠️ Esta parceria não atingiu o mínimo de membros configurado (**${minimumMembers.toLocaleString('pt-BR')}**). Contagem encontrada: **${currentCount}**.`,
+                }).catch(() => null);
+                if (warn) setTimeout(() => warn.delete().catch(() => {}), 10_000);
+                return;
+              }
+
               const partnerServerId = invite.guild.id   || 'unknown';
               const partnerName     = invite.guild.name || 'Desconhecido';
 

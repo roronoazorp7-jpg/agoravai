@@ -457,6 +457,8 @@ const PARTNER_MODAL_FIELDS = {
   thumb:    { label: 'URL da thumbnail',          db: 'partnerThumbnail', isUrl: true,  isLong: false, placeholder: 'https://... (deixe vazio para padrão)' },
   footer:   { label: 'Rodapé do embed',           db: 'partnerFooter',    isUrl: false, isLong: false, placeholder: 'Savage Bot · Parcerias' },
   mensagem: { label: 'Mensagem de agradecimento', db: 'partnerMessage',   isUrl: false, isLong: true,  placeholder: '★ Obrigado por fortalecer nossa comunidade!' },
+  descricao:{ label: 'Descrição da parceria',    db: 'partnerDescription', isUrl: false, isLong: true, placeholder: 'Texto exibido antes da mensagem de agradecimento' },
+  min_membros: { label: 'Mínimo de membros',     db: 'partnerMinMembers', isUrl: false, isLong: false, isInteger: true, placeholder: 'Ex: 100 (vazio para desativar)' },
 };
 
 // ─── Handler principal ────────────────────────────────────────────────────────
@@ -1214,12 +1216,14 @@ export default {
           return interaction.update({ ...payload, content: null });
         }
 
-        return;
+        if (interaction.customId !== 'pcfg_menu') return;
       }
 
       // ── BUTTONS ────────────────────────────────────────────────────────────
-      if (interaction.isButton()) {
-        const { customId } = interaction;
+      if (interaction.isButton() || (interaction.isStringSelectMenu() && interaction.customId === 'pcfg_menu')) {
+        const customId = interaction.isStringSelectMenu()
+          ? `pcfg_${interaction.values[0]}`
+          : interaction.customId;
 
         if (customId.startsWith('bot_leave_')) {
           return handleBotLeaveInteraction(interaction, client);
@@ -2739,7 +2743,7 @@ export default {
               .setPlaceholder(def.placeholder.slice(0, 100))
               .setRequired(false)
               .setMaxLength(def.isLong ? 1000 : 200);
-            if (cfg[def.db]) input.setValue(cfg[def.db]);
+            if (cfg[def.db] !== null && cfg[def.db] !== undefined) input.setValue(String(cfg[def.db]));
             modal.addComponents(new ActionRowBuilder().addComponents(input));
             return interaction.showModal(modal);
           }
@@ -3940,6 +3944,15 @@ export default {
             value = null;
           } else if (field === 'cor') {
             value = value.replace('#', '').toUpperCase();
+          } else if (def.isInteger) {
+            const parsed = Number(value);
+            if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100_000_000) {
+              return interaction.followUp({
+                content: '❌ Informe um número inteiro maior que zero ou deixe vazio para desativar.',
+                ephemeral: true,
+              });
+            }
+            value = parsed;
           }
 
           await prisma.guildConfig.upsert({

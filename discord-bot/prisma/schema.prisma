@@ -176,11 +176,13 @@ model GuildConfig {
   partnerRole            String?
   partnerNotifyDm        Boolean @default(false)
   partnerMessage         String?
+  partnerDescription     String?
   partnerImage           String?
   partnerThumbnail       String?
   partnerFooter          String?
   partnerColor           String?
   partnerRemoveOnLeave   Boolean @default(false)
+  partnerMinMembers      Int?
 
   botIconUrl   String?
   botBannerUrl String?
