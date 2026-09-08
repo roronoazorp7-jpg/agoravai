@@ -6,9 +6,6 @@ import {
   StringSelectMenuOptionBuilder,
   ContainerBuilder,
   TextDisplayBuilder,
-  SeparatorBuilder,
-  SectionBuilder,
-  ThumbnailBuilder,
   MediaGalleryBuilder,
   MediaGalleryItemBuilder,
   MessageFlags,
@@ -158,13 +155,11 @@ export function buildPartnershipPost({
   promoterUsername,
   representativeId,
   representativeUsername,
-  partnerName,
   inviteCode,
   partnershipCount,
   rank,
   guildId,
   guildName,
-  thumbUrl,
   imageUrl,
   messageUrl,
 }) {
@@ -181,51 +176,16 @@ export function buildPartnershipPost({
       defaultText: '',
     })
     : '';
-  const descriptionText = cfg?.partnerDescription?.trim()
-    ? renderPartnerText(cfg.partnerDescription, {
-        promoterId,
-        promoterUsername,
-        representativeId,
-        representativeUsername,
-        partnershipCount,
-        rank,
-        guildId,
-        guildName,
-        defaultText: '',
-      })
-    : '';
-
   const container = new ContainerBuilder();
 
-  if (thumbUrl) {
-    container.addSectionComponents(
-      new SectionBuilder()
-        .addTextDisplayComponents(new TextDisplayBuilder().setContent('**✦ • Parceria Realizada**'))
-        .setThumbnailAccessory(new ThumbnailBuilder().setURL(thumbUrl)),
-    );
-  } else {
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('**✦ • Parceria Realizada**'));
-  }
-
-  container.addSeparatorComponents(new SeparatorBuilder());
-  if (descriptionText) {
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(descriptionText));
-  }
   if (messageText) {
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(messageText));
   }
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent('Obrigado por fortalecer nossa comunidade!'),
-  );
 
   if (imageUrl) {
     container.addMediaGalleryComponents(
       new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(imageUrl)),
     );
-  }
-
-  if (cfg?.partnerFooter) {
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# ${cfg.partnerFooter}`));
   }
 
   const inviteLink = `https://discord.gg/${inviteCode}`;
