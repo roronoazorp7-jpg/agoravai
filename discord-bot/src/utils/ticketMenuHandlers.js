@@ -2,7 +2,9 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  MessageFlags,
   ModalBuilder,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
@@ -32,32 +34,24 @@ export async function buildMenuOptsPanel(guildId, client = null) {
     orderBy: { order: 'asc' },
   });
 
-  const embed = new EmbedBuilder()
-    .setColor(0x5865f2)
-    .setTitle('🎫 Ticket — Opções do Menu')
-    .setDescription(
-      options.length === 0
-        ? '📭 Nenhuma opção criada ainda.\nClique em **Adicionar** para criar a primeira.'
-        : `**${options.length}** opção(ões) configurada(s).\nSelecione uma para editar ou excluir.`,
-    );
-
-  if (options.length > 0) {
-    embed.addFields(
-      options.map(o => ({
-        name: `${o.emoji || '🎫'} ${o.label}`,
-        value: [
-          o.description ? `*${o.description}*` : '',
-          o.pingRole
-            ? `🔔 Cargos: ${o.pingRole.split(',').map(r => `<@&${r.trim()}>`).join(' ')}`
-            : '',
-          o.pingUser
-            ? `👤 Usuários: ${o.pingUser.split(',').map(u => `<@${u.trim()}>`).join(' ')}`
-            : '',
-        ].filter(Boolean).join('\n') || '*(sem pings configurados)*',
-        inline: false,
-      })),
-    );
-  }
+  const description = options.length === 0
+    ? '📭 Nenhuma opção criada ainda.\nClique em **Adicionar** para criar a primeira.'
+    : `**${options.length}** opção(ões) configurada(s).\nSelecione uma para editar ou excluir.`;
+  const optionLines = options.map((o, index) => [
+    `**${index + 1}. ${o.emoji || '🎫'} ${o.label}**`,
+    o.description ? `> ${o.description}` : '',
+    o.pingRole
+      ? `🔔 Cargos: ${o.pingRole.split(',').map(r => `<@&${r.trim()}>`).join(' ')}`
+      : '',
+    o.pingUser
+      ? `👤 Usuários: ${o.pingUser.split(',').map(u => `<@${u.trim()}>`).join(' ')}`
+      : '',
+  ].filter(Boolean).join('\n'));
+  const text = [
+    '## 🎫 Ticket — Opções do Menu',
+    description,
+    optionLines.join('\n\n'),
+  ].filter(Boolean).join('\n\n').slice(0, 3900);
 
   const rows = [];
 
@@ -101,37 +95,19 @@ export async function buildMenuOptsPanel(guildId, client = null) {
     ),
   );
 
-  return { embeds: [embed], components: rows };
+  const container = new ContainerBuilder()
+    .setAccentColor(0x5865f2)
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+
+  return {
+    components: [container, ...rows],
+    flags: MessageFlags.IsComponentsV2,
+  };
 }
 
 // ─── Painel de detalhes de uma opção ──────────────────────────────────────────
 
 export async function buildOptionDetailPanel(option) {
-  const embed = new EmbedBuilder()
-    .setColor(0x5865f2)
-    .setTitle(`${option.emoji || '🎫'} ${option.label}`)
-    .addFields(
-      {
-        name: '📝 Descrição',
-        value: option.description || '*(não definida)*',
-        inline: false,
-      },
-      {
-        name: '🔔 Ping Cargos',
-        value: option.pingRole
-          ? option.pingRole.split(',').map(r => `<@&${r.trim()}>`).join(' ')
-          : '*(nenhum)*',
-        inline: true,
-      },
-      {
-        name: '👤 Ping Usuários',
-        value: option.pingUser
-          ? option.pingUser.split(',').map(u => `<@${u.trim()}>`).join(' ')
-          : '*(nenhum)*',
-        inline: true,
-      },
-    );
-
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`tcfg_menu_opt_edit:${option.id}`)
@@ -150,7 +126,24 @@ export async function buildOptionDetailPanel(option) {
       .setStyle(ButtonStyle.Secondary),
   );
 
-  return { embeds: [embed], components: [row] };
+  const text = [
+    `## ${option.emoji || '🎫'} ${option.label}`,
+    `**📝 Descrição**\n${option.description || '*(não definida)*'}`,
+    `**🔔 Ping Cargos**\n${option.pingRole
+      ? option.pingRole.split(',').map(r => `<@&${r.trim()}>`).join(' ')
+      : '*(nenhum)*'}`,
+    `**👤 Ping Usuários**\n${option.pingUser
+      ? option.pingUser.split(',').map(u => `<@${u.trim()}>`).join(' ')
+      : '*(nenhum)*'}`,
+  ].join('\n\n');
+  const container = new ContainerBuilder()
+    .setAccentColor(0x5865f2)
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(text.slice(0, 3900)));
+
+  return {
+    components: [container, row],
+    flags: MessageFlags.IsComponentsV2,
+  };
 }
 
 // ─── Modal de adição de opção ─────────────────────────────────────────────────
