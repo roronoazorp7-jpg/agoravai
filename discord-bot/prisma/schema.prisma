@@ -241,6 +241,9 @@ model MessageTrigger {
   responseType   String?
   responseSize   Int?
   storageKey     String?
+  storageChannelId    String?
+  storageMessageId    String?
+  storageAttachmentId String?
   createdAt      DateTime @default(now())
 
   @@index([guildId])

@@ -18,6 +18,8 @@ import {
   TextInputBuilder,
   TextInputStyle,
   MessageFlags,
+  ChannelType,
+  PermissionFlagsBits,
 } from 'discord.js';
 import prisma from '../database/client.js';
 
@@ -153,6 +155,78 @@ function getMediaTypeFromFileName(value) {
   if (name.endsWith('.ogg')) return 'audio/ogg';
   if (name.endsWith('.wav')) return 'audio/wav';
   return '';
+}
+
+async function getTriggerStorageChannel(guild, botUserId) {
+  if (!guild || !botUserId) throw new Error('Servidor ou bot não encontrado.');
+
+  const existing = guild.channels.cache.find(channel =>
+    channel.type === ChannelType.GuildText && channel.name === 'trigger-storage');
+  if (existing) return existing;
+
+  return guild.channels.create({
+    name: 'trigger-storage',
+    type: ChannelType.GuildText,
+    topic: 'Armazenamento privado dos arquivos dos gatilhos.',
+    permissionOverwrites: [
+      {
+        id: guild.id,
+        deny: [PermissionFlagsBits.ViewChannel],
+      },
+      {
+        id: botUserId,
+        allow: [
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.AttachFiles,
+          PermissionFlagsBits.ReadMessageHistory,
+          PermissionFlagsBits.ManageMessages,
+        ],
+      },
+    ],
+  });
+}
+
+async function archiveTriggerFile({ guild, botUserId, trigger, filePath, fileName }) {
+  const channel = await getTriggerStorageChannel(guild, botUserId);
+  const archiveMessage = await channel.send({
+    content: `Arquivo privado do gatilho ${trigger.id}`,
+    files: [{ attachment: filePath, name: fileName }],
+    allowedMentions: { parse: [] },
+  });
+  const archivedAttachment = archiveMessage.attachments.first();
+  if (!archivedAttachment) throw new Error('O Discord não confirmou o arquivo arquivado.');
+
+  return {
+    storageChannelId: channel.id,
+    storageMessageId: archiveMessage.id,
+    storageAttachmentId: archivedAttachment.id,
+    responseUrl: archivedAttachment.url,
+    responseName: archivedAttachment.name || fileName,
+    responseType: archivedAttachment.contentType || trigger.responseType || null,
+    responseSize: archivedAttachment.size || trigger.responseSize || null,
+  };
+}
+
+async function getArchivedTriggerAttachment(trigger, client) {
+  if (!trigger.storageChannelId || !trigger.storageMessageId || !client) return null;
+
+  const channel = await client.channels.fetch(trigger.storageChannelId).catch(() => null);
+  if (!channel?.isTextBased?.() || !channel.messages) return null;
+  const archiveMessage = await channel.messages.fetch(trigger.storageMessageId).catch(() => null);
+  if (!archiveMessage) return null;
+
+  return archiveMessage.attachments.get(trigger.storageAttachmentId)
+    || archiveMessage.attachments.first()
+    || null;
+}
+
+async function deleteArchivedTriggerFile(trigger, client) {
+  if (!trigger.storageChannelId || !trigger.storageMessageId || !client) return;
+  const channel = await client.channels.fetch(trigger.storageChannelId).catch(() => null);
+  if (!channel?.isTextBased?.() || !channel.messages) return;
+  const archiveMessage = await channel.messages.fetch(trigger.storageMessageId).catch(() => null);
+  if (archiveMessage) await archiveMessage.delete().catch(() => {});
 }
 
 function cleanUrlCandidate(value) {
@@ -407,7 +481,7 @@ async function saveAttachment(guildId, triggerId, attachment, fileName) {
   }
 }
 
-export async function getTriggerFile(trigger) {
+export async function getTriggerFile(trigger, client) {
   if (trigger.storageKey) {
     const storedPath = join(TRIGGER_DIR, trigger.storageKey);
     const storedSize = await stat(storedPath)
@@ -415,6 +489,43 @@ export async function getTriggerFile(trigger) {
       .catch(() => null);
     if (storedSize !== null && !shouldRefreshStoredFile(trigger, storedSize)) return storedPath;
     if (storedSize !== null) await unlink(storedPath).catch(() => {});
+  }
+
+  const archivedAttachment = await getArchivedTriggerAttachment(trigger, client);
+  if (archivedAttachment?.url) {
+    const source = await resolveTriggerMediaSource(
+      archivedAttachment.url,
+      archivedAttachment.contentType || trigger.responseType,
+    );
+    if (source) {
+      const saved = await saveAttachment(
+        trigger.guildId,
+        trigger.id,
+        {
+          url: source.url,
+          size: archivedAttachment.size || trigger.responseSize,
+          contentType: source.contentType,
+        },
+        archivedAttachment.name || trigger.responseName,
+      );
+      await prisma.messageTrigger.update({
+        where: { id: trigger.id },
+        data: {
+          storageKey: saved.storageKey,
+          responseUrl: source.url,
+          responseName: archivedAttachment.name || trigger.responseName,
+          responseType: source.contentType,
+          responseSize: saved.size,
+        },
+      }).catch(() => {});
+      return join(TRIGGER_DIR, saved.storageKey);
+    }
+    return null;
+  }
+
+  // A trigger with persistent storage must never fall back to an expired URL.
+  if (trigger.storageChannelId || trigger.storageMessageId || trigger.storageAttachmentId) {
+    return null;
   }
 
   if (!trigger.responseUrl) return null;
@@ -467,6 +578,7 @@ export async function handleTriggerButton(interaction) {
     if (trigger.storageKey) {
       await unlink(join(TRIGGER_DIR, trigger.storageKey)).catch(() => {});
     }
+    await deleteArchivedTriggerFile(trigger, interaction.client);
     await prisma.messageTrigger.delete({ where: { id: trigger.id } });
     return interaction.update(await buildTriggerConfigPayload(interaction.guildId));
   }
@@ -506,20 +618,47 @@ export async function handleTriggerModal(interaction) {
     },
   });
 
+  let saved = null;
+  let archive = null;
   try {
-    const saved = await saveAttachment(
+    saved = await saveAttachment(
       interaction.guildId,
       trigger.id,
       attachment,
       attachment.name,
     );
+    archive = await archiveTriggerFile({
+      guild: interaction.guild,
+      botUserId: interaction.client.user?.id,
+      trigger,
+      filePath: join(TRIGGER_DIR, saved.storageKey),
+      fileName: getTriggerFileName({
+        responseName: attachment.name,
+        responseType: attachment.contentType,
+        responseUrl: attachment.url,
+      }),
+    });
     await prisma.messageTrigger.update({
       where: { id: trigger.id },
-      data: { storageKey: saved.storageKey, responseSize: saved.size },
+      data: {
+        storageKey: saved.storageKey,
+        responseUrl: archive.responseUrl,
+        responseName: archive.responseName,
+        responseType: archive.responseType,
+        responseSize: archive.responseSize || saved.size,
+        storageChannelId: archive.storageChannelId,
+        storageMessageId: archive.storageMessageId,
+        storageAttachmentId: archive.storageAttachmentId,
+      },
     });
   } catch (error) {
+    if (saved?.storageKey) await unlink(join(TRIGGER_DIR, saved.storageKey)).catch(() => {});
+    if (archive) await deleteArchivedTriggerFile(archive, interaction.client);
     await prisma.messageTrigger.delete({ where: { id: trigger.id } }).catch(() => {});
-    return interaction.editReply(`❌ Não consegui salvar o arquivo: ${error.message}`);
+    return interaction.editReply(
+      `❌ Não consegui guardar o arquivo de forma permanente: ${error.message}. ` +
+      'Verifique se o bot pode criar canais, enviar arquivos e gerenciar mensagens.',
+    );
   }
 
   return interaction.editReply(

@@ -7,4 +7,4 @@ Os arquivos de resposta dos gatilhos não devem depender somente do disco local 
 
 **Why:** O bot roda fora do workspace em uma plataforma com filesystem efêmero; registros antigos podem continuar no banco enquanto o arquivo local desaparece.
 
-**How to apply:** Ao evoluir os gatilhos, priorize armazenamento persistente e mantenha uma recuperação compatível para registros legados cujo link ainda esteja válido. Uploads antigos do TikTok podem não ter extensão nem MIME salvo; ao entregar um arquivo assim, inferir `.mp4` quando a origem indicar vídeo para que o Discord mostre o player.
+**How to apply:** Para novos gatilhos, arquive o arquivo em uma mensagem privada do Discord e guarde os IDs do canal, mensagem e anexo; buscar a mensagem antes do envio renova a URL. Mantenha recuperação compatível para registros legados cujo link ainda esteja válido. Uploads antigos do TikTok podem não ter extensão nem MIME salvo; ao entregar um arquivo assim, inferir `.mp4` quando a origem indicar vídeo para que o Discord mostre o player.

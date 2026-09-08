@@ -180,7 +180,7 @@ async function handleMessageTrigger(message) {
   setTimeout(() => triggerCooldowns.delete(cooldownKey), 10_000);
 
   try {
-    const filePath = await getTriggerFile(trigger);
+    const filePath = await getTriggerFile(trigger, message.client);
     if (filePath) {
       await message.channel.send({
         files: [{ attachment: filePath, name: getTriggerFileName(trigger) }],
