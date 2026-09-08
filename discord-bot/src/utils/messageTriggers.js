@@ -101,11 +101,17 @@ function safeFileName(value) {
 
 export function getTriggerFileName(trigger) {
   const name = safeFileName(trigger?.responseName);
-  const mimeType = String(trigger?.responseType ?? '').split(';', 1)[0].toLowerCase();
+  const responseType = String(trigger?.responseType ?? '').split(';', 1)[0].toLowerCase();
+  const mimeType = ALLOWED_TYPES.test(responseType)
+    ? responseType
+    : getMediaTypeFromUrl(trigger?.responseUrl) || getMediaTypeFromFileName(name);
   const extension = TYPE_EXTENSIONS[mimeType] ?? '';
   if (extension && (!extname(name) || extname(name).toLowerCase() === '.bin')) {
     return `${name.replace(/\.bin$/i, '')}${extension}`;
   }
+  // Old TikTok uploads often arrived without a file extension and without a
+  // responseType in the database. Keep those attachments playable in Discord.
+  if (!extname(name) && /^tiktok(?:[_-]|$)/i.test(name)) return `${name}.mp4`;
   return extname(name) ? name : `${name}${extension}`;
 }
 
@@ -131,6 +137,21 @@ function getMediaTypeFromUrl(value) {
   } catch {
     // Invalid URLs are rejected by the fetch path.
   }
+  return '';
+}
+
+function getMediaTypeFromFileName(value) {
+  const name = String(value ?? '').toLowerCase();
+  if (name.endsWith('.mp4')) return 'video/mp4';
+  if (name.endsWith('.webm')) return 'video/webm';
+  if (name.endsWith('.mov')) return 'video/quicktime';
+  if (name.endsWith('.mkv')) return 'video/x-matroska';
+  if (name.endsWith('.gif')) return 'image/gif';
+  if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'image/jpeg';
+  if (name.endsWith('.png')) return 'image/png';
+  if (name.endsWith('.mp3')) return 'audio/mpeg';
+  if (name.endsWith('.ogg')) return 'audio/ogg';
+  if (name.endsWith('.wav')) return 'audio/wav';
   return '';
 }
 
