@@ -53,6 +53,7 @@ import { handleWorkInteraction } from '../commands/economia/eco.js';
 import { handleBankInteraction } from '../utils/bankHandlers.js';
 import { handleCardPackInteraction, handleFutPackInteraction, handleCardCollectionInteraction } from '../commands/general/cartas.js';
 import { handleBattleInteraction } from '../commands/jogos/batalha.js';
+import { handleUnoInteraction } from '../utils/unoGame.js';
 import { isCommandBlocked, COMMAND_BLOCK_COMMAND } from '../utils/commandBlock.js';
 import { handleBJHit, handleBJStand, handleMinesCell, handleMinesCashout } from '../utils/gameHandlers.js';
 import { handleAjudaCatSel } from '../commands/general/ajuda.js';
@@ -655,6 +656,9 @@ export default {
           || interaction.customId.startsWith('battle_switch:')
         ) {
           return handleBattleInteraction(interaction);
+        }
+        if (interaction.customId.startsWith('uno_')) {
+          return handleUnoInteraction(interaction);
         }
         if (interaction.customId.startsWith('pokemon_dex_card:')) {
           return handleCardCollectionInteraction(interaction);
@@ -1309,6 +1313,9 @@ export default {
         }
         if (customId.startsWith('battle_')) {
           return handleBattleInteraction(interaction);
+        }
+        if (customId.startsWith('uno_')) {
+          return handleUnoInteraction(interaction);
         }
         if (
           customId.startsWith('pokemon_dex_') ||

@@ -3,6 +3,7 @@ import prisma from '../../database/client.js';
 import { errorEmbed } from '../../utils/embed.js';
 import { startBlackjack, startMines } from '../../utils/gameHandlers.js';
 import { totalCoins } from '../../utils/economyFunds.js';
+import { startUno } from '../../utils/unoGame.js';
 
 import { getEmoji } from '../../utils/emojiManager.js';
 const COIN = () => getEmoji('futecoins');
@@ -32,12 +33,19 @@ export default {
     .addSubcommand(s => s.setName('mines')
       .setDescription('💣 Mines — revele gemas sem explodir!')
       .addStringOption(o => o.setName('aposta').setDescription('Valor (ex: 500 ou "tudo")').setRequired(true))
-      .addIntegerOption(o => o.setName('bombas').setDescription('Número de bombas (padrão: 3)').setMinValue(1).setMaxValue(13))),
+       .addIntegerOption(o => o.setName('bombas').setDescription('Número de bombas (padrão: 3)').setMinValue(1).setMaxValue(13)))
+     .addSubcommand(s => s.setName('uno')
+       .setDescription('🎴 UNO clássico para 2 a 10 jogadores')),
   name: 'jogo',
   aliases: ['apostar', 'jog', 'blackjack', 'bj', 'mines'],
 
   async execute(interaction) {
     const sub = interaction.options.getSubcommand();
+    if (sub === 'uno') {
+      await interaction.deferReply();
+      return startUno(interaction, payload => interaction.editReply(payload));
+    }
+
     await interaction.deferReply();
 
     const eco = await getEco(interaction.user.id, interaction.guildId);
@@ -61,8 +69,12 @@ export default {
     const guildId = message.guildId;
 
     const help = () => message.reply({
-      embeds: [errorEmbed('**Uso:** `savage jogo <subcomando> <aposta> [extra]`\n**Subcomandos:** `blackjack <aposta>`, `mines <aposta> [bombas]`')],
+      embeds: [errorEmbed('**Uso:** `savage jogo <subcomando> <aposta> [extra]`\n**Subcomandos:** `blackjack <aposta>`, `mines <aposta> [bombas]`, `uno`')],
     });
+
+    if (args[0]?.toLowerCase() === 'uno') {
+      return startUno(message, opts => message.reply(opts));
+    }
 
     const eco = await getEco(userId, guildId).catch(() => null);
     if (!eco) return message.reply({ embeds: [errorEmbed('Erro ao acessar seu saldo.')] });
