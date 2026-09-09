@@ -266,13 +266,14 @@ function drawGlyph(ctx, card, x, y, size, rotation = 0) {
 function repairCenterContour(ctx) {
   ctx.save();
   ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 16;
-  ctx.lineCap = 'round';
+  ctx.lineWidth = 13;
+  ctx.lineCap = 'butt';
   ctx.lineJoin = 'round';
   ctx.beginPath();
-  ctx.moveTo(76, 176);
-  ctx.bezierCurveTo(66, 186, 60, 196, 55, 207);
-  ctx.bezierCurveTo(51, 217, 47, 229, 43, 240);
+  ctx.moveTo(95, 150);
+  ctx.bezierCurveTo(83, 157, 78, 169, 72, 181);
+  ctx.bezierCurveTo(66, 192, 59, 203, 54, 216);
+  ctx.bezierCurveTo(48, 230, 43, 242, 36, 252);
   ctx.stroke();
   ctx.restore();
 }
