@@ -27,8 +27,13 @@ const VIP_TAG = '⭐'; // emoji unicode padrão (substitua por getEmoji se criar
 // ─── Defaults ─────────────────────────────────────────────────────────────────
 const VIP_COLOR = 0x5865F2;
 const DEFAULT_VIP_TITLE = `${VIP_TAG} Painel VIP`;
-const DEFAULT_VIP_INTRO = 'Compre VIP com carrinho publico e libere bonus reais na economia.';
-const DEFAULT_VIP_TEXT  = () => '🎙️ Call VIP — crie e configure sua call exclusiva.';
+const DEFAULT_VIP_INTRO = 'Aproveite seus benefícios exclusivos e configure sua própria call no servidor.';
+const DEFAULT_VIP_TEXT  = () => [
+  '🖼️ Permissão para enviar imagens, links e arquivos',
+  '✨ Uso de figurinhas e emojis externos',
+  '✏️ Alteração de apelido',
+  '🎙️ Call VIP exclusiva e configurável',
+].join('\n');
 const DEFAULT_VIP_PRICE_LABEL = 'R$ 20/mes';
 const DEFAULT_VIP_BTN_ESCOLHER  = 'Escolher VIP';
 const DEFAULT_VIP_BTN_CARRINHO  = 'Meu carrinho';
@@ -132,14 +137,15 @@ function buildVipMemberPanel(cfg, grants, call, userId) {
   }
 
   container.addSeparatorComponents(new SeparatorBuilder());
+  const benefits = cfg.vipText || DEFAULT_VIP_TEXT();
   container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent('### ⭐ Seu benefício VIP\n🎙️ Call VIP configurável'),
+    new TextDisplayBuilder().setContent(`### ⭐ Benefícios VIP\n${benefits}`),
   );
   container.addSeparatorComponents(new SeparatorBuilder());
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
       `✅ **VIP ativo**\nSeu acesso está liberado até <t:${expiration}:F> (<t:${expiration}:R>).\n` +
-      'Gerencie aqui o benefício disponível no servidor:',
+      'Gerencie aqui os seus benefícios e a sua call exclusiva:',
     ),
   );
 
@@ -327,6 +333,14 @@ function callPermissionOverwrites(interaction, isPrivate) {
   return base;
 }
 
+function canManageVipCall(botMember) {
+  const permissions = botMember?.permissions;
+  return Boolean(
+    permissions?.has(PermissionFlagsBits.Administrator)
+    || permissions?.has(PermissionFlagsBits.ManageChannels),
+  );
+}
+
 function getVipVoiceOptions(interaction, form, extra = {}) {
   const maximumBitrate = Number(interaction.guild.maximumBitrate) || 96_000;
   const bitrate = Math.min(form.bitrate, maximumBitrate);
@@ -411,10 +425,9 @@ export async function handleVipCallModal(interaction) {
   }
 
   const botMember = await getVipBotMember(interaction);
-  const canManageChannels = botMember?.permissions.has(PermissionFlagsBits.ManageChannels);
-  if (!canManageChannels) {
+  if (!canManageVipCall(botMember)) {
     return interaction.reply({
-      content: '❌ Não consegui confirmar a permissão **Gerenciar Canais** do bot neste servidor. ' +
+      content: '❌ Não consegui confirmar **Administrador** ou **Gerenciar Canais** no cargo do bot neste servidor. ' +
         'Atualize as permissões do bot e tente novamente.',
       ephemeral: true,
     });
@@ -457,8 +470,11 @@ export async function handleVipCallModal(interaction) {
     );
   } catch (error) {
     console.error('[VIP] Falha ao configurar call VIP:', error);
+    const permissionError = error?.code === 50013;
     return interaction.editReply(
-      '❌ Não consegui configurar essa call. Confira se minhas permissões de **Gerenciar Canais** estão ativas.',
+      permissionError
+        ? '❌ O Discord recusou a criação da call. Confira se o cargo do bot tem **Administrador** ou **Gerenciar Canais** e se ele consegue acessar a categoria escolhida.'
+        : '❌ Não consegui configurar essa call. Tente novamente e confira os valores informados.',
     );
   }
 }
