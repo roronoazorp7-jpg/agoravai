@@ -9,8 +9,9 @@ const SOURCE_WIDTH = 640;
 const SOURCE_HEIGHT = 1024;
 const CARD_WIDTH = 320;
 const CARD_HEIGHT = 512;
+const CARD_BOUNDS = { left: 28, top: 40, right: 612, bottom: 988 };
 const sourceImage = loadImage(readFileSync(SOURCE_PATH));
-const cleanTemplate = buildCleanTemplate();
+const templateLayers = buildTemplateLayers();
 const cache = new Map();
 
 const COLORS = Object.freeze({
@@ -107,7 +108,7 @@ function estimateCardGreen(data) {
     : [31, 165, 79];
 }
 
-async function buildCleanTemplate() {
+async function buildTemplateLayers() {
   const image = await sourceImage;
   const canvas = createCanvas(SOURCE_WIDTH, SOURCE_HEIGHT);
   const ctx = canvas.getContext('2d');
@@ -136,7 +137,27 @@ async function buildCleanTemplate() {
   ctx.putImageData(imageData, 0, 0);
   const scaled = createCanvas(CARD_WIDTH, CARD_HEIGHT);
   scaled.getContext('2d').drawImage(canvas, 0, 0, CARD_WIDTH, CARD_HEIGHT);
-  return scaled;
+
+  const arcCanvas = createCanvas(SOURCE_WIDTH, SOURCE_HEIGHT);
+  const arcCtx = arcCanvas.getContext('2d');
+  const arcData = arcCtx.createImageData(SOURCE_WIDTH, SOURCE_HEIGHT);
+  for (let y = CARD_BOUNDS.top; y <= CARD_BOUNDS.bottom; y += 1) {
+    for (let x = CARD_BOUNDS.left; x <= CARD_BOUNDS.right; x += 1) {
+      const pixel = y * SOURCE_WIDTH + x;
+      if (!connectedWhite[pixel]) continue;
+      const sourceOffset = pixel * 4;
+      const targetOffset = sourceOffset;
+      arcData.data[targetOffset] = data[sourceOffset];
+      arcData.data[targetOffset + 1] = data[sourceOffset + 1];
+      arcData.data[targetOffset + 2] = data[sourceOffset + 2];
+      arcData.data[targetOffset + 3] = 255;
+    }
+  }
+  arcCtx.putImageData(arcData, 0, 0);
+  const scaledArc = createCanvas(CARD_WIDTH, CARD_HEIGHT);
+  scaledArc.getContext('2d').drawImage(arcCanvas, 0, 0, CARD_WIDTH, CARD_HEIGHT);
+
+  return { base: scaled, arc: scaledArc };
 }
 
 function hexRgb(hex) {
@@ -248,13 +269,15 @@ export async function generateUnoCard(card) {
 
   const canvas = createCanvas(CARD_WIDTH, CARD_HEIGHT);
   const ctx = canvas.getContext('2d');
-  const base = await cleanTemplate;
+  const { base, arc } = await templateLayers;
   ctx.drawImage(base, 0, 0, CARD_WIDTH, CARD_HEIGHT);
   colorize(ctx, COLORS[card.color] ?? COLORS.wild);
 
-  drawGlyph(ctx, card, 160, 262, card.kind === 'number' ? 122 : 96);
+  const centerSize = card.kind === 'number' ? 108 : 84;
+  drawGlyph(ctx, card, 172, 268, centerSize);
   drawGlyph(ctx, card, 64, 68, card.kind === 'number' ? 46 : 38);
   drawGlyph(ctx, card, 255, 447, card.kind === 'number' ? 46 : 38, Math.PI);
+  ctx.drawImage(arc, 0, 0, CARD_WIDTH, CARD_HEIGHT);
 
   const buffer = canvas.toBuffer('image/png');
   cache.set(key, buffer);
