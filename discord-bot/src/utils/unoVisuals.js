@@ -84,25 +84,27 @@ function connectedWhitePixels(data) {
   return connected;
 }
 
-function nearestGreenPixel(data, x, y) {
-  for (let radius = 3; radius <= 42; radius += 3) {
-    const candidates = [
-      [x - radius, y], [x + radius, y], [x, y - radius], [x, y + radius],
-      [x - radius, y - radius], [x + radius, y - radius],
-      [x - radius, y + radius], [x + radius, y + radius],
-    ];
-    for (const [candidateX, candidateY] of candidates) {
-      if (
-        candidateX < 0 || candidateX >= SOURCE_WIDTH ||
-        candidateY < 0 || candidateY >= SOURCE_HEIGHT
-      ) continue;
-      const offset = (candidateY * SOURCE_WIDTH + candidateX) * 4;
-      if (isGreen(data[offset], data[offset + 1], data[offset + 2])) {
-        return [data[offset], data[offset + 1], data[offset + 2]];
-      }
+function estimateCardGreen(data) {
+  let red = 0;
+  let green = 0;
+  let blue = 0;
+  let count = 0;
+
+  for (let y = 0; y < SOURCE_HEIGHT; y += 4) {
+    for (let x = 0; x < SOURCE_WIDTH; x += 4) {
+      if (insideMask(x, y)) continue;
+      const offset = (y * SOURCE_WIDTH + x) * 4;
+      if (!isGreen(data[offset], data[offset + 1], data[offset + 2])) continue;
+      red += data[offset];
+      green += data[offset + 1];
+      blue += data[offset + 2];
+      count += 1;
     }
   }
-  return [31, 165, 79];
+
+  return count
+    ? [Math.round(red / count), Math.round(green / count), Math.round(blue / count)]
+    : [31, 165, 79];
 }
 
 async function buildCleanTemplate() {
@@ -114,6 +116,7 @@ async function buildCleanTemplate() {
   const imageData = ctx.getImageData(0, 0, SOURCE_WIDTH, SOURCE_HEIGHT);
   const data = imageData.data;
   const connectedWhite = connectedWhitePixels(data);
+  const cardGreen = estimateCardGreen(data);
 
   for (let y = 0; y < SOURCE_HEIGHT; y += 1) {
     for (let x = 0; x < SOURCE_WIDTH; x += 1) {
@@ -124,10 +127,9 @@ async function buildCleanTemplate() {
       const g = data[offset + 1];
       const b = data[offset + 2];
       if (isGreen(r, g, b) || connectedWhite[pixel]) continue;
-      const [greenR, greenG, greenB] = nearestGreenPixel(data, x, y);
-      data[offset] = greenR;
-      data[offset + 1] = greenG;
-      data[offset + 2] = greenB;
+      data[offset] = cardGreen[0];
+      data[offset + 1] = cardGreen[1];
+      data[offset + 2] = cardGreen[2];
     }
   }
 
@@ -204,31 +206,6 @@ function drawSkip(ctx, x, y, size) {
   ctx.restore();
 }
 
-function drawReverse(ctx, x, y, size) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.strokeStyle = '#050505';
-  ctx.fillStyle = '#ffffff';
-  ctx.lineWidth = Math.max(5, size * 0.09);
-  ctx.lineCap = 'round';
-  for (const offset of [-size * 0.12, size * 0.12]) {
-    ctx.beginPath();
-    ctx.arc(0, offset, size * 0.29, Math.PI * 0.12, Math.PI * 1.55);
-    ctx.stroke();
-    const angle = Math.PI * 1.55;
-    const ax = Math.cos(angle) * size * 0.29;
-    const ay = offset + Math.sin(angle) * size * 0.29;
-    ctx.beginPath();
-    ctx.moveTo(ax, ay);
-    ctx.lineTo(ax - size * 0.12, ay - size * 0.02);
-    ctx.lineTo(ax - size * 0.02, ay - size * 0.13);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
 function drawWildMark(ctx, x, y, size) {
   ctx.save();
   ctx.translate(x, y);
@@ -248,10 +225,20 @@ function drawWildMark(ctx, x, y, size) {
   ctx.restore();
 }
 
+function drawWildGlyph(ctx, card, x, y, size, rotation = 0) {
+  if (card.kind !== 'wild4' || size < 60) {
+    if (card.kind === 'wild4') return drawTextGlyph(ctx, '+4', x, y, size * 0.82, rotation);
+    return drawWildMark(ctx, x, y, size * 0.55);
+  }
+
+  drawWildMark(ctx, x, y - size * 0.36, size * 0.52);
+  drawTextGlyph(ctx, '+4', x, y + size * 0.48, size * 0.7, rotation);
+}
+
 function drawGlyph(ctx, card, x, y, size, rotation = 0) {
   if (card.kind === 'skip') return drawSkip(ctx, x, y, size);
-  if (card.kind === 'reverse') return drawReverse(ctx, x, y, size);
-  if (card.color === 'wild') return drawWildMark(ctx, x, y, size * 0.55);
+  if (card.kind === 'reverse') return drawTextGlyph(ctx, '↻', x, y, size * 0.94, rotation);
+  if (card.color === 'wild') return drawWildGlyph(ctx, card, x, y, size, rotation);
   drawTextGlyph(ctx, cardSymbol(card), x, y, size, rotation);
 }
 
