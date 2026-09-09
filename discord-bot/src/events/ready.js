@@ -1,4 +1,4 @@
-import { ActivityType } from 'discord.js';
+import { ActivityType, ChannelType } from 'discord.js';
 import { registerSlashCommands } from '../utils/loader.js';
 import { initEmojis } from '../utils/emojiManager.js';
 import prisma from '../database/client.js';
@@ -12,6 +12,7 @@ async function checkExpiredVips(client) {
     const now     = new Date();
     const expired = await prisma.vipGrant.findMany({ where: { expiresAt: { lte: now } } });
     if (!expired.length) return;
+    const expiredOwners = new Set(expired.map(grant => `${grant.guildId}:${grant.userId}`));
 
     for (const grant of expired) {
       try {
@@ -24,6 +25,41 @@ async function checkExpiredVips(client) {
     }
 
     await prisma.vipGrant.deleteMany({ where: { expiresAt: { lte: now } } });
+
+    for (const ownerKey of expiredOwners) {
+      const [guildId, userId] = ownerKey.split(':');
+      const remaining = await prisma.vipGrant.count({
+        where: {
+          guildId,
+          userId,
+          expiresAt: { gt: now },
+        },
+      });
+      if (remaining > 0) continue;
+
+      const guild = client.guilds.cache.get(guildId)
+        ?? await client.guilds.fetch(guildId).catch(() => null);
+      if (!guild) continue;
+
+      const customRole = await prisma.vipCustomRole.findUnique({
+        where: {
+          guildId_userId: { guildId, userId },
+        },
+      });
+      if (customRole) {
+        const role = guild.roles.cache.get(customRole.roleId)
+          ?? await guild.roles.fetch(customRole.roleId).catch(() => null);
+        if (role) await role.delete('VIP expirado — cargo estético removido').catch(() => {});
+        await prisma.vipCustomRole.delete({ where: { id: customRole.id } }).catch(() => {});
+      }
+
+      const call = guild.channels.cache.find(channel => (
+        channel.type === ChannelType.GuildVoice
+        && channel.topic === `vip-call:${guildId}:${userId}`
+      ));
+      if (call) await call.delete('VIP expirado — call temporária removida').catch(() => {});
+    }
+
     console.log(`[VIP] ${expired.length} VIP(s) expirado(s) removidos.`);
   } catch (err) {
     console.error('[VIP] Erro ao checar VIPs expirados:', err);

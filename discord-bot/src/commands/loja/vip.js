@@ -100,14 +100,33 @@ function findVipCall(guild, userId) {
   ));
 }
 
+async function getVipCustomRole(guild, userId) {
+  const record = await prisma.vipCustomRole.findUnique({
+    where: {
+      guildId_userId: {
+        guildId: guild.id,
+        userId,
+      },
+    },
+  });
+  if (!record) return null;
+
+  const role = guild.roles.cache.get(record.roleId)
+    ?? await guild.roles.fetch(record.roleId).catch(() => null);
+  if (role) return { record, role };
+
+  await prisma.vipCustomRole.delete({ where: { id: record.id } }).catch(() => {});
+  return null;
+}
+
 async function getVipBotMember(interaction) {
   // Atualiza cargos e permissões no Discord antes da checagem. O membro em
-  // cache pode continuar sem ManageChannels mesmo depois de uma alteração.
+  // cache pode continuar sem permissões atualizadas depois de uma alteração.
   return interaction.guild.members.fetchMe()
     .catch(() => interaction.guild.members.me ?? null);
 }
 
-function buildVipMemberPanel(cfg, grants, call, userId) {
+function buildVipMemberPanel(cfg, grants, call, customRole, userId) {
   const container = new ContainerBuilder();
   if (cfg.vipColor) {
     const parsed = parseInt(cfg.vipColor, 16);
@@ -116,6 +135,8 @@ function buildVipMemberPanel(cfg, grants, call, userId) {
 
   const expiration = Math.floor(grants[0].expiresAt.getTime() / 1000);
   const intro = cfg.vipIntro || 'Este é o seu espaço exclusivo para aproveitar os benefícios VIP.';
+  const benefits = cfg.vipText || DEFAULT_VIP_TEXT();
+  const role = customRole?.role;
   if (cfg.vipBanner) {
     container.addMediaGalleryComponents(
       new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(cfg.vipBanner)),
@@ -137,21 +158,62 @@ function buildVipMemberPanel(cfg, grants, call, userId) {
   }
 
   container.addSeparatorComponents(new SeparatorBuilder());
-  const benefits = cfg.vipText || DEFAULT_VIP_TEXT();
   container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(`### ⭐ Benefícios VIP\n${benefits}`),
+    new TextDisplayBuilder().setContent([
+      '**Benefícios do VIP**',
+      '🟢 Crie uma call temporária e configure o seu espaço.',
+      '🟢 Crie e gerencie o seu próprio cargo personalizado.',
+      '🟢 O cargo é estético e começa sem nenhuma permissão.',
+      '',
+      benefits,
+    ].join('\n')),
   );
   container.addSeparatorComponents(new SeparatorBuilder());
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
       `✅ **VIP ativo**\nSeu acesso está liberado até <t:${expiration}:F> (<t:${expiration}:R>).\n` +
-      'Gerencie aqui os seus benefícios e a sua call exclusiva:',
+      'Gerencie aqui os seus benefícios:',
     ),
   );
 
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent([
+      '**Cargo personalizado**',
+      role
+        ? `🟢 Seu cargo: ${role}\nNome: **${role.name}** · Cor: **${role.hexColor}**`
+        : '⚪ Você ainda não criou seu cargo estético.',
+      role
+        ? 'Você pode editar o nome e a cor a qualquer momento.'
+        : 'Crie um cargo do seu jeitinho para usar no seu perfil e com seus amigos.',
+    ].join('\n')),
+  );
+  container.addActionRowComponents(new ActionRowBuilder().addComponents(
+    role
+      ? new ButtonBuilder()
+          .setCustomId(`vip_role_edit:${userId}:${role.id}`)
+          .setLabel('Editar meu cargo')
+          .setStyle(ButtonStyle.Primary)
+      : new ButtonBuilder()
+          .setCustomId(`vip_role_create:${userId}`)
+          .setLabel('Criar meu cargo')
+          .setStyle(ButtonStyle.Success),
+    ...(role
+      ? [new ButtonBuilder()
+          .setCustomId(`vip_role_delete:${userId}:${role.id}`)
+          .setLabel('Excluir cargo')
+          .setStyle(ButtonStyle.Danger)]
+      : []),
+  ));
+
+  container.addSeparatorComponents(new SeparatorBuilder());
   if (call) {
     container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`🎙️ **Call VIP:** ${call}\nNome: **${call.name}**`),
+      new TextDisplayBuilder().setContent([
+        '**Call temporária**',
+        `🟢 ${call}`,
+        `Nome: **${call.name}**`,
+        'Configure nome, limite, bitrate, região e visibilidade.',
+      ].join('\n')),
     );
     container.addActionRowComponents(new ActionRowBuilder().addComponents(
       new ButtonBuilder()
@@ -166,19 +228,27 @@ function buildVipMemberPanel(cfg, grants, call, userId) {
   } else {
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        '🎙️ **Call VIP**\nCrie uma call exclusiva e configure nome, limite, bitrate, região e visibilidade.',
+        '**Call temporária**\n⚪ Você ainda não criou sua call.\n' +
+        'Crie uma call exclusiva e configure nome, limite, bitrate, região e visibilidade.',
       ),
     );
     container.addActionRowComponents(new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`vip_call_create:${userId}`)
-        .setLabel('Criar call')
+        .setLabel('Criar call temporária')
         .setEmoji('🎙️')
         .setStyle(ButtonStyle.Success),
     ));
   }
 
-  return { components: [container], flags: MessageFlags.IsComponentsV2 };
+  const refreshRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`vip_refresh:${userId}`)
+      .setLabel('Atualizar painel')
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  return { components: [container, refreshRow], flags: MessageFlags.IsComponentsV2 };
 }
 
 async function openVipMemberPanel(interaction) {
@@ -200,11 +270,12 @@ async function openVipMemberPanel(interaction) {
     });
   }
 
-  const [cfg, call] = await Promise.all([
+  const [cfg, call, customRole] = await Promise.all([
     getCfg(interaction.guildId),
     Promise.resolve(findVipCall(interaction.guild, interaction.user.id)),
+    getVipCustomRole(interaction.guild, interaction.user.id),
   ]);
-  return interaction.reply(buildVipMemberPanel(cfg, grants, call, interaction.user.id));
+  return interaction.reply(buildVipMemberPanel(cfg, grants, call, customRole, interaction.user.id));
 }
 
 function buildVipCallModal({ mode, userId, call, member }) {
@@ -265,6 +336,62 @@ function buildVipCallModal({ mode, userId, call, member }) {
     new ActionRowBuilder().addComponents(visibility),
   );
   return modal;
+}
+
+function vipRoleName(member) {
+  const base = (member?.displayName ?? member?.user?.username ?? 'membro')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80) || 'membro';
+  return `VIP • ${base}`;
+}
+
+function buildVipRoleModal({ mode, userId, role, member }) {
+  const modal = new ModalBuilder()
+    .setCustomId(
+      mode === 'edit'
+        ? `vip_role_modal_edit:${userId}:${role.id}`
+        : `vip_role_modal_create:${userId}`,
+    )
+    .setTitle(mode === 'edit' ? 'Editar meu cargo VIP' : 'Criar meu cargo VIP');
+
+  const name = new TextInputBuilder()
+    .setCustomId('name')
+    .setLabel('Nome do cargo')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setMaxLength(100)
+    .setValue(role?.name ?? vipRoleName(member));
+
+  const color = new TextInputBuilder()
+    .setCustomId('color')
+    .setLabel('Cor em hexadecimal (sem #)')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(false)
+    .setMaxLength(6)
+    .setPlaceholder('Ex: FF4FD8')
+    .setValue(role?.hexColor && role.hexColor !== '#000000' ? role.hexColor.slice(1) : '');
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(name),
+    new ActionRowBuilder().addComponents(color),
+  );
+  return modal;
+}
+
+function parseVipRoleForm(interaction) {
+  const name = interaction.fields.getTextInputValue('name').trim();
+  const colorRaw = interaction.fields.getTextInputValue('color').trim().replace(/^#/, '');
+
+  if (!name) return { error: 'Informe um nome para o cargo.' };
+  if (colorRaw && !/^[0-9a-f]{6}$/i.test(colorRaw)) {
+    return { error: 'A cor deve ter exatamente 6 caracteres hexadecimais, como `FF4FD8`.' };
+  }
+
+  return {
+    name,
+    color: colorRaw ? parseInt(colorRaw, 16) : 0,
+  };
 }
 
 function parseVipCallForm(interaction) {
@@ -341,6 +468,14 @@ function canManageVipCall(botMember) {
   );
 }
 
+function canManageVipRole(botMember) {
+  const permissions = botMember?.permissions;
+  return Boolean(
+    permissions?.has(PermissionFlagsBits.Administrator)
+    || permissions?.has(PermissionFlagsBits.ManageRoles),
+  );
+}
+
 function getVipVoiceOptions(interaction, form, extra = {}) {
   const maximumBitrate = Number(interaction.guild.maximumBitrate) || 96_000;
   const bitrate = Math.min(form.bitrate, maximumBitrate);
@@ -359,12 +494,96 @@ function getVipVoiceOptions(interaction, form, extra = {}) {
 
 async function refreshVipPanelMessage(interaction) {
   if (!interaction.message) return;
-  const [cfg, grants] = await Promise.all([
+  const [cfg, grants, customRole] = await Promise.all([
     getCfg(interaction.guildId),
     getActiveVipGrants(interaction.guildId, interaction.user.id),
+    getVipCustomRole(interaction.guild, interaction.user.id),
   ]);
   const call = findVipCall(interaction.guild, interaction.user.id);
-  await interaction.message.edit(buildVipMemberPanel(cfg, grants, call, interaction.user.id)).catch(() => {});
+  await interaction.message.edit(
+    buildVipMemberPanel(cfg, grants, call, customRole, interaction.user.id),
+  ).catch(() => {});
+}
+
+async function handleVipRoleButton(interaction) {
+  const [action, userId, roleId] = interaction.customId.split(':');
+  if (interaction.user.id !== userId) {
+    return interaction.reply({
+      content: '❌ Apenas o dono deste VIP pode gerenciar este cargo.',
+      ephemeral: true,
+    });
+  }
+  if ((await getActiveVipGrants(interaction.guildId, userId)).length === 0) {
+    return interaction.reply({
+      content: '❌ Seu VIP não está mais ativo neste servidor.',
+      ephemeral: true,
+    });
+  }
+
+  if (action === 'vip_refresh') {
+    await interaction.deferUpdate();
+    return refreshVipPanelMessage(interaction);
+  }
+
+  const botMember = await getVipBotMember(interaction);
+  if (!canManageVipRole(botMember)) {
+    return interaction.reply({
+      content: '❌ Eu preciso da permissão **Gerenciar Cargos** para criar e editar seu cargo VIP.',
+      ephemeral: true,
+    });
+  }
+
+  const existing = await getVipCustomRole(interaction.guild, userId);
+  if (action === 'vip_role_create') {
+    if (existing) {
+      return interaction.reply({
+        content: `❌ Você já possui um cargo VIP: ${existing.role}`,
+        ephemeral: true,
+      });
+    }
+    return interaction.showModal(buildVipRoleModal({
+      mode: 'create',
+      userId,
+      member: interaction.member,
+    }));
+  }
+
+  if (!existing || existing.role.id !== roleId) {
+    return interaction.reply({
+      content: '❌ Seu cargo VIP não existe mais. Use **Criar meu cargo** para criar outro.',
+      ephemeral: true,
+    });
+  }
+
+  if (action === 'vip_role_edit') {
+    return interaction.showModal(buildVipRoleModal({
+      mode: 'edit',
+      userId,
+      role: existing.role,
+    }));
+  }
+
+  if (action === 'vip_role_delete') {
+    if (!existing.role.editable) {
+      return interaction.reply({
+        content: '❌ Não consigo excluir esse cargo porque ele está acima do meu cargo mais alto.',
+        ephemeral: true,
+      });
+    }
+    await interaction.deferUpdate();
+    const deleted = await existing.role
+      .delete('Cargo VIP estético excluído pelo proprietário')
+      .then(() => true)
+      .catch(() => false);
+    if (!deleted) {
+      return interaction.followUp({
+        content: '❌ Não consegui excluir esse cargo. Confira se meu cargo está acima dele.',
+        ephemeral: true,
+      });
+    }
+    await prisma.vipCustomRole.delete({ where: { id: existing.record.id } }).catch(() => {});
+    return refreshVipPanelMessage(interaction);
+  }
 }
 
 async function handleVipCallButton(interaction) {
@@ -403,6 +622,122 @@ async function handleVipCallButton(interaction) {
     await interaction.deferUpdate();
     await call.delete('Call VIP excluída pelo proprietário').catch(() => {});
     return refreshVipPanelMessage(interaction);
+  }
+}
+
+export async function handleVipRoleModal(interaction) {
+  const parts = interaction.customId.split(':');
+  const mode = parts[0].replace('vip_role_modal_', '');
+  const userId = parts[1];
+  const roleId = parts[2];
+
+  if (interaction.user.id !== userId) {
+    return interaction.reply({
+      content: '❌ Apenas o dono deste VIP pode configurar este cargo.',
+      ephemeral: true,
+    });
+  }
+  if ((await getActiveVipGrants(interaction.guildId, userId)).length === 0) {
+    return interaction.reply({
+      content: '❌ Seu VIP não está mais ativo neste servidor.',
+      ephemeral: true,
+    });
+  }
+
+  const form = parseVipRoleForm(interaction);
+  if (form.error) {
+    return interaction.reply({ content: `❌ ${form.error}`, ephemeral: true });
+  }
+
+  const botMember = await getVipBotMember(interaction);
+  if (!canManageVipRole(botMember)) {
+    return interaction.reply({
+      content: '❌ Eu preciso da permissão **Gerenciar Cargos** para criar e editar seu cargo VIP.',
+      ephemeral: true,
+    });
+  }
+
+  const member = await interaction.guild.members.fetch(userId).catch(() => null);
+  if (!member) {
+    return interaction.reply({
+      content: '❌ Não consegui encontrar seu membro neste servidor.',
+      ephemeral: true,
+    });
+  }
+
+  const existing = await getVipCustomRole(interaction.guild, userId);
+  if (mode === 'create' && existing) {
+    return interaction.reply({
+      content: `❌ Você já possui um cargo VIP: ${existing.role}`,
+      ephemeral: true,
+    });
+  }
+  if (mode === 'edit' && (!existing || existing.role.id !== roleId)) {
+    return interaction.reply({
+      content: '❌ Seu cargo VIP não existe mais. Use **Criar meu cargo** para criar outro.',
+      ephemeral: true,
+    });
+  }
+
+  await interaction.deferReply({ ephemeral: true });
+
+  try {
+    let role;
+    if (mode === 'create') {
+      role = await interaction.guild.roles.create({
+        name: form.name,
+        color: form.color,
+        permissions: [],
+        hoist: false,
+        mentionable: false,
+        reason: `Cargo VIP estético criado por ${interaction.user.tag}`,
+      });
+
+      try {
+        await member.roles.add(role, 'Cargo VIP estético atribuído ao proprietário');
+        await prisma.vipCustomRole.create({
+          data: {
+            guildId: interaction.guildId,
+            userId,
+            roleId: role.id,
+          },
+        });
+      } catch (error) {
+        await role.delete('Rollback de cargo VIP estético').catch(() => {});
+        throw error;
+      }
+    } else {
+      role = existing.role;
+      if (!role.editable) {
+        return interaction.editReply(
+          '❌ Não consigo editar esse cargo porque ele está acima do meu cargo mais alto.',
+        );
+      }
+
+      await role.edit({
+        name: form.name,
+        color: form.color,
+        permissions: [],
+        hoist: false,
+        mentionable: false,
+        reason: 'Cargo VIP estético atualizado pelo proprietário',
+      });
+      if (!member.roles.cache.has(role.id)) {
+        await member.roles.add(role, 'Cargo VIP estético reatribuído ao proprietário');
+      }
+    }
+
+    await refreshVipPanelMessage(interaction);
+    return interaction.editReply(
+      `✅ Seu cargo VIP foi ${mode === 'create' ? 'criado' : 'atualizado'} com sucesso: ${role}`,
+    );
+  } catch (error) {
+    console.error('[VIP] Falha ao configurar cargo VIP:', error);
+    return interaction.editReply(
+      error?.code === 50013
+        ? '❌ O Discord recusou a alteração. Confira se meu cargo está acima do cargo VIP e se tenho **Gerenciar Cargos**.'
+        : '❌ Não consegui configurar seu cargo VIP. Tente novamente em instantes.',
+    );
   }
 }
 
@@ -780,6 +1115,9 @@ export async function handleVipButton(interaction) {
   const id = interaction.customId;
 
   if (id.startsWith('vip_call_')) return handleVipCallButton(interaction);
+  if (id.startsWith('vip_role_') || id.startsWith('vip_refresh')) {
+    return handleVipRoleButton(interaction);
+  }
   if (id.startsWith('vip_cfg_')) return handleVipCfgBtn(interaction);
   if (id === 'vip_admin_config')  return handleVipConfig(interaction);
 

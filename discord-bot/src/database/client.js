@@ -286,6 +286,26 @@ export async function ensureMarriageSchema() {
     CREATE INDEX IF NOT EXISTS "CommandBlockRule_guildId_commandName_idx"
       ON "CommandBlockRule" ("guildId", "commandName")
   `);
+
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "VipCustomRole" (
+      "id" TEXT NOT NULL,
+      "guildId" TEXT NOT NULL,
+      "userId" TEXT NOT NULL,
+      "roleId" TEXT NOT NULL,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "VipCustomRole_pkey" PRIMARY KEY ("id")
+    )
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "VipCustomRole_guildId_userId_key"
+      ON "VipCustomRole" ("guildId", "userId")
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "VipCustomRole_roleId_idx"
+      ON "VipCustomRole" ("roleId")
+  `);
 }
 
 export default prisma;

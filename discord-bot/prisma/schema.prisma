@@ -622,6 +622,18 @@ model VipGrant {
   @@index([expiresAt])
 }
 
+model VipCustomRole {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, userId])
+  @@index([roleId])
+}
+
 /// Token do usuário para automação de Discord Quests (/quest)
 model UserQuestToken {
   id        String   @id @default(cuid())
