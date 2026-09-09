@@ -266,3 +266,17 @@ mtime_ms = 1787166308913
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:308d5f79-ab08-4f85-85f1-edcf5b343e79/794c3bee-aed0-48b8-85e6-7cd0a359c2b4/85611f68-8cac-4070-857d-34d0694203bd"
 storage_version_token = "1787166312857413"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "W-XFJ9PrilJeIyqF7UzcX"
+uri = "file://attached_assets/uno-card-design-sheet.png"
+type = "image"
+title = "Prévia do design das cartas UNO"
+description = "Comparativo visual das cartas de número, Pular, Inverter, +2, Coringa e Coringa +4 com o molde vertical preservado."
+logical_id = "c55a47bf-99ed-4602-9fb9-4180ea4c4873"
+content_hash = "sha256:f919e02718bffed257c608040c8fa4b7232a009a0c2d6eed18c11b8934ccb070"
+size = 260272
+mtime_ms = 1788991364761
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:ca88db20-ebf1-4a85-864c-1dc306011866/c55a47bf-99ed-4602-9fb9-4180ea4c4873/2e127331-b74a-4945-bd8b-37e23243bc83"
+storage_version_token = "1788991375529285"
+content_type = "image/png"
