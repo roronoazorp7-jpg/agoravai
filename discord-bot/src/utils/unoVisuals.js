@@ -263,6 +263,20 @@ function drawGlyph(ctx, card, x, y, size, rotation = 0) {
   drawTextGlyph(ctx, cardSymbol(card), x, y, size, rotation);
 }
 
+function repairCenterContour(ctx) {
+  ctx.save();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 12;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(69, 184);
+  ctx.bezierCurveTo(63, 193, 57, 199, 54, 207);
+  ctx.bezierCurveTo(51, 215, 49, 224, 45, 234);
+  ctx.stroke();
+  ctx.restore();
+}
+
 export async function generateUnoCard(card) {
   const key = `${card.color}:${card.kind}:${card.value ?? ''}`;
   if (cache.has(key)) return cache.get(key);
@@ -278,6 +292,7 @@ export async function generateUnoCard(card) {
   drawGlyph(ctx, card, 64, 68, card.kind === 'number' ? 46 : 38);
   drawGlyph(ctx, card, 255, 447, card.kind === 'number' ? 46 : 38, Math.PI);
   ctx.drawImage(arc, 0, 0, CARD_WIDTH, CARD_HEIGHT);
+  repairCenterContour(ctx);
 
   const buffer = canvas.toBuffer('image/png');
   cache.set(key, buffer);
