@@ -22,3 +22,4 @@
 - [Painel de call VIP](vip-call-panel.md) — `/vip` publica o painel no chat e gerencia uma única call configurável por membro via tópico do canal.
 - [Parcerias em Components V2](partnership-components-v2.md) — publicação sem cor lateral e sem mensagem automática; campos vazios ocultam o bloco e variáveis são resolvidas antes do envio.
 - [Mídia dos gatilhos](trigger-media-storage.md) — links do Discord expiram e o cache local pode sumir em deploys; respostas precisam de armazenamento persistente.
+- [UNO Components V2](uno-components-v2.md) — reconheça interações antes de renderizar/editar a mesa; mantenha mão privada e vitória pública em respostas separadas.
