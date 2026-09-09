@@ -4,34 +4,141 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const TEMPLATE_PATH = join(__dirname, '../assets/uno/template-green-10.jpg');
-const template = loadImage(readFileSync(TEMPLATE_PATH));
+const SOURCE_PATH = join(__dirname, '../assets/uno/template-green-10.jpg');
+const SOURCE_WIDTH = 640;
+const SOURCE_HEIGHT = 1024;
+const CARD_WIDTH = 320;
+const CARD_HEIGHT = 512;
+const sourceImage = loadImage(readFileSync(SOURCE_PATH));
+const cleanTemplate = buildCleanTemplate();
 const cache = new Map();
 
 const COLORS = Object.freeze({
   red: '#ed1c24',
-  yellow: '#ffcc00',
-  green: '#1faa59',
+  yellow: '#f4c20d',
+  green: '#18a957',
   blue: '#1684d8',
-  wild: '#202124',
+  wild: '#242529',
 });
 
-function roundRect(ctx, x, y, width, height, radius) {
-  ctx.beginPath();
-  ctx.moveTo(x + radius, y);
-  ctx.lineTo(x + width - radius, y);
-  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-  ctx.lineTo(x + width, y + height - radius);
-  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-  ctx.lineTo(x + radius, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-  ctx.lineTo(x, y + radius);
-  ctx.quadraticCurveTo(x, y, x + radius, y);
-  ctx.closePath();
+const COLOR_VALUES = Object.freeze({
+  red: 0xed1c24,
+  yellow: 0xf4c20d,
+  green: 0x18a957,
+  blue: 0x1684d8,
+  wild: 0x242529,
+});
+
+const NUMBER_MASKS = [
+  { left: 36, top: 58, right: 208, bottom: 208 },
+  { left: 76, top: 300, right: 570, bottom: 730 },
+  { left: 430, top: 790, right: 620, bottom: 970 },
+];
+
+function isWhite(r, g, b) {
+  return r > 178 && g > 178 && b > 178;
+}
+
+function isGreen(r, g, b) {
+  return g > r * 1.15 && g > b * 1.08 && g > 55;
+}
+
+function insideMask(x, y) {
+  return NUMBER_MASKS.some(mask =>
+    x >= mask.left && x <= mask.right && y >= mask.top && y <= mask.bottom);
+}
+
+function connectedWhitePixels(data) {
+  const total = SOURCE_WIDTH * SOURCE_HEIGHT;
+  const connected = new Uint8Array(total);
+  const queue = new Int32Array(total);
+  let head = 0;
+  let tail = 0;
+
+  const enqueue = (index) => {
+    if (connected[index]) return;
+    const offset = index * 4;
+    if (!isWhite(data[offset], data[offset + 1], data[offset + 2])) return;
+    connected[index] = 1;
+    queue[tail++] = index;
+  };
+
+  for (let x = 0; x < SOURCE_WIDTH; x += 1) {
+    enqueue(x);
+    enqueue((SOURCE_HEIGHT - 1) * SOURCE_WIDTH + x);
+  }
+  for (let y = 0; y < SOURCE_HEIGHT; y += 1) {
+    enqueue(y * SOURCE_WIDTH);
+    enqueue(y * SOURCE_WIDTH + SOURCE_WIDTH - 1);
+  }
+
+  while (head < tail) {
+    const index = queue[head++];
+    const x = index % SOURCE_WIDTH;
+    const y = Math.floor(index / SOURCE_WIDTH);
+    if (x > 0) enqueue(index - 1);
+    if (x + 1 < SOURCE_WIDTH) enqueue(index + 1);
+    if (y > 0) enqueue(index - SOURCE_WIDTH);
+    if (y + 1 < SOURCE_HEIGHT) enqueue(index + SOURCE_WIDTH);
+  }
+  return connected;
+}
+
+function nearestGreenPixel(data, x, y) {
+  for (let radius = 3; radius <= 42; radius += 3) {
+    const candidates = [
+      [x - radius, y], [x + radius, y], [x, y - radius], [x, y + radius],
+      [x - radius, y - radius], [x + radius, y - radius],
+      [x - radius, y + radius], [x + radius, y + radius],
+    ];
+    for (const [candidateX, candidateY] of candidates) {
+      if (
+        candidateX < 0 || candidateX >= SOURCE_WIDTH ||
+        candidateY < 0 || candidateY >= SOURCE_HEIGHT
+      ) continue;
+      const offset = (candidateY * SOURCE_WIDTH + candidateX) * 4;
+      if (isGreen(data[offset], data[offset + 1], data[offset + 2])) {
+        return [data[offset], data[offset + 1], data[offset + 2]];
+      }
+    }
+  }
+  return [31, 165, 79];
+}
+
+async function buildCleanTemplate() {
+  const image = await sourceImage;
+  const canvas = createCanvas(SOURCE_WIDTH, SOURCE_HEIGHT);
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(image, 0, 0, SOURCE_WIDTH, SOURCE_HEIGHT);
+
+  const imageData = ctx.getImageData(0, 0, SOURCE_WIDTH, SOURCE_HEIGHT);
+  const data = imageData.data;
+  const connectedWhite = connectedWhitePixels(data);
+
+  for (let y = 0; y < SOURCE_HEIGHT; y += 1) {
+    for (let x = 0; x < SOURCE_WIDTH; x += 1) {
+      if (!insideMask(x, y)) continue;
+      const pixel = y * SOURCE_WIDTH + x;
+      const offset = pixel * 4;
+      const r = data[offset];
+      const g = data[offset + 1];
+      const b = data[offset + 2];
+      if (isGreen(r, g, b) || connectedWhite[pixel]) continue;
+      const [greenR, greenG, greenB] = nearestGreenPixel(data, x, y);
+      data[offset] = greenR;
+      data[offset + 1] = greenG;
+      data[offset + 2] = greenB;
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+  const scaled = createCanvas(CARD_WIDTH, CARD_HEIGHT);
+  scaled.getContext('2d').drawImage(canvas, 0, 0, CARD_WIDTH, CARD_HEIGHT);
+  return scaled;
 }
 
 function hexRgb(hex) {
-  const value = hex.replace('#', '');
+  const value = hex.slice(1);
   return {
     r: parseInt(value.slice(0, 2), 16),
     g: parseInt(value.slice(2, 4), 16),
@@ -39,52 +146,32 @@ function hexRgb(hex) {
   };
 }
 
-function colorizeTemplate(ctx, target) {
-  const image = ctx.getImageData(0, 0, 320, 512);
-  const pixels = image.data;
-  const rgb = hexRgb(target);
+function colorize(ctx, color) {
+  const image = ctx.getImageData(0, 0, CARD_WIDTH, CARD_HEIGHT);
+  const data = image.data;
+  const target = hexRgb(color);
 
-  for (let index = 0; index < pixels.length; index += 4) {
-    const r = pixels[index];
-    const g = pixels[index + 1];
-    const b = pixels[index + 2];
-    if (g <= r * 1.12 || g <= b * 1.12 || g < 55) continue;
-
+  for (let index = 0; index < data.length; index += 4) {
+    const r = data[index];
+    const g = data[index + 1];
+    const b = data[index + 2];
+    if (!isGreen(r, g, b)) continue;
     const brightness = 0.72 + (g / 255) * 0.28;
-    pixels[index] = Math.min(255, Math.round(rgb.r * brightness));
-    pixels[index + 1] = Math.min(255, Math.round(rgb.g * brightness));
-    pixels[index + 2] = Math.min(255, Math.round(rgb.b * brightness));
+    data[index] = Math.min(255, Math.round(target.r * brightness));
+    data[index + 1] = Math.min(255, Math.round(target.g * brightness));
+    data[index + 2] = Math.min(255, Math.round(target.b * brightness));
   }
   ctx.putImageData(image, 0, 0);
 }
 
 function cardSymbol(card) {
   if (card.kind === 'number') return String(card.value);
-  if (card.kind === 'skip') return '⊘';
-  if (card.kind === 'reverse') return '↻';
   if (card.kind === 'draw2') return '+2';
   if (card.kind === 'wild4') return '+4';
-  return 'W';
+  return '';
 }
 
-function drawWildMark(ctx, x, y) {
-  const colors = [COLORS.red, COLORS.yellow, COLORS.green, COLORS.blue];
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(-0.2);
-  const size = 42;
-  colors.forEach((color, index) => {
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.arc(0, 0, size, index * Math.PI / 2, (index + 1) * Math.PI / 2);
-    ctx.closePath();
-    ctx.fill();
-  });
-  ctx.restore();
-}
-
-function drawLabel(ctx, text, x, y, size, rotation = 0) {
+function drawTextGlyph(ctx, text, x, y, size, rotation = 0) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(rotation);
@@ -93,64 +180,100 @@ function drawLabel(ctx, text, x, y, size, rotation = 0) {
   ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
   ctx.lineWidth = Math.max(4, size * 0.08);
-  ctx.strokeStyle = '#000000';
+  ctx.strokeStyle = '#050505';
   ctx.fillStyle = '#ffffff';
   ctx.strokeText(text, 0, 0);
   ctx.fillText(text, 0, 0);
   ctx.restore();
 }
 
-function coverOldLabels(ctx, color) {
-  ctx.fillStyle = color;
-  roundRect(ctx, 22, 22, 92, 90, 18);
-  ctx.fill();
-  roundRect(ctx, 197, 404, 100, 86, 18);
-  ctx.fill();
-
+function drawSkip(ctx, x, y, size) {
   ctx.save();
-  ctx.translate(160, 268);
-  ctx.rotate(-0.18);
-  roundRect(ctx, -102, -104, 204, 205, 48);
+  ctx.translate(x, y);
+  ctx.strokeStyle = '#050505';
+  ctx.fillStyle = '#ffffff';
+  ctx.lineWidth = Math.max(5, size * 0.08);
+  ctx.beginPath();
+  ctx.arc(0, 0, size * 0.38, 0, Math.PI * 2);
   ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-size * 0.28, size * 0.28);
+  ctx.lineTo(size * 0.28, -size * 0.28);
+  ctx.stroke();
   ctx.restore();
 }
 
-function drawDiagonalArc(ctx) {
+function drawReverse(ctx, x, y, size) {
   ctx.save();
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 9;
+  ctx.translate(x, y);
+  ctx.strokeStyle = '#050505';
+  ctx.fillStyle = '#ffffff';
+  ctx.lineWidth = Math.max(5, size * 0.09);
   ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(-18, 358);
-  ctx.bezierCurveTo(46, 488, 234, 470, 338, 270);
-  ctx.stroke();
+  for (const offset of [-size * 0.12, size * 0.12]) {
+    ctx.beginPath();
+    ctx.arc(0, offset, size * 0.29, Math.PI * 0.12, Math.PI * 1.55);
+    ctx.stroke();
+    const angle = Math.PI * 1.55;
+    const ax = Math.cos(angle) * size * 0.29;
+    const ay = offset + Math.sin(angle) * size * 0.29;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(ax - size * 0.12, ay - size * 0.02);
+    ctx.lineTo(ax - size * 0.02, ay - size * 0.13);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
   ctx.restore();
+}
+
+function drawWildMark(ctx, x, y, size) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(-0.18);
+  ctx.lineWidth = Math.max(3, size * 0.05);
+  const colors = [COLORS.red, COLORS.yellow, COLORS.green, COLORS.blue];
+  colors.forEach((color, index) => {
+    ctx.fillStyle = color;
+    ctx.strokeStyle = '#050505';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, size, index * Math.PI / 2, (index + 1) * Math.PI / 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  });
+  ctx.restore();
+}
+
+function drawGlyph(ctx, card, x, y, size, rotation = 0) {
+  if (card.kind === 'skip') return drawSkip(ctx, x, y, size);
+  if (card.kind === 'reverse') return drawReverse(ctx, x, y, size);
+  if (card.color === 'wild') return drawWildMark(ctx, x, y, size * 0.55);
+  drawTextGlyph(ctx, cardSymbol(card), x, y, size, rotation);
 }
 
 export async function generateUnoCard(card) {
   const key = `${card.color}:${card.kind}:${card.value ?? ''}`;
   if (cache.has(key)) return cache.get(key);
 
-  const canvas = createCanvas(320, 512);
+  const canvas = createCanvas(CARD_WIDTH, CARD_HEIGHT);
   const ctx = canvas.getContext('2d');
-  const targetColor = COLORS[card.color] ?? COLORS.wild;
+  const base = await cleanTemplate;
+  ctx.drawImage(base, 0, 0, CARD_WIDTH, CARD_HEIGHT);
+  colorize(ctx, COLORS[card.color] ?? COLORS.wild);
 
-  ctx.drawImage(await template, 0, 0, 320, 512);
-  colorizeTemplate(ctx, targetColor);
-  coverOldLabels(ctx, targetColor);
-  drawDiagonalArc(ctx);
-
-  if (card.color === 'wild') {
-    drawWildMark(ctx, 160, 264);
-  } else {
-    drawLabel(ctx, cardSymbol(card), 160, 264, card.kind === 'reverse' || card.kind === 'skip' ? 98 : 126);
-  }
-
-  const corner = cardSymbol(card);
-  drawLabel(ctx, corner, 67, 67, card.kind === 'reverse' || card.kind === 'skip' ? 42 : 48);
-  drawLabel(ctx, corner, 254, 450, card.kind === 'reverse' || card.kind === 'skip' ? 42 : 48, Math.PI);
+  drawGlyph(ctx, card, 160, 262, card.kind === 'number' ? 122 : 96);
+  drawGlyph(ctx, card, 64, 68, card.kind === 'number' ? 46 : 38);
+  drawGlyph(ctx, card, 255, 447, card.kind === 'number' ? 46 : 38, Math.PI);
 
   const buffer = canvas.toBuffer('image/png');
   cache.set(key, buffer);
   return buffer;
+}
+
+export function unoColorValue(color) {
+  return COLOR_VALUES[color] ?? COLOR_VALUES.wild;
 }
