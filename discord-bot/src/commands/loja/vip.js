@@ -11,6 +11,8 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  FileUploadBuilder,
+  LabelBuilder,
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
@@ -39,6 +41,7 @@ const DEFAULT_VIP_BTN_ESCOLHER  = 'Escolher VIP';
 const DEFAULT_VIP_BTN_CARRINHO  = 'Meu carrinho';
 const VIP_CALL_TOPIC_PREFIX = 'vip-call:';
 const VIP_CUSTOM_ROLE_ANCHOR_ID = '1546692504966004786';
+const VIP_ROLE_ICON_MAX_SIZE = 10 * 1024 * 1024;
 const VIP_CALL_REGIONS = new Set([
   'brazil',
   'hongkong',
@@ -372,7 +375,6 @@ function buildVipRoleModal({ mode, userId, role, member }) {
 
   const name = new TextInputBuilder()
     .setCustomId('name')
-    .setLabel('Nome do cargo')
     .setStyle(TextInputStyle.Short)
     .setRequired(true)
     .setMaxLength(100)
@@ -380,7 +382,6 @@ function buildVipRoleModal({ mode, userId, role, member }) {
 
   const color = new TextInputBuilder()
     .setCustomId('color')
-    .setLabel('Cor principal (hexadecimal)')
     .setStyle(TextInputStyle.Short)
     .setRequired(false)
     .setMaxLength(6)
@@ -389,7 +390,6 @@ function buildVipRoleModal({ mode, userId, role, member }) {
 
   const gradient = new TextInputBuilder()
     .setCustomId('gradient')
-    .setLabel('Cor do gradiente (opcional)')
     .setStyle(TextInputStyle.Short)
     .setRequired(false)
     .setMaxLength(6)
@@ -398,18 +398,38 @@ function buildVipRoleModal({ mode, userId, role, member }) {
 
   const icon = new TextInputBuilder()
     .setCustomId('icon')
-    .setLabel('Ícone: URL, emoji personalizado ou comum')
     .setStyle(TextInputStyle.Short)
     .setRequired(false)
-    .setMaxLength(4000)
-    .setPlaceholder('URL PNG/JPG/WebP, emoji ou "remover"')
-    .setValue(role?.iconURL() ?? role?.unicodeEmoji ?? '');
+    .setMaxLength(100)
+    .setPlaceholder('Emoji ou "remover" — para imagem, use o upload abaixo')
+    .setValue(role?.unicodeEmoji ?? '');
 
-  modal.addComponents(
-    new ActionRowBuilder().addComponents(name),
-    new ActionRowBuilder().addComponents(color),
-    new ActionRowBuilder().addComponents(gradient),
-    new ActionRowBuilder().addComponents(icon),
+  const iconFile = new FileUploadBuilder()
+    .setCustomId('icon_file')
+    .setMinValues(1)
+    .setMaxValues(1)
+    .setRequired(false);
+
+  modal.addLabelComponents(
+    new LabelBuilder()
+      .setLabel('Nome do cargo')
+      .setTextInputComponent(name),
+    new LabelBuilder()
+      .setLabel('Cor principal')
+      .setDescription('Hexadecimal, por exemplo FF4FD8.')
+      .setTextInputComponent(color),
+    new LabelBuilder()
+      .setLabel('Cor do gradiente (opcional)')
+      .setDescription('Informe uma segunda cor para criar o gradiente.')
+      .setTextInputComponent(gradient),
+    new LabelBuilder()
+      .setLabel('Emoji do cargo (opcional)')
+      .setDescription('Use um emoji ou escreva "remover".')
+      .setTextInputComponent(icon),
+    new LabelBuilder()
+      .setLabel('Imagem do ícone (opcional)')
+      .setDescription('Envie PNG, JPG, GIF ou WebP diretamente.')
+      .setFileUploadComponent(iconFile),
   );
   return modal;
 }
@@ -419,6 +439,7 @@ function parseVipRoleForm(interaction) {
   const colorRaw = interaction.fields.getTextInputValue('color').trim().replace(/^#/, '').toUpperCase();
   const gradientRaw = interaction.fields.getTextInputValue('gradient').trim().replace(/^#/, '').toUpperCase();
   const iconRaw = interaction.fields.getTextInputValue('icon').trim();
+  const iconAttachment = interaction.fields.getUploadedFiles('icon_file', true)?.first() ?? null;
 
   if (!name) return { error: 'Informe um nome para o cargo.' };
   if (colorRaw && !/^[0-9A-F]{6}$/.test(colorRaw)) {
@@ -430,12 +451,37 @@ function parseVipRoleForm(interaction) {
   if (gradientRaw && !colorRaw) {
     return { error: 'Informe também uma cor principal para usar o gradiente.' };
   }
+  if (iconAttachment && iconRaw) {
+    return { error: 'Escolha entre enviar uma imagem ou informar um emoji, não os dois.' };
+  }
+  if (iconAttachment && iconAttachment.contentType && !iconAttachment.contentType.startsWith('image/')) {
+    return { error: 'O arquivo do ícone precisa ser uma imagem PNG, JPG, GIF ou WebP.' };
+  }
+  if (iconAttachment && iconAttachment.size > VIP_ROLE_ICON_MAX_SIZE) {
+    return { error: 'A imagem do ícone não pode exceder 10 MB.' };
+  }
+
   const isCustomEmoji = /^<a?:[\w~+-]+:\d+>$/.test(iconRaw) || /^\d{17,20}$/.test(iconRaw);
-  const isImageOrCustomEmoji = /^https?:\/\/\S+$/i.test(iconRaw) || isCustomEmoji;
-  const isUnicodeEmoji = iconRaw && !isImageOrCustomEmoji && iconRaw.toLowerCase() !== 'remover'
+  const isUnicodeEmoji = iconRaw && !isCustomEmoji && iconRaw.toLowerCase() !== 'remover'
     && iconRaw.length <= 8 && !/\s/.test(iconRaw);
-  if (iconRaw && iconRaw.toLowerCase() !== 'remover' && !isImageOrCustomEmoji && !isUnicodeEmoji) {
-    return { error: 'O ícone deve ser uma URL pública, emoji personalizado, emoji comum ou `remover`.' };
+  if (iconRaw && iconRaw.toLowerCase() !== 'remover' && !isCustomEmoji && !isUnicodeEmoji) {
+    return { error: 'Informe um emoji válido ou use `remover` para limpar o ícone.' };
+  }
+
+  let icon;
+  let unicodeEmoji;
+  if (iconAttachment) {
+    icon = iconAttachment.url;
+    unicodeEmoji = null;
+  } else if (iconRaw.toLowerCase() === 'remover') {
+    icon = null;
+    unicodeEmoji = null;
+  } else if (isCustomEmoji) {
+    icon = iconRaw;
+    unicodeEmoji = null;
+  } else if (isUnicodeEmoji) {
+    icon = null;
+    unicodeEmoji = iconRaw;
   }
 
   return {
@@ -445,8 +491,8 @@ function parseVipRoleForm(interaction) {
       ...(gradientRaw ? { secondaryColor: parseInt(gradientRaw, 16) } : {}),
     },
     // Undefined mantém o ícone atual ao editar; "remover" o limpa.
-    icon: iconRaw.toLowerCase() === 'remover' || isImageOrCustomEmoji ? (iconRaw.toLowerCase() === 'remover' ? null : iconRaw) : undefined,
-    unicodeEmoji: iconRaw.toLowerCase() === 'remover' ? null : (isUnicodeEmoji ? iconRaw : undefined),
+    icon,
+    unicodeEmoji,
   };
 }
 
