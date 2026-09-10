@@ -24,17 +24,19 @@ import { getEmoji } from '../../utils/emojiManager.js';
 
 // ─── Emojis — resolvidos como application emojis ────────────────────────────
 const COIN    = () => getEmoji('futecoins');
-const VIP_TAG = '⭐'; // emoji unicode padrão (substitua por getEmoji se criar emoji VIP na app)
+const VIP_TAG = () => getEmoji('01_angels_animated');
+const VIP_WING = () => getEmoji('rx_bran');
+const VIP_REFRESH = () => getEmoji('refresh_button');
 
 // ─── Defaults ─────────────────────────────────────────────────────────────────
 const VIP_COLOR = 0x5865F2;
-const DEFAULT_VIP_TITLE = `${VIP_TAG} Painel VIP`;
+const DEFAULT_VIP_TITLE = () => `${VIP_TAG()} Painel VIP`;
 const DEFAULT_VIP_INTRO = 'Aproveite seus benefícios exclusivos e configure sua própria call no servidor.';
 const DEFAULT_VIP_TEXT  = () => [
-  '🖼️ Permissão para enviar imagens, links e arquivos',
-  '✨ Uso de figurinhas e emojis externos',
-  '✏️ Alteração de apelido',
-  '🎙️ Call VIP exclusiva e configurável',
+  '• Permissão para enviar imagens, links e arquivos',
+  '• Uso de figurinhas e emojis externos',
+  '• Alteração de apelido',
+  '• Call VIP exclusiva e configurável',
 ].join('\n');
 const DEFAULT_VIP_PRICE_LABEL = 'R$ 20/mes';
 const DEFAULT_VIP_BTN_ESCOLHER  = 'Escolher VIP';
@@ -141,6 +143,7 @@ function buildVipMemberPanel(cfg, grants, call, customRole, userId) {
   const intro = cfg.vipIntro || 'Este é o seu espaço exclusivo para aproveitar os benefícios VIP.';
   const benefits = cfg.vipText || DEFAULT_VIP_TEXT();
   const role = customRole?.role;
+  const title = cfg.vipTitle || DEFAULT_VIP_TITLE();
   if (cfg.vipBanner) {
     container.addMediaGalleryComponents(
       new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(cfg.vipBanner)),
@@ -151,23 +154,23 @@ function buildVipMemberPanel(cfg, grants, call, customRole, userId) {
     container.addSectionComponents(
       new SectionBuilder()
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(
-          `## ${cfg.vipTitle || DEFAULT_VIP_TITLE}\n${intro}`,
+          `## ${title}\n${intro}`,
         ))
         .setThumbnailAccessory(new ThumbnailBuilder().setURL(cfg.vipThumb)),
     );
   } else {
     container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`## ${cfg.vipTitle || DEFAULT_VIP_TITLE}\n${intro}`),
+      new TextDisplayBuilder().setContent(`## ${title}\n${intro}`),
     );
   }
 
   container.addSeparatorComponents(new SeparatorBuilder());
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent([
-      '**Benefícios do VIP**',
-      '🟢 Crie uma call temporária e configure o seu espaço.',
-      '🟢 Crie e gerencie o seu próprio cargo personalizado.',
-      '🟢 O cargo é estético e começa sem nenhuma permissão.',
+      '### Benefícios exclusivos',
+      '• Crie uma call temporária e configure o seu espaço.',
+      '• Crie e gerencie o seu próprio cargo personalizado.',
+      '• O cargo é estético e começa sem nenhuma permissão.',
       '',
       benefits,
     ].join('\n')),
@@ -175,17 +178,17 @@ function buildVipMemberPanel(cfg, grants, call, customRole, userId) {
   container.addSeparatorComponents(new SeparatorBuilder());
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `✅ **VIP ativo**\nSeu acesso está liberado até <t:${expiration}:F> (<t:${expiration}:R>).\n` +
-      'Gerencie aqui os seus benefícios:',
+      `### Acesso ativo\nSeu VIP está liberado até <t:${expiration}:F> (<t:${expiration}:R>).\n` +
+      'Gerencie seus benefícios exclusivos abaixo.',
     ),
   );
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent([
-      '**Cargo personalizado**',
+      '### Cargo personalizado',
       role
-        ? `🟢 Seu cargo: ${role}\nNome: **${role.name}** · Cor: **${roleColorSummary(role)}**${role.iconURL() ? ` · Ícone: [ver](<${role.iconURL()}>)` : ''}`
-        : '⚪ Você ainda não criou seu cargo estético.',
+        ? `Seu cargo: ${role}\nNome: **${role.name}** · Cor: **${roleColorSummary(role)}**${role.iconURL() ? ` · Ícone: [ver](<${role.iconURL()}>)` : ''}`
+        : 'Você ainda não criou seu cargo estético.',
       role
         ? 'Você pode editar o nome, as cores, o gradiente e o ícone a qualquer momento.'
         : 'Crie um cargo do seu jeitinho para usar no seu perfil e com seus amigos.',
@@ -196,15 +199,18 @@ function buildVipMemberPanel(cfg, grants, call, customRole, userId) {
       ? new ButtonBuilder()
           .setCustomId(`vip_role_edit:${userId}:${role.id}`)
           .setLabel('Editar meu cargo')
+          .setEmoji(VIP_TAG())
           .setStyle(ButtonStyle.Primary)
       : new ButtonBuilder()
           .setCustomId(`vip_role_create:${userId}`)
           .setLabel('Criar meu cargo')
+          .setEmoji(VIP_TAG())
           .setStyle(ButtonStyle.Success),
     ...(role
       ? [new ButtonBuilder()
           .setCustomId(`vip_role_delete:${userId}:${role.id}`)
           .setLabel('Excluir cargo')
+          .setEmoji(VIP_WING())
           .setStyle(ButtonStyle.Danger)]
       : []),
   ));
@@ -213,8 +219,8 @@ function buildVipMemberPanel(cfg, grants, call, customRole, userId) {
   if (call) {
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent([
-        '**Call temporária**',
-        `🟢 ${call}`,
+        '### Call temporária',
+        `Canal ativo: ${call}`,
         `Nome: **${call.name}**`,
         'Configure nome, limite, bitrate, região e visibilidade.',
       ].join('\n')),
@@ -223,16 +229,18 @@ function buildVipMemberPanel(cfg, grants, call, customRole, userId) {
       new ButtonBuilder()
         .setCustomId(`vip_call_edit:${userId}:${call.id}`)
         .setLabel('Configurar call')
+        .setEmoji(VIP_WING())
         .setStyle(ButtonStyle.Primary),
       new ButtonBuilder()
         .setCustomId(`vip_call_delete:${userId}:${call.id}`)
         .setLabel('Excluir call')
+        .setEmoji(VIP_TAG())
         .setStyle(ButtonStyle.Danger),
     ));
   } else {
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        '**Call temporária**\n⚪ Você ainda não criou sua call.\n' +
+        '### Call temporária\nVocê ainda não criou sua call.\n' +
         'Crie uma call exclusiva e configure nome, limite, bitrate, região e visibilidade.',
       ),
     );
@@ -240,7 +248,7 @@ function buildVipMemberPanel(cfg, grants, call, customRole, userId) {
       new ButtonBuilder()
         .setCustomId(`vip_call_create:${userId}`)
         .setLabel('Criar call temporária')
-        .setEmoji('🎙️')
+        .setEmoji(VIP_WING())
         .setStyle(ButtonStyle.Success),
     ));
   }
@@ -249,6 +257,7 @@ function buildVipMemberPanel(cfg, grants, call, customRole, userId) {
     new ButtonBuilder()
       .setCustomId(`vip_refresh:${userId}`)
       .setLabel('Atualizar painel')
+      .setEmoji(VIP_REFRESH())
       .setStyle(ButtonStyle.Secondary),
   );
 
@@ -1124,37 +1133,37 @@ export function buildVipConfigPayload(cfg, plans = []) {
     if (!isNaN(p)) c1.setAccentColor(p);
   }
 
-  const coin = cfg.vipEmojiCoin || COIN;
-  const tag  = cfg.vipEmojiTag  || VIP_TAG;
+  const coin = cfg.vipEmojiCoin || COIN();
+  const tag  = cfg.vipEmojiTag  || VIP_TAG();
 
   c1.addTextDisplayComponents(new TextDisplayBuilder().setContent(
     [
-      '⚙️ **Configuração — VIP**',
-      `🏷️ **Título:** ${cfg.vipTitle || '*(padrão)*'}`,
-      `📝 **Intro:** ${cfg.vipIntro ? cfg.vipIntro.slice(0, 80) + (cfg.vipIntro.length > 80 ? '…' : '') : '*(padrão)*'}`,
-      `🎨 **Cor lateral:** ${cfg.vipColor ? `#${cfg.vipColor}` : '*(sem lateral)*'}`,
-      `🖼️ **Banner:** ${cfg.vipBanner ? `[Ver](<${cfg.vipBanner}>)` : '*(nenhum)*'}  📷 **Thumb:** ${cfg.vipThumb ? `[Ver](<${cfg.vipThumb}>)` : '*(nenhuma)*'}`,
-      `💰 **Preço:** ${cfg.vipPriceLabel || DEFAULT_VIP_PRICE_LABEL}`,
+      `${VIP_WING()} **Configuração — VIP**`,
+      `**Título:** ${cfg.vipTitle || '*(padrão)*'}`,
+      `**Intro:** ${cfg.vipIntro ? cfg.vipIntro.slice(0, 80) + (cfg.vipIntro.length > 80 ? '…' : '') : '*(padrão)*'}`,
+      `**Cor lateral:** ${cfg.vipColor ? `#${cfg.vipColor}` : '*(sem lateral)*'}`,
+      `**Banner:** ${cfg.vipBanner ? `[Ver](<${cfg.vipBanner}>)` : '*(nenhum)*'}  **Thumb:** ${cfg.vipThumb ? `[Ver](<${cfg.vipThumb}>)` : '*(nenhuma)*'}`,
+      `**Preço:** ${cfg.vipPriceLabel || DEFAULT_VIP_PRICE_LABEL}`,
       `${coin} Emoji moeda · ${tag} Emoji VIP`,
-      `⭐ **Benefícios:** ${(cfg.vipText || DEFAULT_VIP_TEXT()).split('\n').slice(0, 3).join(' · ')}${(cfg.vipText || DEFAULT_VIP_TEXT()).split('\n').length > 3 ? ' …' : ''}`,
+      `${VIP_TAG()} **Benefícios:** ${(cfg.vipText || DEFAULT_VIP_TEXT()).split('\n').slice(0, 3).join(' · ')}${(cfg.vipText || DEFAULT_VIP_TEXT()).split('\n').length > 3 ? ' …' : ''}`,
     ].join('\n'),
   ));
 
   // Linha 1: campos de texto
   c1.addActionRowComponents(new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('vip_cfg_titulo').setLabel('Título').setEmoji('🏷️').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('vip_cfg_intro').setLabel('Intro').setEmoji('📝').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('vip_cfg_texto').setLabel('Benefícios').setEmoji('⭐').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('vip_cfg_preco').setLabel('Preço').setEmoji('💰').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('vip_cfg_titulo').setLabel('Título').setEmoji(VIP_TAG()).setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('vip_cfg_intro').setLabel('Intro').setEmoji(VIP_WING()).setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('vip_cfg_texto').setLabel('Benefícios').setEmoji(VIP_TAG()).setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('vip_cfg_preco').setLabel('Preço').setEmoji(coin).setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('vip_cfg_escolher').setLabel('Btn Escolher').setStyle(ButtonStyle.Secondary),
   ));
 
   // Linha 2: visual
   c1.addActionRowComponents(new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('vip_cfg_banner').setLabel('Banner').setEmoji('🖼️').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('vip_cfg_thumb').setLabel('Thumb').setEmoji('📷').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('vip_cfg_cor').setLabel('Cor').setEmoji('🎨').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('vip_cfg_sem_cor').setLabel('Sem Lateral').setEmoji('◻️').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('vip_cfg_banner').setLabel('Banner').setEmoji(VIP_WING()).setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('vip_cfg_thumb').setLabel('Thumb').setEmoji(VIP_TAG()).setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('vip_cfg_cor').setLabel('Cor').setEmoji(VIP_TAG()).setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('vip_cfg_sem_cor').setLabel('Sem Lateral').setEmoji(VIP_REFRESH()).setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('vip_cfg_carrinho').setLabel('Btn Carrinho').setStyle(ButtonStyle.Secondary),
   ));
 
@@ -1164,7 +1173,7 @@ export function buildVipConfigPayload(cfg, plans = []) {
     new ButtonBuilder().setCustomId('vip_cfg_emoji_tag').setLabel('Emoji VIP').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('vip_cfg_emoji_btn1').setLabel('Emoji Btn1').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('vip_cfg_emoji_btn2').setLabel('Emoji Btn2').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('vip_cfg_reset').setLabel('Resetar').setEmoji('♻️').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('vip_cfg_reset').setLabel('Resetar').setEmoji(VIP_REFRESH()).setStyle(ButtonStyle.Danger),
   ));
 
   // ── Container 2: planos ───────────────────────────────────────────────────
@@ -1298,9 +1307,9 @@ export async function handleVipButton(interaction) {
     }
     c.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        `## ${VIP_TAG} Adquirir VIP\n` +
+        `## ${VIP_TAG()} Adquirir VIP\n` +
         `Para comprar o VIP, entre em contato com a equipe do servidor.\n\n` +
-        `**Plano:** ${VIP_TAG} ${priceLabel}\n` +
+        `**Plano:** ${VIP_TAG()} ${priceLabel}\n` +
         `${COIN()} Após ativação, seus bônus são aplicados automaticamente.`,
       ),
     );
@@ -1338,7 +1347,7 @@ export async function handleVipButton(interaction) {
     } else {
       const linhas = grants.map(g => {
         const ts = Math.floor(g.expiresAt.getTime() / 1000);
-        return `${VIP_TAG} Cargo <@&${g.roleId}> — expira <t:${ts}:R>`;
+        return `${VIP_TAG()} Cargo <@&${g.roleId}> — expira <t:${ts}:R>`;
       });
       c.addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
