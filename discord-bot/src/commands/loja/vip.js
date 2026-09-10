@@ -42,6 +42,7 @@ const DEFAULT_VIP_PRICE_LABEL = 'R$ 20/mes';
 const DEFAULT_VIP_BTN_ESCOLHER  = 'Escolher VIP';
 const DEFAULT_VIP_BTN_CARRINHO  = 'Meu carrinho';
 const VIP_CALL_TOPIC_PREFIX = 'vip-call:';
+const VIP_CALL_CATEGORY_ID = '1546637286559588413';
 const VIP_CUSTOM_ROLE_ANCHOR_ID = '1546692504966004786';
 const VIP_ROLE_ICON_MAX_SIZE = 10 * 1024 * 1024;
 const VIP_CALL_REGIONS = new Set([
@@ -102,8 +103,23 @@ function vipCallName(member) {
 function findVipCall(guild, userId) {
   const topic = vipCallTopic(guild.id, userId);
   return guild.channels.cache.find(channel => (
-    channel.type === ChannelType.GuildVoice && channel.topic === topic
+    channel.type === ChannelType.GuildVoice
+    && (
+      // Compatibilidade com uma versão antiga que tentou usar tópico.
+      channel.topic === topic
+      || (
+        channel.parentId === VIP_CALL_CATEGORY_ID
+        && channel.permissionOverwrites.cache.get(userId)?.allow.has(PermissionFlagsBits.Connect)
+      )
+    )
   ));
+}
+
+function isVipCallChannel(channel, userId, guildId) {
+  if (!channel || channel.type !== ChannelType.GuildVoice) return false;
+  if (channel.topic === vipCallTopic(guildId, userId)) return true;
+  return channel.parentId === VIP_CALL_CATEGORY_ID
+    && channel.permissionOverwrites.cache.get(userId)?.allow.has(PermissionFlagsBits.Connect);
 }
 
 async function getVipCustomRole(guild, userId) {
@@ -932,8 +948,7 @@ export async function handleVipCallModal(interaction) {
       call = await interaction.guild.channels.fetch(channelId).catch(() => null);
       if (
         !call ||
-        call.type !== ChannelType.GuildVoice ||
-        call.topic !== vipCallTopic(interaction.guildId, userId)
+        !isVipCallChannel(call, userId, interaction.guildId)
       ) {
         return interaction.editReply('❌ Essa call VIP não existe mais. Use o botão **Criar call**.');
       }
@@ -944,27 +959,22 @@ export async function handleVipCallModal(interaction) {
       }, 'Configuração da call VIP atualizada pelo proprietário');
       await applyVipCallPermissions(call, interaction, form);
     } else {
-      const parentId = interaction.channel?.parent?.type === ChannelType.GuildCategory
-        ? interaction.channel.parentId
-        : undefined;
+      const parent = interaction.guild.channels.cache.get(VIP_CALL_CATEGORY_ID)
+        ?? await interaction.guild.channels.fetch(VIP_CALL_CATEGORY_ID).catch(() => null);
+      if (!parent || parent.type !== ChannelType.GuildCategory) {
+        return interaction.editReply(
+          `❌ Não encontrei a categoria configurada para as calls VIP (\`${VIP_CALL_CATEGORY_ID}\`).`,
+        );
+      }
+
       const createOptions = {
         name: form.name || vipCallName(interaction.member),
         type: ChannelType.GuildVoice,
-        parent: parentId,
-        topic: vipCallTopic(interaction.guildId, userId),
+        parent: VIP_CALL_CATEGORY_ID,
         ...getVipVoiceOptions(interaction, form),
       };
 
-      try {
-        call = await interaction.guild.channels.create(createOptions);
-      } catch (firstError) {
-        // Uma categoria pode estar cheia ou negar a criação mesmo quando o
-        // bot consegue criar canais no servidor. Nesse caso, tente fora dela.
-        if (!parentId || ![50013, 50035].includes(firstError?.code)) throw firstError;
-        console.warn('[VIP] Falha ao criar call na categoria; tentando sem categoria:', formatVipCallError(firstError));
-        const { parent: ignoredParent, ...withoutParent } = createOptions;
-        call = await interaction.guild.channels.create(withoutParent);
-      }
+      call = await interaction.guild.channels.create(createOptions);
 
       try {
         await applyVipCallPermissions(call, interaction, form);

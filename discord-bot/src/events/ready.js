@@ -1,4 +1,4 @@
-import { ActivityType, ChannelType } from 'discord.js';
+import { ActivityType, ChannelType, PermissionFlagsBits } from 'discord.js';
 import { registerSlashCommands } from '../utils/loader.js';
 import { initEmojis } from '../utils/emojiManager.js';
 import prisma from '../database/client.js';
@@ -6,6 +6,7 @@ import { startDeathEventScheduler } from '../utils/deathEvent.js';
 import { startBumpReminderScheduler } from '../utils/bumpReminder.js';
 
 // ─── VIP expirado ─────────────────────────────────────────────────────────────
+const VIP_CALL_CATEGORY_ID = '1546637286559588413';
 
 async function checkExpiredVips(client) {
   try {
@@ -53,10 +54,18 @@ async function checkExpiredVips(client) {
         await prisma.vipCustomRole.delete({ where: { id: customRole.id } }).catch(() => {});
       }
 
-      const call = guild.channels.cache.find(channel => (
-        channel.type === ChannelType.GuildVoice
-        && channel.topic === `vip-call:${guildId}:${userId}`
-      ));
+      const call = guild.channels.cache.find(channel => {
+        const ownerOverwrite = channel.permissionOverwrites?.cache?.get(userId);
+        return channel.type === ChannelType.GuildVoice
+          && (
+            // Compatibilidade com a versão antiga que tentou usar tópico.
+            channel.topic === `vip-call:${guildId}:${userId}`
+            || (
+              channel.parentId === VIP_CALL_CATEGORY_ID
+              && ownerOverwrite?.allow.has(PermissionFlagsBits.Connect)
+            )
+          );
+      });
       if (call) await call.delete('VIP expirado — call temporária removida').catch(() => {});
     }
 
