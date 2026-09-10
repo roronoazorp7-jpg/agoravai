@@ -606,13 +606,31 @@ function getVipVoiceOptions(interaction, form, extra = {}) {
     ...extra,
     userLimit: form.userLimit,
     bitrate,
-    permissionOverwrites: callPermissionOverwrites(interaction, form.isPrivate),
   };
 
   // "auto" deve deixar o Discord escolher a região. Enviar null em alguns
   // endpoints/versões pode causar uma rejeição desnecessária na criação.
   if (form.rtcRegion) options.rtcRegion = form.rtcRegion;
   return options;
+}
+
+async function applyVipCallPermissions(call, interaction, form) {
+  await call.permissionOverwrites.set(
+    callPermissionOverwrites(interaction, form.isPrivate),
+    'Permissões da call VIP configuradas pelo proprietário',
+  );
+}
+
+function formatVipCallError(error) {
+  const raw = error?.rawError?.errors;
+  const details = raw
+    ? JSON.stringify(raw).replace(/\s+/g, ' ').slice(0, 700)
+    : '';
+  const code = error?.code ? ` código ${error.code}` : '';
+  const message = error?.message
+    ? ` ${error.message.replace(/\s+/g, ' ').slice(0, 500)}`
+    : '';
+  return `${code}${message}${details ? ` Detalhes: ${details}` : ''}`.trim();
 }
 
 async function refreshVipPanelMessage(interaction) {
@@ -915,17 +933,36 @@ export async function handleVipCallModal(interaction) {
         name: form.name,
         ...getVipVoiceOptions(interaction, form),
       }, 'Configuração da call VIP atualizada pelo proprietário');
+      await applyVipCallPermissions(call, interaction, form);
     } else {
       const parentId = interaction.channel?.parent?.type === ChannelType.GuildCategory
         ? interaction.channel.parentId
         : undefined;
-      call = await interaction.guild.channels.create({
+      const createOptions = {
         name: form.name || vipCallName(interaction.member),
         type: ChannelType.GuildVoice,
         parent: parentId,
         topic: vipCallTopic(interaction.guildId, userId),
         ...getVipVoiceOptions(interaction, form),
-      });
+      };
+
+      try {
+        call = await interaction.guild.channels.create(createOptions);
+      } catch (firstError) {
+        // Uma categoria pode estar cheia ou negar a criação mesmo quando o
+        // bot consegue criar canais no servidor. Nesse caso, tente fora dela.
+        if (!parentId || ![50013, 50035].includes(firstError?.code)) throw firstError;
+        console.warn('[VIP] Falha ao criar call na categoria; tentando sem categoria:', formatVipCallError(firstError));
+        const { parent: ignoredParent, ...withoutParent } = createOptions;
+        call = await interaction.guild.channels.create(withoutParent);
+      }
+
+      try {
+        await applyVipCallPermissions(call, interaction, form);
+      } catch (permissionError) {
+        await call.delete('Rollback de call VIP — falha ao aplicar permissões').catch(() => {});
+        throw permissionError;
+      }
     }
 
     await refreshVipPanelMessage(interaction);
@@ -933,12 +970,13 @@ export async function handleVipCallModal(interaction) {
       `✅ Call VIP ${mode === 'edit' ? 'atualizada' : 'criada'} com sucesso: ${call}`,
     );
   } catch (error) {
-    console.error('[VIP] Falha ao configurar call VIP:', error);
+    console.error('[VIP] Falha ao configurar call VIP:', formatVipCallError(error), error);
     const permissionError = error?.code === 50013;
+    const technicalDetails = formatVipCallError(error).slice(0, 900);
     return interaction.editReply(
       permissionError
         ? '❌ O Discord recusou a criação da call. Confira se o cargo do bot tem **Administrador** ou **Gerenciar Canais** e se ele consegue acessar a categoria escolhida.'
-        : '❌ Não consegui configurar essa call. Tente novamente e confira os valores informados.',
+        : `❌ Não consegui configurar essa call. Tente novamente.${technicalDetails ? `\nDetalhe técnico: \`${technicalDetails}\`` : ''}`,
     );
   }
 }
