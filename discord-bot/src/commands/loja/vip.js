@@ -38,6 +38,7 @@ const DEFAULT_VIP_PRICE_LABEL = 'R$ 20/mes';
 const DEFAULT_VIP_BTN_ESCOLHER  = 'Escolher VIP';
 const DEFAULT_VIP_BTN_CARRINHO  = 'Meu carrinho';
 const VIP_CALL_TOPIC_PREFIX = 'vip-call:';
+const VIP_CUSTOM_ROLE_ANCHOR_ID = '1546692504966004786';
 const VIP_CALL_REGIONS = new Set([
   'brazil',
   'hongkong',
@@ -180,10 +181,10 @@ function buildVipMemberPanel(cfg, grants, call, customRole, userId) {
     new TextDisplayBuilder().setContent([
       '**Cargo personalizado**',
       role
-        ? `🟢 Seu cargo: ${role}\nNome: **${role.name}** · Cor: **${role.hexColor}**`
+        ? `🟢 Seu cargo: ${role}\nNome: **${role.name}** · Cor: **${roleColorSummary(role)}**${role.iconURL() ? ` · Ícone: [ver](<${role.iconURL()}>)` : ''}`
         : '⚪ Você ainda não criou seu cargo estético.',
       role
-        ? 'Você pode editar o nome e a cor a qualquer momento.'
+        ? 'Você pode editar o nome, as cores, o gradiente e o ícone a qualquer momento.'
         : 'Crie um cargo do seu jeitinho para usar no seu perfil e com seus amigos.',
     ].join('\n')),
   );
@@ -346,6 +347,20 @@ function vipRoleName(member) {
   return `VIP • ${base}`;
 }
 
+function formatRoleColor(color) {
+  return typeof color === 'number' && color > 0
+    ? color.toString(16).padStart(6, '0').toUpperCase()
+    : '';
+}
+
+function roleColorSummary(role) {
+  if (!role) return '';
+  const primary = formatRoleColor(role.colors?.primaryColor);
+  const secondary = formatRoleColor(role.colors?.secondaryColor);
+  if (secondary) return `#${primary} → #${secondary}`;
+  return primary ? `#${primary}` : role.hexColor;
+}
+
 function buildVipRoleModal({ mode, userId, role, member }) {
   const modal = new ModalBuilder()
     .setCustomId(
@@ -365,33 +380,95 @@ function buildVipRoleModal({ mode, userId, role, member }) {
 
   const color = new TextInputBuilder()
     .setCustomId('color')
-    .setLabel('Cor em hexadecimal (sem #)')
+    .setLabel('Cor principal (hexadecimal)')
     .setStyle(TextInputStyle.Short)
     .setRequired(false)
     .setMaxLength(6)
-    .setPlaceholder('Ex: FF4FD8')
-    .setValue(role?.hexColor && role.hexColor !== '#000000' ? role.hexColor.slice(1) : '');
+    .setPlaceholder('Ex: FF4FD8 — deixe vazio para preto')
+    .setValue(formatRoleColor(role?.colors?.primaryColor));
+
+  const gradient = new TextInputBuilder()
+    .setCustomId('gradient')
+    .setLabel('Cor do gradiente (opcional)')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(false)
+    .setMaxLength(6)
+    .setPlaceholder('Ex: 7B61FF — precisa da cor principal')
+    .setValue(formatRoleColor(role?.colors?.secondaryColor));
+
+  const icon = new TextInputBuilder()
+    .setCustomId('icon')
+    .setLabel('Ícone: URL, emoji personalizado ou comum')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(false)
+    .setMaxLength(4000)
+    .setPlaceholder('URL PNG/JPG/WebP, emoji ou "remover"')
+    .setValue(role?.iconURL() ?? role?.unicodeEmoji ?? '');
 
   modal.addComponents(
     new ActionRowBuilder().addComponents(name),
     new ActionRowBuilder().addComponents(color),
+    new ActionRowBuilder().addComponents(gradient),
+    new ActionRowBuilder().addComponents(icon),
   );
   return modal;
 }
 
 function parseVipRoleForm(interaction) {
   const name = interaction.fields.getTextInputValue('name').trim();
-  const colorRaw = interaction.fields.getTextInputValue('color').trim().replace(/^#/, '');
+  const colorRaw = interaction.fields.getTextInputValue('color').trim().replace(/^#/, '').toUpperCase();
+  const gradientRaw = interaction.fields.getTextInputValue('gradient').trim().replace(/^#/, '').toUpperCase();
+  const iconRaw = interaction.fields.getTextInputValue('icon').trim();
 
   if (!name) return { error: 'Informe um nome para o cargo.' };
-  if (colorRaw && !/^[0-9a-f]{6}$/i.test(colorRaw)) {
-    return { error: 'A cor deve ter exatamente 6 caracteres hexadecimais, como `FF4FD8`.' };
+  if (colorRaw && !/^[0-9A-F]{6}$/.test(colorRaw)) {
+    return { error: 'A cor principal deve ter exatamente 6 caracteres hexadecimais, como `FF4FD8`.' };
+  }
+  if (gradientRaw && !/^[0-9A-F]{6}$/.test(gradientRaw)) {
+    return { error: 'A cor do gradiente deve ter exatamente 6 caracteres hexadecimais, como `7B61FF`.' };
+  }
+  if (gradientRaw && !colorRaw) {
+    return { error: 'Informe também uma cor principal para usar o gradiente.' };
+  }
+  const isCustomEmoji = /^<a?:[\w~+-]+:\d+>$/.test(iconRaw) || /^\d{17,20}$/.test(iconRaw);
+  const isImageOrCustomEmoji = /^https?:\/\/\S+$/i.test(iconRaw) || isCustomEmoji;
+  const isUnicodeEmoji = iconRaw && !isImageOrCustomEmoji && iconRaw.toLowerCase() !== 'remover'
+    && iconRaw.length <= 8 && !/\s/.test(iconRaw);
+  if (iconRaw && iconRaw.toLowerCase() !== 'remover' && !isImageOrCustomEmoji && !isUnicodeEmoji) {
+    return { error: 'O ícone deve ser uma URL pública, emoji personalizado, emoji comum ou `remover`.' };
   }
 
   return {
     name,
-    color: colorRaw ? parseInt(colorRaw, 16) : 0,
+    colors: {
+      primaryColor: colorRaw ? parseInt(colorRaw, 16) : 0,
+      ...(gradientRaw ? { secondaryColor: parseInt(gradientRaw, 16) } : {}),
+    },
+    // Undefined mantém o ícone atual ao editar; "remover" o limpa.
+    icon: iconRaw.toLowerCase() === 'remover' || isImageOrCustomEmoji ? (iconRaw.toLowerCase() === 'remover' ? null : iconRaw) : undefined,
+    unicodeEmoji: iconRaw.toLowerCase() === 'remover' ? null : (isUnicodeEmoji ? iconRaw : undefined),
   };
+}
+
+async function placeVipRoleBelowAnchor(guild, role, botMember) {
+  const anchor = guild.roles.cache.get(VIP_CUSTOM_ROLE_ANCHOR_ID)
+    ?? await guild.roles.fetch(VIP_CUSTOM_ROLE_ANCHOR_ID).catch(() => null);
+
+  if (!anchor) {
+    throw new Error(`O cargo de referência ${VIP_CUSTOM_ROLE_ANCHOR_ID} não foi encontrado.`);
+  }
+  if (anchor.id === guild.id || anchor.position <= 1) {
+    throw new Error('O cargo de referência não permite colocar o cargo VIP abaixo dele.');
+  }
+
+  const targetPosition = anchor.position - 1;
+  if (targetPosition >= botMember.roles.highest.position) {
+    throw new Error('O cargo de referência está acima do meu cargo mais alto.');
+  }
+
+  await role.setPosition(targetPosition, {
+    reason: `Cargo VIP mantido abaixo de ${VIP_CUSTOM_ROLE_ANCHOR_ID}`,
+  });
 }
 
 function parseVipCallForm(interaction) {
@@ -686,14 +763,17 @@ export async function handleVipRoleModal(interaction) {
     if (mode === 'create') {
       role = await interaction.guild.roles.create({
         name: form.name,
-        color: form.color,
+        colors: form.colors,
         permissions: [],
         hoist: false,
         mentionable: false,
+        ...(form.icon !== undefined ? { icon: form.icon } : {}),
+        ...(form.unicodeEmoji !== undefined ? { unicodeEmoji: form.unicodeEmoji } : {}),
         reason: `Cargo VIP estético criado por ${interaction.user.tag}`,
       });
 
       try {
+        await placeVipRoleBelowAnchor(interaction.guild, role, botMember);
         await member.roles.add(role, 'Cargo VIP estético atribuído ao proprietário');
         await prisma.vipCustomRole.create({
           data: {
@@ -716,12 +796,15 @@ export async function handleVipRoleModal(interaction) {
 
       await role.edit({
         name: form.name,
-        color: form.color,
+        colors: form.colors,
         permissions: [],
         hoist: false,
         mentionable: false,
+        ...(form.icon !== undefined ? { icon: form.icon } : {}),
+        ...(form.unicodeEmoji !== undefined ? { unicodeEmoji: form.unicodeEmoji } : {}),
         reason: 'Cargo VIP estético atualizado pelo proprietário',
       });
+      await placeVipRoleBelowAnchor(interaction.guild, role, botMember);
       if (!member.roles.cache.has(role.id)) {
         await member.roles.add(role, 'Cargo VIP estético reatribuído ao proprietário');
       }
