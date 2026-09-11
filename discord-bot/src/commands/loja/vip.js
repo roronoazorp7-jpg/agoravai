@@ -122,6 +122,17 @@ function isVipCallChannel(channel, userId, guildId) {
     && channel.permissionOverwrites.cache.get(userId)?.allow.has(PermissionFlagsBits.Connect);
 }
 
+function compactVipText(value, maxLength = 320) {
+  const compact = String(value ?? '')
+    .split('\n')
+    .map(line => line.replace(/^[\s•·▪▸➡️✅🟢⚪]+/u, '').trim())
+    .filter(Boolean)
+    .join(' · ');
+  return compact.length > maxLength
+    ? `${compact.slice(0, maxLength - 1).trimEnd()}…`
+    : compact;
+}
+
 async function getVipCustomRole(guild, userId) {
   const record = await prisma.vipCustomRole.findUnique({
     where: {
@@ -160,6 +171,7 @@ function buildVipMemberPanel(cfg, grants, call, customRole, userId) {
   const benefits = cfg.vipText || DEFAULT_VIP_TEXT();
   const role = customRole?.role;
   const title = cfg.vipTitle || DEFAULT_VIP_TITLE();
+  const compactBenefits = compactVipText(benefits);
   if (cfg.vipBanner) {
     container.addMediaGalleryComponents(
       new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(cfg.vipBanner)),
@@ -183,31 +195,17 @@ function buildVipMemberPanel(cfg, grants, call, customRole, userId) {
   container.addSeparatorComponents(new SeparatorBuilder());
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent([
-      '### Benefícios exclusivos',
-      '• Crie uma call temporária e configure o seu espaço.',
-      '• Crie e gerencie o seu próprio cargo personalizado.',
-      '• O cargo é estético e começa sem nenhuma permissão.',
-      '',
-      benefits,
-    ].join('\n')),
-  );
-  container.addSeparatorComponents(new SeparatorBuilder());
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(
-      `### Acesso ativo\nSeu VIP está liberado até <t:${expiration}:F> (<t:${expiration}:R>).\n` +
-      'Gerencie seus benefícios exclusivos abaixo.',
-    ),
+      `**VIP ativo** · até <t:${expiration}:F> (<t:${expiration}:R>)`,
+      compactBenefits ? `**Benefícios:** ${compactBenefits}` : '',
+    ].filter(Boolean).join('\n')),
   );
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent([
-      '### Cargo personalizado',
+      '**Cargo personalizado**',
       role
-        ? `Seu cargo: ${role}\nNome: **${role.name}** · Cor: **${roleColorSummary(role)}**${role.iconURL() ? ` · Ícone: [ver](<${role.iconURL()}>)` : ''}`
-        : 'Você ainda não criou seu cargo estético.',
-      role
-        ? 'Você pode editar o nome, as cores, o gradiente e o ícone a qualquer momento.'
-        : 'Crie um cargo do seu jeitinho para usar no seu perfil e com seus amigos.',
+        ? `${role} · **${role.name}** · ${roleColorSummary(role)}${role.iconURL() ? ' · ícone' : ''}`
+        : 'Ainda não criado.',
     ].join('\n')),
   );
   container.addActionRowComponents(new ActionRowBuilder().addComponents(
@@ -235,10 +233,8 @@ function buildVipMemberPanel(cfg, grants, call, customRole, userId) {
   if (call) {
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent([
-        '### Call temporária',
-        `Canal ativo: ${call}`,
-        `Nome: **${call.name}**`,
-        'Configure nome, limite, bitrate, região e visibilidade.',
+        '**Call temporária**',
+        `${call} · **${call.name}**`,
       ].join('\n')),
     );
     container.addActionRowComponents(new ActionRowBuilder().addComponents(
@@ -256,8 +252,7 @@ function buildVipMemberPanel(cfg, grants, call, customRole, userId) {
   } else {
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        '### Call temporária\nVocê ainda não criou sua call.\n' +
-        'Crie uma call exclusiva e configure nome, limite, bitrate, região e visibilidade.',
+        '**Call temporária**\nAinda não criada.',
       ),
     );
     container.addActionRowComponents(new ActionRowBuilder().addComponents(
