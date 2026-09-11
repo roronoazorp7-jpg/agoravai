@@ -34,6 +34,8 @@ import {
 } from '../utils/antiSpam.js';
 
 const PREFIXES = ['savage ', 's '];
+const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif']);
+const VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'webm', 'm4v', 'avi', 'mkv']);
 
 function getMentionPrompt(message, client) {
   return message.content
@@ -555,51 +557,58 @@ export default {
           return new ActionRowBuilder().addComponents(buttons);
         }
 
-        // Pré-busca todos os arquivos ANTES de deletar a mensagem original
+        // Pré-busca todos os arquivos ANTES de deletar a mensagem original.
+        // Vídeos também precisam ser reanexados: a URL do anexo original pode
+        // deixar de estar disponível assim que a mensagem for removida.
         const attachmentFiles = [];
+        let downloadFailed = false;
         for (const attachment of message.attachments.values()) {
-          const isImage = attachment.contentType?.startsWith('image/');
-          const isVideo = attachment.contentType?.startsWith('video/');
+          const ext = attachment.name?.split('.').pop()?.toLowerCase() ?? '';
+          const isImage = attachment.contentType?.startsWith('image/') || IMAGE_EXTENSIONS.has(ext);
+          const isVideo = attachment.contentType?.startsWith('video/') || VIDEO_EXTENSIONS.has(ext);
           if (!isImage && !isVideo) continue;
 
-          let imageBuf = null;
-          if (isImage) {
+          let mediaBuf = null;
+          for (const url of [attachment.url, attachment.proxyURL].filter(Boolean)) {
             try {
-              const resp = await fetch(attachment.url);
-              imageBuf = Buffer.from(await resp.arrayBuffer());
-            } catch {
-              try {
-                const resp = await fetch(attachment.proxyURL);
-                imageBuf = Buffer.from(await resp.arrayBuffer());
-              } catch {}
-            }
+              const resp = await fetch(url);
+              if (!resp.ok) continue;
+              mediaBuf = Buffer.from(await resp.arrayBuffer());
+              break;
+            } catch {}
           }
 
-          const ext = attachment.name?.split('.').pop()?.toLowerCase() ?? 'png';
-          attachmentFiles.push({ attachment, isImage, isVideo, imageBuf, ext });
+          // Sem o buffer, não apagamos a mensagem original: isso evita
+          // perder um vídeo quando a CDN estiver temporariamente indisponível.
+          if (!mediaBuf) {
+            console.error(`[INSTA] Não foi possível baixar o anexo ${attachment.name ?? attachment.id}.`);
+            downloadFailed = true;
+            break;
+          }
+
+          attachmentFiles.push({ attachment, isImage, isVideo, mediaBuf, ext });
         }
+
+        if (downloadFailed || attachmentFiles.length === 0) return;
 
         // Deleta a mensagem original SÓ APÓS ter baixado os arquivos
         try { await message.delete(); } catch {}
 
-        for (const { attachment, isImage, isVideo, imageBuf, ext } of attachmentFiles) {
+        for (const { attachment, isImage, isVideo, mediaBuf, ext } of attachmentFiles) {
           const postId     = `${message.id}_${attachment.id}`;
           const authorName = message.member?.displayName ?? message.author.username;
           const authorAvatar = message.author.displayAvatarURL({ size: 64 });
           const content    = message.content || null;
 
-          // Monta arquivo para re-upload (imagem) ou usa URL para vídeo
-          let files = [];
+          // Imagens são exibidas na galeria; vídeos são enviados como anexo
+          // para o Discord renderizar o player nativo no post.
+          const fileName = `post_${attachment.id}.${ext || (isVideo ? 'mp4' : 'png')}`;
+          const files = [new AttachmentBuilder(mediaBuf, { name: fileName })];
           let initialImageUrl = null;
 
-          if (isImage && imageBuf) {
-            const fileName = `post_${Date.now()}.${ext}`;
-            files = [new AttachmentBuilder(imageBuf, { name: fileName })];
+          if (isImage) {
             initialImageUrl = `attachment://${fileName}`;
-          } else if (isImage) {
-            initialImageUrl = attachment.proxyURL || attachment.url;
           }
-          // Vídeo: attachment vai automaticamente junto com a mensagem V2
 
           likesMap.set(postId, new Set());
 
@@ -614,7 +623,9 @@ export default {
           });
 
           // Após o envio, pega a URL CDN real do attachment para usar nos edits futuros
-          const cdnImageUrl = post.attachments.first()?.url ?? initialImageUrl;
+          const cdnImageUrl = isImage
+            ? (post.attachments.first()?.url ?? initialImageUrl)
+            : null;
 
           // Armazena dados do post para reuso no handler de likes
           postDataMap.set(postId, {
@@ -626,6 +637,7 @@ export default {
             instaHandle,
             authorId: message.author.id,
             cdnImageUrl,
+            isVideo,
           });
 
           // Cria thread de comentários e atualiza botões com "Comentar"
