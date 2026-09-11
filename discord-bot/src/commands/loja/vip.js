@@ -123,17 +123,6 @@ function isVipCallChannel(channel, userId, guildId) {
     && channel.permissionOverwrites.cache.get(userId)?.allow.has(PermissionFlagsBits.Connect);
 }
 
-function compactVipText(value, maxLength = 320) {
-  const compact = String(value ?? '')
-    .split('\n')
-    .map(line => line.replace(/^[\s•·▪▸➡️✅🟢⚪]+/u, '').trim())
-    .filter(Boolean)
-    .join(' · ');
-  return compact.length > maxLength
-    ? `${compact.slice(0, maxLength - 1).trimEnd()}…`
-    : compact;
-}
-
 function buildVipRoleGiveSelector(userId, roleId) {
   return new UserSelectMenuBuilder()
     .setCustomId(`vip_role_give_select:${userId}:${roleId}`)
@@ -192,10 +181,8 @@ function buildVipMemberPanel(cfg, grants, call, customRole, userId) {
 
   const expiration = Math.floor(grants[0].expiresAt.getTime() / 1000);
   const intro = cfg.vipIntro || 'Este é o seu espaço exclusivo para aproveitar os benefícios VIP.';
-  const benefits = cfg.vipText || DEFAULT_VIP_TEXT();
   const role = customRole?.role;
   const title = cfg.vipTitle || DEFAULT_VIP_TITLE();
-  const compactBenefits = compactVipText(benefits);
   if (cfg.vipBanner) {
     container.addMediaGalleryComponents(
       new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(cfg.vipBanner)),
@@ -218,10 +205,9 @@ function buildVipMemberPanel(cfg, grants, call, customRole, userId) {
 
   container.addSeparatorComponents(new SeparatorBuilder());
   container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent([
+    new TextDisplayBuilder().setContent(
       `**VIP ativo** · até <t:${expiration}:F> (<t:${expiration}:R>)`,
-      compactBenefits ? `**Benefícios:** ${compactBenefits}` : '',
-    ].filter(Boolean).join('\n')),
+    ),
   );
 
   container.addTextDisplayComponents(
