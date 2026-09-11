@@ -62,6 +62,42 @@ const VIP_CALL_REGIONS = new Set([
   'us-west',
 ]);
 
+function normalizeVipColor(raw) {
+  const value = String(raw ?? '')
+    .trim()
+    .replace(/^#/, '')
+    .replace(/^0x/i, '')
+    .toUpperCase();
+  if (!value) return null;
+  if (/^[0-9A-F]{3}$/.test(value)) {
+    return value.split('').map(char => `${char}${char}`).join('');
+  }
+  if (/^[0-9A-F]{6}$/.test(value)) return value;
+  return undefined;
+}
+
+function getVipAccentColor(raw) {
+  const normalized = normalizeVipColor(raw);
+  return normalized ? parseInt(normalized, 16) : null;
+}
+
+function normalizeVipEmoji(raw) {
+  const value = String(raw ?? '').trim();
+  if (!value) return null;
+
+  const custom = value.match(/^<(a?):([^:>\s]{2,32}):(\d{17,20})>$/);
+  if (custom) return value;
+
+  const hasEmoji = /[\p{Extended_Pictographic}\p{Emoji_Presentation}]/u.test(value);
+  const hasText = /[\p{Letter}\p{Number}\s]/u.test(value);
+  return hasEmoji && !hasText ? value : undefined;
+}
+
+function getVipEmoji(raw, fallback) {
+  const normalized = normalizeVipEmoji(raw);
+  return normalized === undefined || normalized === null ? fallback : normalized;
+}
+
 async function getCfg(guildId) {
   return prisma.guildConfig.upsert({ where: { guildId }, create: { guildId }, update: {} });
 }
@@ -174,10 +210,8 @@ async function getVipBotMember(interaction) {
 
 function buildVipMemberPanel(cfg, grants, call, customRole, userId) {
   const container = new ContainerBuilder();
-  if (cfg.vipColor) {
-    const parsed = parseInt(cfg.vipColor, 16);
-    if (!isNaN(parsed)) container.setAccentColor(parsed);
-  }
+  const accentColor = getVipAccentColor(cfg.vipColor);
+  if (accentColor !== null) container.setAccentColor(accentColor);
 
   const expiration = Math.floor(grants[0].expiresAt.getTime() / 1000);
   const intro = cfg.vipIntro || 'Este é o seu espaço exclusivo para aproveitar os benefícios VIP.';
@@ -1394,20 +1428,18 @@ const VIP_CFG_FIELDS = {
 export function buildVipConfigPayload(cfg, plans = []) {
   // ── Container 1: campos de texto ─────────────────────────────────────────
   const c1 = new ContainerBuilder();
-  if (cfg.vipColor) {
-    const p = parseInt(cfg.vipColor, 16);
-    if (!isNaN(p)) c1.setAccentColor(p);
-  }
+  const accentColor = getVipAccentColor(cfg.vipColor);
+  if (accentColor !== null) c1.setAccentColor(accentColor);
 
-  const coin = cfg.vipEmojiCoin || COIN();
-  const tag  = cfg.vipEmojiTag  || VIP_TAG();
+  const coin = getVipEmoji(cfg.vipEmojiCoin, COIN());
+  const tag  = getVipEmoji(cfg.vipEmojiTag, VIP_TAG());
 
   c1.addTextDisplayComponents(new TextDisplayBuilder().setContent(
     [
       `${VIP_WING()} **Configuração — VIP**`,
       `**Título:** ${cfg.vipTitle || '*(padrão)*'}`,
       `**Intro:** ${cfg.vipIntro ? cfg.vipIntro.slice(0, 80) + (cfg.vipIntro.length > 80 ? '…' : '') : '*(padrão)*'}`,
-      `**Cor lateral:** ${cfg.vipColor ? `#${cfg.vipColor}` : '*(sem lateral)*'}`,
+      `**Cor lateral:** ${normalizeVipColor(cfg.vipColor) ? `#${normalizeVipColor(cfg.vipColor)}` : '*(sem lateral)*'}`,
       `**Banner:** ${cfg.vipBanner ? `[Ver](<${cfg.vipBanner}>)` : '*(nenhum)*'}  **Thumb:** ${cfg.vipThumb ? `[Ver](<${cfg.vipThumb}>)` : '*(nenhuma)*'}`,
       `**Preço:** ${cfg.vipPriceLabel || DEFAULT_VIP_PRICE_LABEL}`,
       `${coin} Emoji moeda · ${tag} Emoji VIP`,
@@ -1540,7 +1572,27 @@ export async function handleVipConfigModal(interaction) {
   if (!def) return;
 
   let value = interaction.fields.getTextInputValue('value').trim() || null;
-  if (value && field === 'cor') value = value.replace(/^#/, '').toUpperCase().slice(0, 6);
+  if (field === 'cor') {
+    const normalizedColor = normalizeVipColor(value);
+    if (normalizedColor === undefined) {
+      return interaction.followUp({
+        content: '❌ Informe uma cor hexadecimal válida, como `#5865F2`, `5865F2` ou `#F0F`.',
+        ephemeral: true,
+      });
+    }
+    value = normalizedColor;
+  }
+
+  if (field.startsWith('emoji_')) {
+    const normalizedEmoji = normalizeVipEmoji(value);
+    if (normalizedEmoji === undefined) {
+      return interaction.followUp({
+        content: '❌ Informe um emoji Unicode (por exemplo `✨`) ou um emoji personalizado no formato `<:nome:ID>`.',
+        ephemeral: true,
+      });
+    }
+    value = normalizedEmoji;
+  }
 
   await prisma.guildConfig.upsert({
     where:  { guildId: interaction.guildId },
@@ -1567,10 +1619,8 @@ export async function handleVipButton(interaction) {
     const cfg = await getCfg(interaction.guildId);
     const priceLabel = cfg.vipPriceLabel || DEFAULT_VIP_PRICE_LABEL;
     const c = new ContainerBuilder();
-    if (cfg.vipColor) {
-      const parsed = parseInt(cfg.vipColor, 16);
-      if (!isNaN(parsed)) c.setAccentColor(parsed);
-    }
+    const accentColor = getVipAccentColor(cfg.vipColor);
+    if (accentColor !== null) c.setAccentColor(accentColor);
     c.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
         `## ${VIP_TAG()} Adquirir VIP\n` +
@@ -1599,10 +1649,8 @@ export async function handleVipButton(interaction) {
     ]);
 
     const c = new ContainerBuilder();
-    if (cfg.vipColor) {
-      const parsed = parseInt(cfg.vipColor, 16);
-      if (!isNaN(parsed)) c.setAccentColor(parsed);
-    }
+    const accentColor = getVipAccentColor(cfg.vipColor);
+    if (accentColor !== null) c.setAccentColor(accentColor);
     if (grants.length === 0) {
       c.addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
