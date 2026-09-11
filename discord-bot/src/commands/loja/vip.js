@@ -883,11 +883,12 @@ export async function handleVipRoleSelect(interaction) {
   });
 
   try {
-    await recipient.user.send({
+    const requestMessage = await interaction.channel?.send({
       content: [
-        `**${interaction.member.displayName}** quer compartilhar o cargo **${customRole.role.name}** com você no servidor **${interaction.guild.name}**.`,
+        `<@${recipientId}> **${interaction.member.displayName}** quer compartilhar o cargo **${customRole.role.name}** com você.`,
         'Você precisa aceitar para receber o cargo. Esta solicitação expira em 15 minutos.',
       ].join('\n'),
+      allowedMentions: { users: [recipientId] },
       components: [
         new ActionRowBuilder().addComponents(
           new ButtonBuilder()
@@ -901,11 +902,12 @@ export async function handleVipRoleSelect(interaction) {
         ),
       ],
     });
+    if (!requestMessage) throw new Error('Canal do painel indisponível');
   } catch (error) {
     await prisma.vipRoleGrantRequest.delete({ where: { id: request.id } }).catch(() => {});
-    console.error('[VIP] Não consegui enviar solicitação de cargo por DM:', error);
+    console.error('[VIP] Não consegui publicar solicitação de cargo no canal do painel:', error);
     return interaction.followUp({
-      content: `❌ Não consegui enviar uma DM para ${recipient}. Peça para ele liberar mensagens diretas e tente novamente.`,
+      content: `❌ Não consegui publicar a solicitação neste canal para ${recipient}. Verifique se tenho permissão para enviar mensagens e tente novamente.`,
       ephemeral: true,
     });
   }
