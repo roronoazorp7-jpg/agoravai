@@ -47,7 +47,14 @@ import { buildWalletCard, walletRefreshRow } from '../commands/economia/pf.js';
 import { handlePetButton } from '../commands/general/pet.js';
 import { handleModerationButton } from '../commands/admin/moderacao.js';
 import { handleBotLeaveInteraction } from '../commands/admin/bot.js';
-import { handleVipButton, handleVipConfigModal, handleVipCallModal, handleVipRoleModal } from '../commands/loja/vip.js';
+import {
+  handleVipButton,
+  handleVipConfigModal,
+  handleVipCallModal,
+  handleVipRoleModal,
+  handleVipRoleSelect,
+  handleVipRoleRequestButton,
+} from '../commands/loja/vip.js';
 import { handleFishingInteraction } from '../commands/economia/pescaria.js';
 import { handleWorkInteraction } from '../commands/economia/eco.js';
 import { handleBankInteraction } from '../utils/bankHandlers.js';
@@ -778,6 +785,10 @@ export default {
       }
 
       // ── TELLONYM: destinatários do formulário ─────────────────────────────
+      if (interaction.isUserSelectMenu() && interaction.customId.startsWith('vip_role_give_select:')) {
+        return handleVipRoleSelect(interaction);
+      }
+
       if (interaction.isUserSelectMenu() && interaction.customId === 'tellonym_target') {
         const key = tellonymSessionKey(interaction);
         const session = tellonymSessions.get(key) ?? { targetIds: [], message: null };
@@ -1157,6 +1168,9 @@ export default {
 
         // ── VIP ────────────────────────────────────────────────────────────
         if (interaction.customId.startsWith('vip_')) {
+          if (interaction.customId.startsWith('vip_role_request_')) {
+            return handleVipRoleRequestButton(interaction);
+          }
           return handleVipButton(interaction);
         }
 

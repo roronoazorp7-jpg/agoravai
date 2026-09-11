@@ -11,6 +11,7 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  UserSelectMenuBuilder,
   FileUploadBuilder,
   LabelBuilder,
   ModalBuilder,
@@ -133,6 +134,29 @@ function compactVipText(value, maxLength = 320) {
     : compact;
 }
 
+function buildVipRoleGiveSelector(userId, roleId) {
+  return new UserSelectMenuBuilder()
+    .setCustomId(`vip_role_give_select:${userId}:${roleId}`)
+    .setPlaceholder('Escolha quem receberá seu cargo')
+    .setMinValues(1)
+    .setMaxValues(1);
+}
+
+function buildVipRoleRequestClosedPayload(content) {
+  return {
+    content,
+    components: [
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('vip_role_request_done')
+          .setLabel('Solicitação encerrada')
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(true),
+      ),
+    ],
+  };
+}
+
 async function getVipCustomRole(guild, userId) {
   const record = await prisma.vipCustomRole.findUnique({
     where: {
@@ -221,11 +245,18 @@ function buildVipMemberPanel(cfg, grants, call, customRole, userId) {
           .setEmoji(VIP_TAG())
           .setStyle(ButtonStyle.Success),
     ...(role
-      ? [new ButtonBuilder()
+      ? [
+        new ButtonBuilder()
+          .setCustomId(`vip_role_give:${userId}:${role.id}`)
+          .setLabel('Dar cargo')
+          .setEmoji(VIP_WING())
+          .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
           .setCustomId(`vip_role_delete:${userId}:${role.id}`)
           .setLabel('Excluir cargo')
           .setEmoji(VIP_WING())
-          .setStyle(ButtonStyle.Danger)]
+          .setStyle(ButtonStyle.Danger),
+      ]
       : []),
   ));
 
@@ -716,6 +747,19 @@ async function handleVipRoleButton(interaction) {
     });
   }
 
+  if (action === 'vip_role_give') {
+    return interaction.reply({
+      components: [
+        new TextDisplayBuilder().setContent(
+          `Escolha um membro para receber **${existing.role.name}**.\n` +
+          'Ele receberá uma solicitação privada e precisará aceitar antes de receber o cargo.',
+        ),
+        new ActionRowBuilder().addComponents(buildVipRoleGiveSelector(userId, roleId)),
+      ],
+      flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+    });
+  }
+
   if (action === 'vip_role_edit') {
     return interaction.showModal(buildVipRoleModal({
       mode: 'edit',
@@ -744,6 +788,235 @@ async function handleVipRoleButton(interaction) {
     }
     await prisma.vipCustomRole.delete({ where: { id: existing.record.id } }).catch(() => {});
     return refreshVipPanelMessage(interaction);
+  }
+}
+
+export async function handleVipRoleSelect(interaction) {
+  const [, giverId, roleId] = interaction.customId.split(':');
+  if (interaction.user.id !== giverId) {
+    return interaction.reply({
+      content: '❌ Apenas o dono deste VIP pode compartilhar este cargo.',
+      ephemeral: true,
+    });
+  }
+
+  await interaction.deferUpdate();
+
+  const recipientId = interaction.values[0];
+  if (recipientId === giverId) {
+    return interaction.followUp({
+      content: '❌ Escolha outro membro. Você já possui este cargo.',
+      ephemeral: true,
+    });
+  }
+
+  const grants = await getActiveVipGrants(interaction.guildId, giverId);
+  if (grants.length === 0) {
+    return interaction.followUp({
+      content: '❌ Seu VIP não está mais ativo neste servidor.',
+      ephemeral: true,
+    });
+  }
+
+  const customRole = await getVipCustomRole(interaction.guild, giverId);
+  if (!customRole || customRole.role.id !== roleId) {
+    return interaction.followUp({
+      content: '❌ Seu cargo VIP não existe mais. Atualize o painel e tente novamente.',
+      ephemeral: true,
+    });
+  }
+  if (!customRole.role.editable) {
+    return interaction.followUp({
+      content: '❌ Não consigo atribuir este cargo porque ele está acima do meu cargo mais alto.',
+      ephemeral: true,
+    });
+  }
+
+  const recipient = await interaction.guild.members.fetch(recipientId).catch(() => null);
+  if (!recipient || recipient.user.bot) {
+    return interaction.followUp({
+      content: '❌ Escolha um membro humano deste servidor.',
+      ephemeral: true,
+    });
+  }
+  if (recipient.roles.cache.has(roleId)) {
+    return interaction.followUp({
+      content: `❌ ${recipient} já possui este cargo.`,
+      ephemeral: true,
+    });
+  }
+
+  const now = new Date();
+  await prisma.vipRoleGrantRequest.updateMany({
+    where: {
+      status: 'PENDING',
+      expiresAt: { lte: now },
+    },
+    data: { status: 'EXPIRED' },
+  });
+
+  const pending = await prisma.vipRoleGrantRequest.findFirst({
+    where: {
+      guildId: interaction.guildId,
+      roleId,
+      giverId,
+      recipientId,
+      status: 'PENDING',
+      expiresAt: { gt: now },
+    },
+  });
+  if (pending) {
+    return interaction.followUp({
+      content: `⏳ ${recipient} já possui uma solicitação pendente para este cargo.`,
+      ephemeral: true,
+    });
+  }
+
+  const request = await prisma.vipRoleGrantRequest.create({
+    data: {
+      guildId: interaction.guildId,
+      roleId,
+      giverId,
+      recipientId,
+      expiresAt: new Date(now.getTime() + 15 * 60 * 1000),
+    },
+  });
+
+  try {
+    await recipient.user.send({
+      content: [
+        `**${interaction.member.displayName}** quer compartilhar o cargo **${customRole.role.name}** com você no servidor **${interaction.guild.name}**.`,
+        'Você precisa aceitar para receber o cargo. Esta solicitação expira em 15 minutos.',
+      ].join('\n'),
+      components: [
+        new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`vip_role_request_accept:${request.id}`)
+            .setLabel('Aceitar cargo')
+            .setStyle(ButtonStyle.Success),
+          new ButtonBuilder()
+            .setCustomId(`vip_role_request_decline:${request.id}`)
+            .setLabel('Recusar')
+            .setStyle(ButtonStyle.Danger),
+        ),
+      ],
+    });
+  } catch (error) {
+    await prisma.vipRoleGrantRequest.delete({ where: { id: request.id } }).catch(() => {});
+    console.error('[VIP] Não consegui enviar solicitação de cargo por DM:', error);
+    return interaction.followUp({
+      content: `❌ Não consegui enviar uma DM para ${recipient}. Peça para ele liberar mensagens diretas e tente novamente.`,
+      ephemeral: true,
+    });
+  }
+
+  return interaction.followUp({
+    content: `✅ Solicitação enviada para ${recipient}. O cargo só será atribuído se ele aceitar.`,
+    ephemeral: true,
+  });
+}
+
+export async function handleVipRoleRequestButton(interaction) {
+  const [action, requestId] = interaction.customId.split(':');
+  const request = await prisma.vipRoleGrantRequest.findUnique({ where: { id: requestId } });
+  if (!request || request.recipientId !== interaction.user.id) {
+    return interaction.reply({
+      content: '❌ Esta solicitação não está disponível para você.',
+      ephemeral: true,
+    });
+  }
+  if (request.status !== 'PENDING') {
+    return interaction.reply({
+      content: '❌ Esta solicitação já foi encerrada.',
+      ephemeral: true,
+    });
+  }
+
+  const now = new Date();
+  if (request.expiresAt <= now) {
+    await prisma.vipRoleGrantRequest.update({
+      where: { id: request.id },
+      data: { status: 'EXPIRED' },
+    });
+    return interaction.update(
+      buildVipRoleRequestClosedPayload('⌛ Esta solicitação expirou. Peça uma nova solicitação pelo painel VIP.'),
+    );
+  }
+
+  if (action === 'vip_role_request_decline') {
+    await prisma.vipRoleGrantRequest.update({
+      where: { id: request.id },
+      data: { status: 'DECLINED' },
+    });
+    return interaction.update(buildVipRoleRequestClosedPayload('❌ Você recusou receber este cargo.'));
+  }
+
+  if (action !== 'vip_role_request_accept') {
+    return interaction.reply({ content: '❌ Ação inválida.', ephemeral: true });
+  }
+
+  await interaction.deferUpdate();
+  const guild = interaction.client.guilds.cache.get(request.guildId)
+    ?? await interaction.client.guilds.fetch(request.guildId).catch(() => null);
+  if (!guild) {
+    await prisma.vipRoleGrantRequest.update({
+      where: { id: request.id },
+      data: { status: 'CANCELLED' },
+    });
+    return interaction.editReply(
+      buildVipRoleRequestClosedPayload('❌ Não consegui encontrar o servidor. A solicitação foi cancelada.'),
+    );
+  }
+
+  const giverVip = await getActiveVipGrants(request.guildId, request.giverId);
+  const role = guild.roles.cache.get(request.roleId)
+    ?? await guild.roles.fetch(request.roleId).catch(() => null);
+  if (giverVip.length === 0 || !role) {
+    await prisma.vipRoleGrantRequest.update({
+      where: { id: request.id },
+      data: { status: 'CANCELLED' },
+    });
+    return interaction.editReply(
+      buildVipRoleRequestClosedPayload('❌ O VIP ou o cargo não está mais disponível. A solicitação foi cancelada.'),
+    );
+  }
+  if (!role.editable) {
+    await prisma.vipRoleGrantRequest.update({
+      where: { id: request.id },
+      data: { status: 'CANCELLED' },
+    });
+    return interaction.editReply(
+      buildVipRoleRequestClosedPayload('❌ O bot não consegue atribuir esse cargo. A solicitação foi cancelada.'),
+    );
+  }
+
+  const member = await guild.members.fetch(interaction.user.id).catch(() => null);
+  if (!member) {
+    await prisma.vipRoleGrantRequest.update({
+      where: { id: request.id },
+      data: { status: 'CANCELLED' },
+    });
+    return interaction.editReply(
+      buildVipRoleRequestClosedPayload('❌ Você não está mais neste servidor. A solicitação foi cancelada.'),
+    );
+  }
+
+  try {
+    if (!member.roles.cache.has(role.id)) {
+      await member.roles.add(role, 'Cargo VIP aceito pelo destinatário');
+    }
+    await prisma.vipRoleGrantRequest.update({
+      where: { id: request.id },
+      data: { status: 'ACCEPTED' },
+    });
+    return interaction.editReply(
+      buildVipRoleRequestClosedPayload(`✅ Você aceitou o cargo **${role.name}** no servidor **${guild.name}**.`),
+    );
+  } catch (error) {
+    console.error('[VIP] Falha ao atribuir cargo aceito:', error);
+    return interaction.editReply(
+      buildVipRoleRequestClosedPayload('❌ Não consegui atribuir o cargo. Verifique a hierarquia de cargos e tente novamente.'),
+    );
   }
 }
 

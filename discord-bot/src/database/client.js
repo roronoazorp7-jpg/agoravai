@@ -306,6 +306,32 @@ export async function ensureMarriageSchema() {
     CREATE INDEX IF NOT EXISTS "VipCustomRole_roleId_idx"
       ON "VipCustomRole" ("roleId")
   `);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "VipRoleGrantRequest" (
+      "id" TEXT NOT NULL,
+      "guildId" TEXT NOT NULL,
+      "roleId" TEXT NOT NULL,
+      "giverId" TEXT NOT NULL,
+      "recipientId" TEXT NOT NULL,
+      "status" TEXT NOT NULL DEFAULT 'PENDING',
+      "expiresAt" TIMESTAMP(3) NOT NULL,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "VipRoleGrantRequest_pkey" PRIMARY KEY ("id")
+    )
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "VipRoleGrantRequest_recipientId_status_idx"
+      ON "VipRoleGrantRequest" ("recipientId", "status")
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "VipRoleGrantRequest_guildId_giverId_status_idx"
+      ON "VipRoleGrantRequest" ("guildId", "giverId", "status")
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "VipRoleGrantRequest_expiresAt_idx"
+      ON "VipRoleGrantRequest" ("expiresAt")
+  `);
 }
 
 export default prisma;
