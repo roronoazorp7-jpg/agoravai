@@ -15,6 +15,7 @@ import {
 } from 'discord.js';
 import prisma from '../database/client.js';
 import { likesMap, threadsMap, postDataMap } from '../utils/instaState.js';
+import { getEmoji } from '../utils/emojiManager.js';
 import { buildPartnershipPost } from '../utils/partnershipPanels.js';
 import {
   askAdminCommand,
@@ -496,7 +497,11 @@ export default {
 
       if (cfg?.instaChannel && message.channelId === cfg.instaChannel && message.attachments.size > 0) {
         const accentColor = cfg.instaColor ? parseInt(cfg.instaColor, 16) : null;
-        const likeEmoji   = parseEmoji(cfg.instaEmoji ?? '💜');
+        const configuredLikeEmoji = cfg.instaEmoji?.trim();
+        const likeEmoji   = configuredLikeEmoji && configuredLikeEmoji !== '💜'
+          ? parseEmoji(configuredLikeEmoji)
+          : getEmoji('insta_like');
+        const commentEmoji = getEmoji('insta_comment');
         const instaHandle = cfg.instaHandle ?? null;
 
         // Helpers para montar o Container e o ActionRow
@@ -526,7 +531,7 @@ export default {
               .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
               .setCustomId(`insta_who_${postId}`)
-              .setEmoji('👁️')
+              .setEmoji(emoji)
               .setLabel('Curtidas')
               .setStyle(ButtonStyle.Secondary),
           ];
@@ -534,7 +539,7 @@ export default {
             buttons.push(
               new ButtonBuilder()
                 .setCustomId(`insta_comment_${threadId}`)
-                .setEmoji('💬')
+                .setEmoji(commentEmoji)
                 .setLabel('Comentar')
                 .setStyle(ButtonStyle.Secondary)
             );

@@ -59,6 +59,9 @@ const REQUIRED_EMOJIS = [
   { name: 'tell_hearts',     asset: 'tell-hearts.png',     mime: 'image/png',  fallback: '🗨️' },
   // ── Controles de cards ───────────────────────────────────────────────────────
   { name: 'refresh_button',  asset: 'refresh-button.png', mime: 'image/png', fallback: '🔄' },
+  // ── Feed do Instagram ─────────────────────────────────────────────────────
+  { name: 'insta_comment',   asset: 'insta-comment.webp', mime: 'image/webp', fallback: '💬' },
+  { name: 'insta_like',      asset: 'insta-like.webp',    mime: 'image/webp', fallback: '💜' },
   // ── Moderação ────────────────────────────────────────────────────────────────
   { name: 'mod_heart', asset: 'mod-heart.png', mime: 'image/png', fallback: '❤️' },
 ];
