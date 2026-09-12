@@ -6,8 +6,7 @@ import {
   EmbedBuilder,
   ContainerBuilder,
   TextDisplayBuilder,
-  SectionBuilder,
-  ThumbnailBuilder,
+  SeparatorBuilder,
   MediaGalleryBuilder,
   MediaGalleryItemBuilder,
   MessageFlags,
@@ -504,21 +503,19 @@ export default {
         const commentEmoji = getEmoji('insta_comment');
         const instaHandle = cfg.instaHandle ?? null;
 
-        // Helpers para montar o Container e o ActionRow
-        function buildInstaContainer({ authorName, authorAvatar, content, accentColor: ac, imageUrl }) {
+        // Helpers para montar o Container no estilo de publicação compacta.
+        function buildInstaContainer({ authorName, authorUsername, content, accentColor: ac, imageUrl }) {
           const c = new ContainerBuilder();
           if (ac !== null && ac !== undefined) c.setAccentColor(ac);
-          const headerText = content ? `### ${authorName}\n${content}` : `### ${authorName}`;
-          c.addSectionComponents(
-            new SectionBuilder()
-              .addTextDisplayComponents(new TextDisplayBuilder().setContent(headerText))
-              .setThumbnailAccessory(new ThumbnailBuilder().setURL(authorAvatar))
-          );
+          const publicationText = `Publicação de @${authorUsername} (${authorName})`;
+          const headerText = content ? `${publicationText}\n${content}` : publicationText;
+          c.addTextDisplayComponents(new TextDisplayBuilder().setContent(headerText));
           if (imageUrl) {
             c.addMediaGalleryComponents(
               new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(imageUrl))
             );
           }
+          c.addSeparatorComponents(new SeparatorBuilder());
           return c;
         }
 
@@ -553,13 +550,14 @@ export default {
                 .setLabel(`@${handle}`)
             );
           }
-          buttons.push(
-            new ButtonBuilder()
-              .setCustomId(`insta_del_${postId}_${authorId}`)
-              .setEmoji('🗑️')
-              .setStyle(ButtonStyle.Danger)
-          );
-          return new ActionRowBuilder().addComponents(buttons);
+          const deleteButton = new ButtonBuilder()
+            .setCustomId(`insta_del_${postId}_${authorId}`)
+            .setEmoji('🗑️')
+            .setStyle(ButtonStyle.Danger);
+          return [
+            new ActionRowBuilder().addComponents(buttons),
+            new ActionRowBuilder().addComponents(deleteButton),
+          ];
         }
 
         // Pré-busca todos os arquivos ANTES de deletar a mensagem original.
@@ -602,7 +600,7 @@ export default {
         for (const { attachment, isImage, isVideo, mediaBuf, ext } of attachmentFiles) {
           const postId     = `${message.id}_${attachment.id}`;
           const authorName = message.member?.displayName ?? message.author.username;
-          const authorAvatar = message.author.displayAvatarURL({ size: 64 });
+          const authorUsername = message.author.username;
           const content    = message.content || null;
 
           // A mídia precisa ser referenciada dentro da galeria. Só enviar o
@@ -615,11 +613,19 @@ export default {
 
           likesMap.set(postId, new Set());
 
-          const containerOpts = { authorName, authorAvatar, content, accentColor, imageUrl: initialImageUrl };
+          const containerOpts = { authorName, authorUsername, content, accentColor, imageUrl: initialImageUrl };
+          const actionRows = buildInstaActionRow({
+            postId,
+            likeEmoji,
+            likesCount: 0,
+            threadId: null,
+            instaHandle,
+            authorId: message.author.id,
+          });
           const post = await message.channel.send({
             components: [
               buildInstaContainer(containerOpts),
-              buildInstaActionRow({ postId, likeEmoji, likesCount: 0, threadId: null, instaHandle, authorId: message.author.id }),
+              ...actionRows,
             ],
             files,
             flags: MessageFlags.IsComponentsV2,
@@ -633,7 +639,6 @@ export default {
           // Armazena dados do post para reuso no handler de likes
           postDataMap.set(postId, {
             authorName,
-            authorAvatar,
             content,
             accentColor,
             likeEmoji,
@@ -651,11 +656,19 @@ export default {
             });
             threadsMap.set(postId, thread.id);
 
-            const editContainerOpts = { authorName, authorAvatar, content, accentColor, imageUrl: cdnImageUrl };
+            const editContainerOpts = { authorName, authorUsername, content, accentColor, imageUrl: cdnImageUrl };
+            const editActionRows = buildInstaActionRow({
+              postId,
+              likeEmoji,
+              likesCount: 0,
+              threadId: thread.id,
+              instaHandle,
+              authorId: message.author.id,
+            });
             await post.edit({
               components: [
                 buildInstaContainer(editContainerOpts),
-                buildInstaActionRow({ postId, likeEmoji, likesCount: 0, threadId: thread.id, instaHandle, authorId: message.author.id }),
+                ...editActionRows,
               ],
               flags: MessageFlags.IsComponentsV2,
             });
