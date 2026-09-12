@@ -600,15 +600,13 @@ export default {
           const authorAvatar = message.author.displayAvatarURL({ size: 64 });
           const content    = message.content || null;
 
-          // Imagens são exibidas na galeria; vídeos são enviados como anexo
-          // para o Discord renderizar o player nativo no post.
+          // A mídia precisa ser referenciada dentro da galeria. Só enviar o
+          // vídeo como anexo deixa o arquivo fora do conteúdo visual do post.
           const fileName = `post_${attachment.id}.${ext || (isVideo ? 'mp4' : 'png')}`;
           const files = [new AttachmentBuilder(mediaBuf, { name: fileName })];
-          let initialImageUrl = null;
-
-          if (isImage) {
-            initialImageUrl = `attachment://${fileName}`;
-          }
+          const initialImageUrl = (isImage || isVideo)
+            ? `attachment://${fileName}`
+            : null;
 
           likesMap.set(postId, new Set());
 
@@ -623,7 +621,7 @@ export default {
           });
 
           // Após o envio, pega a URL CDN real do attachment para usar nos edits futuros
-          const cdnImageUrl = isImage
+          const cdnImageUrl = isImage || isVideo
             ? (post.attachments.first()?.url ?? initialImageUrl)
             : null;
 
