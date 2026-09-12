@@ -531,7 +531,7 @@ export default {
               .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
               .setCustomId(`insta_who_${postId}`)
-              .setEmoji(emoji)
+              .setEmoji(getEmoji('insta_like'))
               .setLabel('Curtidas')
               .setStyle(ButtonStyle.Secondary),
           ];
