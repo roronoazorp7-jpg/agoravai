@@ -76,6 +76,18 @@ model CommandBlockRule {
   @@index([guildId, commandName])
 }
 
+model ChatLock {
+  id             String   @id @default(cuid())
+  guildId        String
+  channelId      String
+  allowedRoleIds String   @default("")
+  lockedById     String
+  lockedAt       DateTime @default(now())
+
+  @@unique([guildId, channelId])
+  @@index([guildId])
+}
+
 model GuildConfig {
   id      String @id @default(cuid())
   guildId String @unique
