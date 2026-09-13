@@ -26,6 +26,14 @@ function v2Panel(text) {
   };
 }
 
+function contextUserId(context) {
+  return context.user?.id ?? context.author?.id;
+}
+
+function contextMemberPermissions(context) {
+  return context.memberPermissions ?? context.member?.permissions;
+}
+
 function selectedRoles(interaction) {
   const unique = new Map();
   for (const optionName of ROLE_OPTIONS) {
@@ -65,7 +73,7 @@ async function ensureLockPermissions(interaction) {
     return { error: 'Use este comando dentro de um canal de texto ou de anúncios.' };
   }
 
-  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels)) {
+  if (!contextMemberPermissions(interaction)?.has(PermissionFlagsBits.ManageChannels)) {
     return { error: 'Você precisa da permissão **Gerenciar Canais**.' };
   }
 
@@ -100,7 +108,7 @@ async function lockChat(interaction) {
   if (checked.error) return interaction.reply(v2Panel(`## 🔒 Lock do chat\n\n${checked.error}`));
 
   const { channel, botMember } = checked;
-  const roles = selectedRoles(interaction);
+  const roles = interaction.options ? selectedRoles(interaction) : [];
   const roleError = validateRoles(roles, interaction.guild);
   if (roleError) return interaction.reply(v2Panel(`## 🔒 Lock do chat\n\n${roleError}`));
 
@@ -137,11 +145,11 @@ async function lockChat(interaction) {
         guildId: interaction.guildId,
         channelId: channel.id,
         allowedRoleIds: roles.map(role => role.id).join(','),
-        lockedById: interaction.user.id,
+        lockedById: contextUserId(interaction),
       },
       update: {
         allowedRoleIds: roles.map(role => role.id).join(','),
-        lockedById: interaction.user.id,
+        lockedById: contextUserId(interaction),
         lockedAt: new Date(),
       },
     });
@@ -155,7 +163,7 @@ async function lockChat(interaction) {
     ...v2Panel(
       `## 🔒 Chat trancado\n\n` +
       `**Cargos que podem falar:** ${roleList(roles)}\n` +
-      `**Trancado por:** <@${interaction.user.id}>`,
+      `**Trancado por:** <@${contextUserId(interaction)}>`,
     ),
   });
 }
@@ -191,7 +199,7 @@ async function unlockChat(interaction) {
   return interaction.reply({
     ...v2Panel(
       `## 🔓 Chat destrancado\n\n` +
-      `**Destrancado por:** <@${interaction.user.id}>`,
+      `**Destrancado por:** <@${contextUserId(interaction)}>`,
     ),
   });
 }
@@ -221,12 +229,23 @@ export default {
         .setName('unlock')
         .setDescription('Destranca o canal atual'),
     ),
-  name: 'chat',
+  // Os comandos de texto têm nomes próprios; o slash continua agrupado em /chat.
+  name: 'lock',
+  aliases: ['unlock'],
 
   async execute(interaction) {
     const subcommand = interaction.options.getSubcommand();
     if (subcommand === 'lock') return lockChat(interaction);
     if (subcommand === 'unlock') return unlockChat(interaction);
     return interaction.reply(v2Panel('Use `/chat lock` ou `/chat unlock`.'));
+  },
+
+  async executePrefix(message, _args, _client, commandName) {
+    const invokedCommand = commandName
+      ?? message.content.trim().split(/\s+/)[1]?.toLowerCase();
+
+    if (invokedCommand === 'lock') return lockChat(message);
+    if (invokedCommand === 'unlock') return unlockChat(message);
+    return message.reply('Use `savage lock` ou `savage unlock`.');
   },
 };
