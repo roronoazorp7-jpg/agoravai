@@ -9,7 +9,9 @@ import {
   TextDisplayBuilder,
 } from 'discord.js';
 
-const ROLES_PER_PAGE = 20;
+// Mantém uma linha livre no container para navegação, mesmo em servidores
+// com muitos cargos. Isso evita ultrapassar limites de componentes do cliente.
+const ROLES_PER_PAGE = 15;
 const PERMISSIONS_PER_PAGE = 8;
 
 const PERMISSION_DEFS = [
@@ -49,7 +51,8 @@ const PERMISSION_DEFS = [
 })).filter(permission => permission.flag !== undefined);
 
 function truncate(value, max) {
-  return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+  const text = String(value ?? 'Cargo');
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
 function roleList(guild) {

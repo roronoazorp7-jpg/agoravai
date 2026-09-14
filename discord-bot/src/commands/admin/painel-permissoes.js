@@ -30,6 +30,11 @@ export default {
       return message.reply('❌ Você precisa da permissão **Gerenciar Cargos** para usar este comando.');
     }
 
-    return message.channel.send(buildRolePermissionsHome(message.guild));
+    try {
+      return await message.channel.send(buildRolePermissionsHome(message.guild));
+    } catch (error) {
+      console.error('[PERMISSIONS PANEL PREFIX]', error);
+      throw error;
+    }
   },
 };
