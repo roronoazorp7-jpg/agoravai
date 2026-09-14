@@ -13,7 +13,10 @@ import {
 // Cada item passa a ser uma Section V2 (texto + botão-acessório). O container
 // aceita até 10 filhos; reservamos um para o cabeçalho e deixamos oito itens.
 const ROLES_PER_PAGE = 8;
-const PERMISSIONS_PER_PAGE = 8;
+// No detalhe, cada permissão usa dois filhos do container: o nome e a linha
+// do interruptor. Quatro itens deixam espaço para o cabeçalho sem estourar o
+// limite de componentes V2.
+const PERMISSIONS_PER_PAGE = 4;
 
 const PERMISSION_DEFS = [
   ['ViewChannel', 'Ver canais'],
@@ -175,19 +178,16 @@ export function buildRolePermissionsDetail(guild, roleId, requestedPage = 0, rol
 
   for (const permission of visiblePermissions) {
     const active = hasRawPermission(role, permission.flag);
-    const section = new SectionBuilder()
-      .addTextDisplayComponents(new TextDisplayBuilder().setContent([
-        `**${permission.label}**`,
-        active ? 'Permissão concedida' : 'Permissão não concedida',
-      ].join('\n')))
-      .setButtonAccessory(
-        new ButtonBuilder()
-          .setCustomId(`perm_toggle:${role.id}:${permission.key}:${page}:${rolePage}`)
-          .setLabel(active ? 'Ativo' : 'Inativo')
-          .setStyle(active ? ButtonStyle.Success : ButtonStyle.Secondary)
-          .setDisabled(role.managed),
-      );
-    container.addSectionComponents(section);
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(
+      `**${permission.label}**`,
+    ));
+    container.addActionRowComponents(new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`perm_toggle:${role.id}:${permission.key}:${page}:${rolePage}`)
+        .setLabel(active ? 'Ativado' : 'Desativado')
+        .setStyle(active ? ButtonStyle.Success : ButtonStyle.Secondary)
+        .setDisabled(role.managed),
+    ));
   }
 
   const navigation = new ActionRowBuilder().addComponents(
