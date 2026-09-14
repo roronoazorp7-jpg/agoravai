@@ -118,6 +118,7 @@ export function buildRolePermissionsHome(guild, requestedPage = 0) {
     ));
   }
 
+  const buttonRows = [];
   for (let index = 0; index < visibleRoles.length; index += 5) {
     const row = new ActionRowBuilder();
     for (const role of visibleRoles.slice(index, index + 5)) {
@@ -129,13 +130,13 @@ export function buildRolePermissionsHome(guild, requestedPage = 0) {
           .setDisabled(role.managed),
       );
     }
-    container.addActionRowComponents(row);
+    buttonRows.push(row);
   }
 
-  if (pageCount > 1) container.addActionRowComponents(buildNavigation(page, pageCount));
+  if (pageCount > 1) buttonRows.push(buildNavigation(page, pageCount));
 
   return {
-    components: [container],
+    components: [container, ...buttonRows],
     flags: MessageFlags.IsComponentsV2,
   };
 }
@@ -169,6 +170,7 @@ export function buildRolePermissionsDetail(guild, roleId, requestedPage = 0, rol
     `Grupo de permissões: **${page + 1}/${pageCount}**`,
   ].join('\n')));
 
+  const buttonRows = [];
   for (let index = 0; index < visiblePermissions.length; index += 4) {
     const row = new ActionRowBuilder();
     for (const permission of visiblePermissions.slice(index, index + 4)) {
@@ -181,7 +183,7 @@ export function buildRolePermissionsDetail(guild, roleId, requestedPage = 0, rol
           .setDisabled(role.managed),
       );
     }
-    container.addActionRowComponents(row);
+    buttonRows.push(row);
   }
 
   const navigation = new ActionRowBuilder().addComponents(
@@ -190,8 +192,8 @@ export function buildRolePermissionsDetail(guild, roleId, requestedPage = 0, rol
     pageButton(`perm_detail:${role.id}:${Math.min(pageCount - 1, page + 1)}:${rolePage}`, 'Próximo', page >= pageCount - 1),
     pageButton(`perm_detail:${role.id}:${pageCount - 1}:${rolePage}`, 'Último grupo', page >= pageCount - 1),
   );
-  container.addActionRowComponents(navigation);
-  container.addActionRowComponents(new ActionRowBuilder().addComponents(
+  buttonRows.push(navigation);
+  buttonRows.push(new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`perm_roles:${rolePage}`)
       .setLabel('Voltar aos cargos')
@@ -199,7 +201,7 @@ export function buildRolePermissionsDetail(guild, roleId, requestedPage = 0, rol
   ));
 
   return {
-    components: [container],
+    components: [container, ...buttonRows],
     flags: MessageFlags.IsComponentsV2,
   };
 }
