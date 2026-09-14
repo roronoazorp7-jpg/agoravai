@@ -11,13 +11,12 @@ import {
 } from 'discord.js';
 import { getEmoji } from './emojiManager.js';
 
-// Cada item passa a ser uma Section V2 (texto + botão-acessório). O container
-// aceita até 10 filhos; reservamos um para o cabeçalho e deixamos oito itens.
-const ROLES_PER_PAGE = 8;
+// Cada item passa a ser uma Section V2 (texto + botão-acessório). Menos itens
+// por página mantém o painel compacto no celular.
+const ROLES_PER_PAGE = 4;
 // No detalhe, cada permissão usa dois filhos do container: o nome e a linha
-// do interruptor. Quatro itens deixam espaço para o cabeçalho sem estourar o
-// limite de componentes V2.
-const PERMISSIONS_PER_PAGE = 4;
+// do interruptor. Três itens deixam o grupo mais curto e fácil de ler.
+const PERMISSIONS_PER_PAGE = 3;
 
 const PERMISSION_DEFS = [
   ['ViewChannel', 'Ver canais'],
@@ -108,13 +107,9 @@ export function buildRolePermissionsHome(guild, requestedPage = 0) {
 
   const container = new ContainerBuilder();
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent([
-    '## Painel de Permissões',
+    '## Permissões',
     `**${guild.name}**`,
-    '',
-    'Selecione um cargo para consultar suas permissões e alterar os acessos.',
-    'Cargos integrados não podem ser editados pelo Discord.',
-    '',
-    `Cargos encontrados: **${roles.length}** · Página **${page + 1}/${pageCount}**`,
+    `Cargos: **${roles.length}** · Página **${page + 1}/${pageCount}**`,
   ].join('\n')));
 
   if (!visibleRoles.length) {
@@ -167,15 +162,9 @@ export function buildRolePermissionsDetail(guild, roleId, requestedPage = 0, rol
 
   const container = new ContainerBuilder();
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent([
-    '## Permissões do cargo',
-    `**${truncate(role.name, 80)}** · <@&${role.id}>`,
-    '',
-    role.managed
-      ? 'Este cargo é integrado e não pode ser alterado.'
-      : 'Clique em uma permissão para conceder ou remover o acesso.',
-    `Permissões ativas: **${enabled.length}**${enabled.length ? `\n${truncate(enabled.join(' · '), 900)}` : ''}`,
-    '',
-    `Grupo de permissões: **${page + 1}/${pageCount}**`,
+    '## Permissões',
+    `**${truncate(role.name, 80)}**`,
+    `Ativas: **${enabled.length}** · Grupo **${page + 1}/${pageCount}**`,
   ].join('\n')));
 
   for (const permission of visiblePermissions) {
