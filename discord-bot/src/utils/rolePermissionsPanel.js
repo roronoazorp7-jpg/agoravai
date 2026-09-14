@@ -9,6 +9,7 @@ import {
   SectionBuilder,
   TextDisplayBuilder,
 } from 'discord.js';
+import { getEmoji } from './emojiManager.js';
 
 // Cada item passa a ser uma Section V2 (texto + botão-acessório). O container
 // aceita até 10 filhos; reservamos um para o cabeçalho e deixamos oito itens.
@@ -86,6 +87,7 @@ function pageButton(customId, label, disabled = false) {
   return new ButtonBuilder()
     .setCustomId(customId)
     .setLabel(label)
+    .setEmoji(getEmoji('permission_panel'))
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(disabled);
 }
@@ -132,6 +134,7 @@ export function buildRolePermissionsHome(guild, requestedPage = 0) {
         new ButtonBuilder()
           .setCustomId(`perm_role:${role.id}:${page}`)
           .setLabel(role.managed ? 'Ver' : 'Abrir')
+          .setEmoji(getEmoji('permission_panel'))
           .setStyle(role.managed ? ButtonStyle.Secondary : ButtonStyle.Primary)
           .setDisabled(role.managed),
       );
@@ -185,6 +188,7 @@ export function buildRolePermissionsDetail(guild, roleId, requestedPage = 0, rol
       new ButtonBuilder()
         .setCustomId(`perm_toggle:${role.id}:${permission.key}:${page}:${rolePage}`)
         .setLabel(active ? 'Ativado' : 'Desativado')
+        .setEmoji(getEmoji('permission_panel'))
         .setStyle(active ? ButtonStyle.Success : ButtonStyle.Secondary)
         .setDisabled(role.managed),
     ));
@@ -200,6 +204,7 @@ export function buildRolePermissionsDetail(guild, roleId, requestedPage = 0, rol
     new ButtonBuilder()
       .setCustomId(`perm_roles:${rolePage}`)
       .setLabel('Voltar aos cargos')
+      .setEmoji(getEmoji('permission_panel'))
       .setStyle(ButtonStyle.Secondary),
   )];
 
