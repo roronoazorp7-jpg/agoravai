@@ -122,6 +122,37 @@ async function getActiveVipGrants(guildId, userId) {
   });
 }
 
+async function getVipBoosterAccess(guild, guildId, userId) {
+  const [grants, member] = await Promise.all([
+    getActiveVipGrants(guildId, userId),
+    guild.members.fetch(userId).catch(() => null),
+  ]);
+
+  return {
+    grants,
+    hasVip: grants.length > 0,
+    isBooster: !!member?.premiumSince,
+  };
+}
+
+function vipAccessError(access) {
+  if (!access.hasVip && !access.isBooster) {
+    return '❌ Este painel é exclusivo para membros com VIP ativo que também impulsionam o servidor.';
+  }
+  if (!access.hasVip) {
+    return '❌ Você precisa ter um VIP ativo neste servidor para usar este painel.';
+  }
+  return '❌ Você precisa estar impulsionando este servidor para usar o painel VIP.';
+}
+
+function vipAccessReply(interaction, access, method = 'reply') {
+  const payload = { content: vipAccessError(access) };
+  if (typeof interaction.isRepliable === 'function' && interaction.isRepliable()) {
+    payload.ephemeral = true;
+  }
+  return interaction[method](payload);
+}
+
 function vipCallTopic(guildId, userId) {
   return `${VIP_CALL_TOPIC_PREFIX}${guildId}:${userId}`;
 }
@@ -327,9 +358,13 @@ function buildVipMemberPanel(cfg, grants, call, customRole, userId) {
 }
 
 async function openVipMemberPanel(interaction) {
-  let grants;
+  let access;
   try {
-    grants = await getActiveVipGrants(interaction.guildId, interaction.user.id);
+    access = await getVipBoosterAccess(
+      interaction.guild,
+      interaction.guildId,
+      interaction.user.id,
+    );
   } catch (error) {
     console.error('[VIP] Erro ao consultar VIP ativo:', error);
     return interaction.reply({
@@ -338,19 +373,14 @@ async function openVipMemberPanel(interaction) {
     });
   }
 
-  if (grants.length === 0) {
-    return interaction.reply({
-      content: '❌ Você não possui um VIP ativo neste servidor.',
-      ephemeral: true,
-    });
-  }
+  if (!access.hasVip || !access.isBooster) return vipAccessReply(interaction, access);
 
   const [cfg, call, customRole] = await Promise.all([
     getCfg(interaction.guildId),
     Promise.resolve(findVipCall(interaction.guild, interaction.user.id)),
     getVipCustomRole(interaction.guild, interaction.user.id),
   ]);
-  return interaction.reply(buildVipMemberPanel(cfg, grants, call, customRole, interaction.user.id));
+  return interaction.reply(buildVipMemberPanel(cfg, access.grants, call, customRole, interaction.user.id));
 }
 
 function buildVipCallModal({ mode, userId, call, member }) {
@@ -731,12 +761,8 @@ async function handleVipRoleButton(interaction) {
       ephemeral: true,
     });
   }
-  if ((await getActiveVipGrants(interaction.guildId, userId)).length === 0) {
-    return interaction.reply({
-      content: '❌ Seu VIP não está mais ativo neste servidor.',
-      ephemeral: true,
-    });
-  }
+  const access = await getVipBoosterAccess(interaction.guild, interaction.guildId, userId);
+  if (!access.hasVip || !access.isBooster) return vipAccessReply(interaction, access);
 
   if (action === 'vip_refresh') {
     await interaction.deferUpdate();
@@ -826,20 +852,15 @@ export async function handleVipRoleSelect(interaction) {
     });
   }
 
+  const access = await getVipBoosterAccess(interaction.guild, interaction.guildId, giverId);
+  if (!access.hasVip || !access.isBooster) return vipAccessReply(interaction, access);
+
   await interaction.deferUpdate();
 
   const recipientId = interaction.values[0];
   if (recipientId === giverId) {
     return interaction.followUp({
       content: '❌ Escolha outro membro. Você já possui este cargo.',
-      ephemeral: true,
-    });
-  }
-
-  const grants = await getActiveVipGrants(interaction.guildId, giverId);
-  if (grants.length === 0) {
-    return interaction.followUp({
-      content: '❌ Seu VIP não está mais ativo neste servidor.',
       ephemeral: true,
     });
   }
@@ -862,6 +883,17 @@ export async function handleVipRoleSelect(interaction) {
   if (!recipient || recipient.user.bot) {
     return interaction.followUp({
       content: '❌ Escolha um membro humano deste servidor.',
+      ephemeral: true,
+    });
+  }
+  const recipientAccess = await getVipBoosterAccess(
+    interaction.guild,
+    interaction.guildId,
+    recipientId,
+  );
+  if (!recipientAccess.hasVip || !recipientAccess.isBooster) {
+    return interaction.followUp({
+      content: '❌ O destinatário também precisa ter VIP ativo e estar impulsionando o servidor.',
       ephemeral: true,
     });
   }
@@ -953,6 +985,14 @@ export async function handleVipRoleRequestButton(interaction) {
       ephemeral: true,
     });
   }
+  const recipientAccess = await getVipBoosterAccess(
+    interaction.guild,
+    interaction.guildId,
+    interaction.user.id,
+  );
+  if (!recipientAccess.hasVip || !recipientAccess.isBooster) {
+    return vipAccessReply(interaction, recipientAccess);
+  }
   if (request.status !== 'PENDING') {
     return interaction.reply({
       content: '❌ Esta solicitação já foi encerrada.',
@@ -996,10 +1036,10 @@ export async function handleVipRoleRequestButton(interaction) {
     );
   }
 
-  const giverVip = await getActiveVipGrants(request.guildId, request.giverId);
+  const giverAccess = await getVipBoosterAccess(guild, request.guildId, request.giverId);
   const role = guild.roles.cache.get(request.roleId)
     ?? await guild.roles.fetch(request.roleId).catch(() => null);
-  if (giverVip.length === 0 || !role) {
+  if (!giverAccess.hasVip || !giverAccess.isBooster || !role) {
     await prisma.vipRoleGrantRequest.update({
       where: { id: request.id },
       data: { status: 'CANCELLED' },
@@ -1053,9 +1093,8 @@ async function handleVipCallButton(interaction) {
   if (interaction.user.id !== userId) {
     return interaction.reply({ content: '❌ Apenas o dono deste VIP pode gerenciar esta call.', ephemeral: true });
   }
-  if ((await getActiveVipGrants(interaction.guildId, userId)).length === 0) {
-    return interaction.reply({ content: '❌ Seu VIP não está mais ativo neste servidor.', ephemeral: true });
-  }
+  const access = await getVipBoosterAccess(interaction.guild, interaction.guildId, userId);
+  if (!access.hasVip || !access.isBooster) return vipAccessReply(interaction, access);
 
   const existing = findVipCall(interaction.guild, userId);
   if (action === 'vip_call_create') {
@@ -1099,12 +1138,8 @@ export async function handleVipRoleModal(interaction) {
       ephemeral: true,
     });
   }
-  if ((await getActiveVipGrants(interaction.guildId, userId)).length === 0) {
-    return interaction.reply({
-      content: '❌ Seu VIP não está mais ativo neste servidor.',
-      ephemeral: true,
-    });
-  }
+  const access = await getVipBoosterAccess(interaction.guild, interaction.guildId, userId);
+  if (!access.hasVip || !access.isBooster) return vipAccessReply(interaction, access);
 
   const form = parseVipRoleForm(interaction);
   if (form.error) {
@@ -1218,9 +1253,8 @@ export async function handleVipCallModal(interaction) {
   if (interaction.user.id !== userId) {
     return interaction.reply({ content: '❌ Apenas o dono deste VIP pode configurar esta call.', ephemeral: true });
   }
-  if ((await getActiveVipGrants(interaction.guildId, userId)).length === 0) {
-    return interaction.reply({ content: '❌ Seu VIP não está mais ativo neste servidor.', ephemeral: true });
-  }
+  const access = await getVipBoosterAccess(interaction.guild, interaction.guildId, userId);
+  if (!access.hasVip || !access.isBooster) return vipAccessReply(interaction, access);
 
   const form = parseVipCallForm(interaction);
   if (form.error) {
@@ -1622,6 +1656,9 @@ export async function handleVipButton(interaction) {
   if (id === 'vip_admin_config')  return handleVipConfig(interaction);
 
   if (id === 'vip_escolher') {
+    const access = await getVipBoosterAccess(interaction.guild, interaction.guildId, interaction.user.id);
+    if (!access.hasVip || !access.isBooster) return vipAccessReply(interaction, access);
+
     const cfg = await getCfg(interaction.guildId);
     const priceLabel = cfg.vipPriceLabel || DEFAULT_VIP_PRICE_LABEL;
     const c = new ContainerBuilder();
@@ -1642,17 +1679,11 @@ export async function handleVipButton(interaction) {
   }
 
   if (id === 'vip_carrinho') {
-    // Verifica se o usuário tem algum VipGrant ativo
-    const [cfg, grants] = await Promise.all([
-      getCfg(interaction.guildId),
-      prisma.vipGrant.findMany({
-        where: {
-          guildId: interaction.guildId,
-          userId:  interaction.user.id,
-          expiresAt: { gt: new Date() },
-        },
-      }),
-    ]);
+    const access = await getVipBoosterAccess(interaction.guild, interaction.guildId, interaction.user.id);
+    if (!access.hasVip || !access.isBooster) return vipAccessReply(interaction, access);
+
+    const cfg = await getCfg(interaction.guildId);
+    const grants = access.grants;
 
     const c = new ContainerBuilder();
     const accentColor = getVipAccentColor(cfg.vipColor);
