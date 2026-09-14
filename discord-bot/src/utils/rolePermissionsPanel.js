@@ -87,7 +87,6 @@ function pageButton(customId, label, disabled = false) {
   return new ButtonBuilder()
     .setCustomId(customId)
     .setLabel(label)
-    .setEmoji(getEmoji('permission_panel'))
     .setStyle(ButtonStyle.Secondary)
     .setDisabled(disabled);
 }
@@ -204,7 +203,6 @@ export function buildRolePermissionsDetail(guild, roleId, requestedPage = 0, rol
     new ButtonBuilder()
       .setCustomId(`perm_roles:${rolePage}`)
       .setLabel('Voltar aos cargos')
-      .setEmoji(getEmoji('permission_panel'))
       .setStyle(ButtonStyle.Secondary),
   )];
 
