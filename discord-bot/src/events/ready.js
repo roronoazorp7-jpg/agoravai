@@ -4,6 +4,7 @@ import { initEmojis } from '../utils/emojiManager.js';
 import prisma from '../database/client.js';
 import { startDeathEventScheduler } from '../utils/deathEvent.js';
 import { startBumpReminderScheduler } from '../utils/bumpReminder.js';
+import { configuredBoostRoleIds, syncBoostRoles } from '../utils/boostRoles.js';
 
 // ─── VIP expirado ─────────────────────────────────────────────────────────────
 const VIP_CALL_CATEGORY_ID = '1546637286559588413';
@@ -75,6 +76,31 @@ async function checkExpiredVips(client) {
   }
 }
 
+async function syncConfiguredBoostRoles(client) {
+  const configs = await prisma.guildConfig.findMany({
+    where: { boostRoles: { not: null } },
+    select: { guildId: true, boostRoles: true },
+  });
+
+  for (const cfg of configs) {
+    const guild = client.guilds.cache.get(cfg.guildId);
+    const roleIds = configuredBoostRoleIds(cfg);
+    if (!guild || !roleIds.length) continue;
+
+    try {
+      const result = await syncBoostRoles(guild, roleIds);
+      if (result.assigned || result.failures) {
+        console.log(
+          `[BOOST] ${guild.name}: ${result.assigned} cargo(s) sincronizado(s), ` +
+          `${result.failures} falha(s).`,
+        );
+      }
+    } catch (error) {
+      console.error(`[BOOST] Falha ao sincronizar "${guild.name}":`, error.message);
+    }
+  }
+}
+
 // ─── Ready ────────────────────────────────────────────────────────────────────
 
 export default {
@@ -95,6 +121,9 @@ export default {
 
     await checkExpiredVips(client);
     setInterval(() => checkExpiredVips(client), 5 * 60 * 1000);
+    syncConfiguredBoostRoles(client).catch(error => {
+      console.error('[BOOST] Erro na sincronização inicial:', error.message);
+    });
     startDeathEventScheduler(client);
     startBumpReminderScheduler(client);
 

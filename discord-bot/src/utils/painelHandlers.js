@@ -20,6 +20,10 @@ import { buildPartnerConfigPayload } from './partnershipPanels.js';
 import { buildLojaAdminPayload } from './shopHandlers.js';
 import { buildVipConfigPayload } from '../commands/loja/vip.js';
 import { buildTriggerConfigPayload } from './messageTriggers.js';
+import {
+  canManageBoostRoles,
+  syncBoostRoles,
+} from './boostRoles.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -746,6 +750,12 @@ export async function handleBoostCfgRoleSelect(interaction) {
 
   const me = interaction.guild.members.me
     ?? await interaction.guild.members.fetchMe().catch(() => null);
+  if (!me || !canManageBoostRoles(interaction.guild)) {
+    return interaction.reply({
+      content: '❌ Eu preciso da permissão **Gerenciar Cargos** para entregar os cargos de boost.',
+      ephemeral: true,
+    });
+  }
   const selected = [...new Set(interaction.values)]
     .map(id => interaction.guild.roles.cache.get(id))
     .filter(role => role && !role.managed && role.id !== interaction.guild.id);
@@ -765,7 +775,10 @@ export async function handleBoostCfgRoleSelect(interaction) {
     update: { boostRoles },
   });
 
-  return interaction.update(buildBoostConfigPayload(interaction.guild, await getCfg(interaction.guildId)));
+  await interaction.update(buildBoostConfigPayload(interaction.guild, await getCfg(interaction.guildId)));
+  syncBoostRoles(interaction.guild, selected.map(role => role.id)).catch(error => {
+    console.error('[BOOST] Erro ao sincronizar boosters existentes:', error.message);
+  });
 }
 
 export async function handleBoostCfgBtn(interaction) {
