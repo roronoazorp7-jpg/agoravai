@@ -6,12 +6,13 @@ import {
   MessageFlags,
   PermissionFlagsBits,
   PermissionsBitField,
+  SectionBuilder,
   TextDisplayBuilder,
 } from 'discord.js';
 
-// Mantém uma linha livre no container para navegação, mesmo em servidores
-// com muitos cargos. Isso evita ultrapassar limites de componentes do cliente.
-const ROLES_PER_PAGE = 15;
+// Cada item passa a ser uma Section V2 (texto + botão-acessório). O container
+// aceita até 10 filhos; reservamos um para o cabeçalho e deixamos oito itens.
+const ROLES_PER_PAGE = 8;
 const PERMISSIONS_PER_PAGE = 8;
 
 const PERMISSION_DEFS = [
@@ -118,25 +119,27 @@ export function buildRolePermissionsHome(guild, requestedPage = 0) {
     ));
   }
 
-  const buttonRows = [];
-  for (let index = 0; index < visibleRoles.length; index += 5) {
-    const row = new ActionRowBuilder();
-    for (const role of visibleRoles.slice(index, index + 5)) {
-      row.addComponents(
+  for (const role of visibleRoles) {
+    const section = new SectionBuilder()
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent([
+        `**${truncate(role.name, 80)}**`,
+        role.managed ? 'Cargo integrado · somente leitura' : 'Cargo disponível para edição',
+      ].join('\n')))
+      .setButtonAccessory(
         new ButtonBuilder()
           .setCustomId(`perm_role:${role.id}:${page}`)
-          .setLabel(truncate(role.name, 70))
+          .setLabel(role.managed ? 'Ver' : 'Abrir')
           .setStyle(role.managed ? ButtonStyle.Secondary : ButtonStyle.Primary)
           .setDisabled(role.managed),
       );
-    }
-    buttonRows.push(row);
+    container.addSectionComponents(section);
   }
 
-  if (pageCount > 1) buttonRows.push(buildNavigation(page, pageCount));
+  const controls = [];
+  if (pageCount > 1) controls.push(buildNavigation(page, pageCount));
 
   return {
-    components: [container, ...buttonRows],
+    components: [container, ...controls],
     flags: MessageFlags.IsComponentsV2,
   };
 }
@@ -170,20 +173,21 @@ export function buildRolePermissionsDetail(guild, roleId, requestedPage = 0, rol
     `Grupo de permissões: **${page + 1}/${pageCount}**`,
   ].join('\n')));
 
-  const buttonRows = [];
-  for (let index = 0; index < visiblePermissions.length; index += 4) {
-    const row = new ActionRowBuilder();
-    for (const permission of visiblePermissions.slice(index, index + 4)) {
-      const active = hasRawPermission(role, permission.flag);
-      row.addComponents(
+  for (const permission of visiblePermissions) {
+    const active = hasRawPermission(role, permission.flag);
+    const section = new SectionBuilder()
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent([
+        `**${permission.label}**`,
+        active ? 'Permissão concedida' : 'Permissão não concedida',
+      ].join('\n')))
+      .setButtonAccessory(
         new ButtonBuilder()
           .setCustomId(`perm_toggle:${role.id}:${permission.key}:${page}:${rolePage}`)
-          .setLabel(truncate(`${active ? '✓' : '+'} ${permission.label}`, 80))
+          .setLabel(active ? 'Ativo' : 'Inativo')
           .setStyle(active ? ButtonStyle.Success : ButtonStyle.Secondary)
           .setDisabled(role.managed),
       );
-    }
-    buttonRows.push(row);
+    container.addSectionComponents(section);
   }
 
   const navigation = new ActionRowBuilder().addComponents(
@@ -192,16 +196,15 @@ export function buildRolePermissionsDetail(guild, roleId, requestedPage = 0, rol
     pageButton(`perm_detail:${role.id}:${Math.min(pageCount - 1, page + 1)}:${rolePage}:next`, 'Próximo', page >= pageCount - 1),
     pageButton(`perm_detail:${role.id}:${pageCount - 1}:${rolePage}:last`, 'Último grupo', page >= pageCount - 1),
   );
-  buttonRows.push(navigation);
-  buttonRows.push(new ActionRowBuilder().addComponents(
+  const controls = [navigation, new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`perm_roles:${rolePage}`)
       .setLabel('Voltar aos cargos')
       .setStyle(ButtonStyle.Secondary),
-  ));
+  )];
 
   return {
-    components: [container, ...buttonRows],
+    components: [container, ...controls],
     flags: MessageFlags.IsComponentsV2,
   };
 }
