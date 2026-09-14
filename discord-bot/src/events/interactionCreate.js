@@ -61,6 +61,7 @@ import { handleBankInteraction } from '../utils/bankHandlers.js';
 import { handleCardPackInteraction, handleFutPackInteraction, handleCardCollectionInteraction } from '../commands/general/cartas.js';
 import { handleBattleInteraction } from '../commands/jogos/batalha.js';
 import { handleUnoInteraction } from '../utils/unoGame.js';
+import { handleMilhaoInteraction } from '../utils/milhaoGame.js';
 import { isCommandBlocked, COMMAND_BLOCK_COMMAND } from '../utils/commandBlock.js';
 import { handleBJHit, handleBJStand, handleMinesCell, handleMinesCashout } from '../utils/gameHandlers.js';
 import { handleAjudaCatSel } from '../commands/general/ajuda.js';
@@ -1331,6 +1332,9 @@ export default {
         }
         if (customId.startsWith('uno_')) {
           return handleUnoInteraction(interaction);
+        }
+        if (customId.startsWith('milhao_')) {
+          return handleMilhaoInteraction(interaction);
         }
         if (
           customId.startsWith('pokemon_dex_') ||

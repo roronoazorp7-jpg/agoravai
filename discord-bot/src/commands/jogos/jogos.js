@@ -4,6 +4,7 @@ import { errorEmbed } from '../../utils/embed.js';
 import { startBlackjack, startMines } from '../../utils/gameHandlers.js';
 import { totalCoins } from '../../utils/economyFunds.js';
 import { startUno } from '../../utils/unoGame.js';
+import { startMilhao } from '../../utils/milhaoGame.js';
 
 import { getEmoji } from '../../utils/emojiManager.js';
 const COIN = () => getEmoji('futecoins');
@@ -35,15 +36,22 @@ export default {
       .addStringOption(o => o.setName('aposta').setDescription('Valor (ex: 500 ou "tudo")').setRequired(true))
        .addIntegerOption(o => o.setName('bombas').setDescription('Número de bombas (padrão: 3)').setMinValue(1).setMaxValue(13)))
      .addSubcommand(s => s.setName('uno')
-       .setDescription('🎴 UNO clássico para 2 a 10 jogadores')),
+       .setDescription('🎴 UNO clássico para 2 a 10 jogadores'))
+    .addSubcommand(s => s.setName('milhao')
+      .setDescription('🎤 Jogo do Milhão — perguntas com 30 segundos por turno')),
   name: 'jogo',
-  aliases: ['apostar', 'jog', 'blackjack', 'bj', 'mines'],
+  aliases: ['apostar', 'jog', 'blackjack', 'bj', 'mines', 'milhao'],
 
   async execute(interaction) {
     const sub = interaction.options.getSubcommand();
     if (sub === 'uno') {
       await interaction.deferReply();
       return startUno(interaction, payload => interaction.editReply(payload));
+    }
+
+    if (sub === 'milhao') {
+      await interaction.deferReply();
+      return startMilhao(interaction, payload => interaction.editReply(payload));
     }
 
     await interaction.deferReply();
@@ -65,17 +73,20 @@ export default {
   },
 
   async executePrefix(message, args, client, calledAs) {
-    const userId  = message.author.id;
-    const guildId = message.guildId;
-
     const help = () => message.reply({
-      embeds: [errorEmbed('**Uso:** `savage jogo <subcomando> <aposta> [extra]`\n**Subcomandos:** `blackjack <aposta>`, `mines <aposta> [bombas]`, `uno`')],
+      embeds: [errorEmbed('**Uso:** `savage jogo <subcomando> <aposta> [extra]`\n**Subcomandos:** `blackjack <aposta>`, `mines <aposta> [bombas]`, `uno`, `milhao`')],
     });
 
     if (args[0]?.toLowerCase() === 'uno') {
       return startUno(message, opts => message.reply(opts));
     }
 
+    if (calledAs === 'milhao' || args[0]?.toLowerCase() === 'milhao') {
+      return startMilhao(message, opts => message.reply(opts));
+    }
+
+    const userId  = message.author.id;
+    const guildId = message.guildId;
     const eco = await getEco(userId, guildId).catch(() => null);
     if (!eco) return message.reply({ embeds: [errorEmbed('Erro ao acessar seu saldo.')] });
 
