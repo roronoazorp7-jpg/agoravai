@@ -10,6 +10,7 @@ import {
 } from 'discord.js';
 import { randomUUID } from 'node:crypto';
 import { getEmoji } from '../../utils/emojiManager.js';
+import prisma from '../../database/client.js';
 
 const MOD_HEART = () => getEmoji('mod_heart');
 const pendingModeration = new Map();
@@ -34,6 +35,12 @@ const ACTIONS = {
     confirm: 'Confirmar mute',
     permission: PermissionFlagsBits.ModerateMembers,
     past: 'silenciado',
+  },
+  warn: {
+    title: 'Aplicar warn?',
+    confirm: 'Confirmar warn',
+    permission: PermissionFlagsBits.ModerateMembers,
+    past: 'advertido',
   },
 };
 
@@ -131,6 +138,7 @@ function hierarchyError(context, member, action) {
     kick: member.kickable,
     mute: member.moderatable,
   }[action];
+  if (action === 'warn') return null;
   if (!manageable) return 'Meu cargo precisa estar acima do cargo desse membro.';
   return null;
 }
@@ -218,6 +226,7 @@ async function startPrefixModeration(message, action, {
 function prefixUsage(action) {
   if (action === 'ban') return 'Uso: `savage ban @usuario [dias] [motivo]` ou `s ban @usuario [dias] [motivo]`';
   if (action === 'kick') return 'Uso: `savage kick @usuario [motivo]` ou `s kick @usuario [motivo]`';
+  if (action === 'warn') return 'Uso: `savage warn @usuario [motivo]` ou `s warn @usuario [motivo]`';
   return 'Uso: `savage mute @usuario <minutos> [motivo]` ou `s mute @usuario <minutos> [motivo]`';
 }
 
@@ -258,6 +267,36 @@ async function executeModeration(interaction, session) {
   if (hierarchy) throw new Error(hierarchy);
 
   const auditReason = reason === '—' ? `Moderação por ${contextUser(interaction).tag}` : reason;
+  if (action === 'warn') {
+    const warning = await prisma.memberWarning.upsert({
+      where: {
+        guildId_userId: {
+          guildId: session.guildId,
+          userId: targetId,
+        },
+      },
+      create: {
+        guildId: session.guildId,
+        userId: targetId,
+        count: 1,
+      },
+      update: {
+        count: { increment: 1 },
+      },
+    });
+
+    if (warning.count < 3) {
+      return { warningCount: warning.count, muted: false };
+    }
+
+    await member.timeout(24 * 60 * 60 * 1000, auditReason);
+    await prisma.memberWarning.update({
+      where: { id: warning.id },
+      data: { count: 0 },
+    });
+    return { warningCount: warning.count, muted: true };
+  }
+
   if (action === 'ban') {
     await interaction.guild.members.ban(targetId, {
       deleteMessageSeconds: deleteDays * 24 * 60 * 60,
@@ -286,7 +325,15 @@ export async function handleModerationButton(interaction) {
 
   await interaction.deferUpdate();
   try {
-    await executeModeration(interaction, session);
+    const result = await executeModeration(interaction, session);
+    if (session.action === 'warn') {
+      const outcome = result.muted
+        ? `<@${session.targetId}> recebeu o **3º warn** e foi silenciado por **1 dia**. A contagem foi reiniciada.`
+        : `<@${session.targetId}> recebeu um warn. Total atual: **${result.warningCount}/3**.`;
+      return interaction.editReply(panel(
+        `## ${MOD_HEART()} Moderação concluída\n\n${outcome}`,
+      ));
+    }
     return interaction.editReply(panel(
       `## ${MOD_HEART()} Moderação concluída\n\n` +
       `<@${session.targetId}> foi **${ACTIONS[session.action].past}** com sucesso.`,
@@ -362,4 +409,24 @@ const muteCommand = {
   },
 };
 
-export default [banCommand, kickCommand, muteCommand];
+const warnCommand = {
+  data: new SlashCommandBuilder()
+    .setName('warn')
+    .setDescription('Adverte um membro após confirmação')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+    .addUserOption(option =>
+      option.setName('usuario').setDescription('Membro que será advertido').setRequired(true))
+    .addStringOption(option =>
+      option.setName('motivo').setDescription('Motivo da advertência').setMaxLength(400)),
+  name: 'warn',
+  async execute(interaction) {
+    return startModeration(interaction, 'warn', interaction.options);
+  },
+  async executePrefix(message, args) {
+    const parsed = parsePrefixModeration(message, 'warn', args);
+    if (parsed.error) return message.reply(parsed.error);
+    return startPrefixModeration(message, 'warn', parsed);
+  },
+};
+
+export default [banCommand, kickCommand, muteCommand, warnCommand];
