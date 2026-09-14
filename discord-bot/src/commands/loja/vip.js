@@ -455,16 +455,16 @@ function buildVipRoleModal({ mode, userId, role, member }) {
     .setCustomId('color')
     .setStyle(TextInputStyle.Short)
     .setRequired(false)
-    .setMaxLength(6)
-    .setPlaceholder('Ex: FF4FD8 — deixe vazio para preto')
+    .setMaxLength(7)
+    .setPlaceholder('Ex: FF4FD8 ou #FF4FD8 — deixe vazio para preto')
     .setValue(formatRoleColor(role?.colors?.primaryColor));
 
   const gradient = new TextInputBuilder()
     .setCustomId('gradient')
     .setStyle(TextInputStyle.Short)
     .setRequired(false)
-    .setMaxLength(6)
-    .setPlaceholder('Ex: 7B61FF — precisa da cor principal')
+    .setMaxLength(7)
+    .setPlaceholder('Ex: 7B61FF ou #7B61FF — precisa da cor principal')
     .setValue(formatRoleColor(role?.colors?.secondaryColor));
 
   const icon = new TextInputBuilder()
@@ -565,6 +565,12 @@ function parseVipRoleForm(interaction) {
     icon,
     unicodeEmoji,
   };
+}
+
+function getVipRoleColorOptions(colors) {
+  return colors.secondaryColor === undefined
+    ? { color: colors.primaryColor }
+    : { colors };
 }
 
 async function placeVipRoleBelowAnchor(guild, role, botMember) {
@@ -1142,7 +1148,7 @@ export async function handleVipRoleModal(interaction) {
     if (mode === 'create') {
       role = await interaction.guild.roles.create({
         name: form.name,
-        colors: form.colors,
+        ...getVipRoleColorOptions(form.colors),
         permissions: [],
         hoist: false,
         mentionable: false,
@@ -1175,7 +1181,7 @@ export async function handleVipRoleModal(interaction) {
 
       await role.edit({
         name: form.name,
-        colors: form.colors,
+        ...getVipRoleColorOptions(form.colors),
         permissions: [],
         hoist: false,
         mentionable: false,
