@@ -114,6 +114,7 @@ import {
   handlePresencedCfgBtn,
   handlePresencedCfgModal,
 } from '../utils/painelHandlers.js';
+import { handleRolePermissionsInteraction } from '../utils/rolePermissionsPanel.js';
 import {
   GLOBAL_MESSAGE_OWNER_ID,
   isGlobalMessageOwner,
@@ -1486,6 +1487,16 @@ export default {
         }
 
         // ── VIP ────────────────────────────────────────────────────────────
+        if (
+          customId === 'perm_roles'
+          || customId.startsWith('perm_roles:')
+          || customId.startsWith('perm_role:')
+          || customId.startsWith('perm_detail:')
+          || customId.startsWith('perm_toggle:')
+        ) {
+          return handleRolePermissionsInteraction(interaction);
+        }
+
         if (customId.startsWith('vip_')) {
           return handleVipButton(interaction);
         }
