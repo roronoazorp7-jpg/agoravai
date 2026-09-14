@@ -88,10 +88,10 @@ function pageButton(customId, label, disabled = false) {
 
 function buildNavigation(page, pageCount) {
   return new ActionRowBuilder().addComponents(
-    pageButton('perm_roles:0', 'Primeira', page === 0),
-    pageButton(`perm_roles:${Math.max(0, page - 1)}`, 'Anterior', page === 0),
-    pageButton(`perm_roles:${Math.min(pageCount - 1, page + 1)}`, 'Próxima', page >= pageCount - 1),
-    pageButton(`perm_roles:${pageCount - 1}`, 'Última', page >= pageCount - 1),
+    pageButton('perm_roles:0:first', 'Primeira', page === 0),
+    pageButton(`perm_roles:${Math.max(0, page - 1)}:previous`, 'Anterior', page === 0),
+    pageButton(`perm_roles:${Math.min(pageCount - 1, page + 1)}:next`, 'Próxima', page >= pageCount - 1),
+    pageButton(`perm_roles:${pageCount - 1}:last`, 'Última', page >= pageCount - 1),
   );
 }
 
@@ -187,10 +187,10 @@ export function buildRolePermissionsDetail(guild, roleId, requestedPage = 0, rol
   }
 
   const navigation = new ActionRowBuilder().addComponents(
-    pageButton(`perm_detail:${role.id}:0:${rolePage}`, 'Primeiro grupo', page === 0),
-    pageButton(`perm_detail:${role.id}:${Math.max(0, page - 1)}:${rolePage}`, 'Anterior', page === 0),
-    pageButton(`perm_detail:${role.id}:${Math.min(pageCount - 1, page + 1)}:${rolePage}`, 'Próximo', page >= pageCount - 1),
-    pageButton(`perm_detail:${role.id}:${pageCount - 1}:${rolePage}`, 'Último grupo', page >= pageCount - 1),
+    pageButton(`perm_detail:${role.id}:0:${rolePage}:first`, 'Primeiro grupo', page === 0),
+    pageButton(`perm_detail:${role.id}:${Math.max(0, page - 1)}:${rolePage}:previous`, 'Anterior', page === 0),
+    pageButton(`perm_detail:${role.id}:${Math.min(pageCount - 1, page + 1)}:${rolePage}:next`, 'Próximo', page >= pageCount - 1),
+    pageButton(`perm_detail:${role.id}:${pageCount - 1}:${rolePage}:last`, 'Último grupo', page >= pageCount - 1),
   );
   buttonRows.push(navigation);
   buttonRows.push(new ActionRowBuilder().addComponents(
