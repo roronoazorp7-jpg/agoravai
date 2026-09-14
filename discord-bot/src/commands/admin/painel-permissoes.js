@@ -34,7 +34,12 @@ export default {
       return await message.channel.send(buildRolePermissionsHome(message.guild));
     } catch (error) {
       console.error('[PERMISSIONS PANEL PREFIX]', error);
-      throw error;
+      const reason = String(
+        error?.rawError?.message
+        ?? error?.message
+        ?? 'o Discord recusou o formato do painel',
+      ).replace(/\s+/g, ' ').slice(0, 300);
+      return message.reply(`❌ Não consegui publicar o painel. Motivo: \`${reason}\``);
     }
   },
 };
