@@ -1,12 +1,16 @@
 import {
   ActionRowBuilder,
+  AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
   ContainerBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
   MessageFlags,
   SeparatorBuilder,
   TextDisplayBuilder,
 } from 'discord.js';
+import { fileURLToPath } from 'node:url';
 import prisma from '../database/client.js';
 import { getEmoji } from './emojiManager.js';
 
@@ -15,6 +19,8 @@ const TURN_TIME_MS = 30_000;
 const LOBBY_TIME_MS = 120_000;
 const MAX_TURNS = 40;
 const COIN = () => getEmoji('futecoins');
+const MILHAO_BANNER_PATH = fileURLToPath(new URL('../assets/milhao-banner.png', import.meta.url));
+const MILHAO_BANNER_NAME = 'milhao-banner.png';
 
 const PRIZES = [
   100,
@@ -239,7 +245,6 @@ function findGame(interaction, id) {
 
 function v2Notice(text) {
   const container = new ContainerBuilder()
-    .setAccentColor(0xed4245)
     .addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
   return {
     components: [container],
@@ -247,9 +252,19 @@ function v2Notice(text) {
   };
 }
 
-function gameContainer(text, color = 0x6d4aff) {
+function gameContainer(text) {
   return new ContainerBuilder()
-    .setAccentColor(color)
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(text))
+    .addSeparatorComponents(new SeparatorBuilder());
+}
+
+function lobbyContainer(text) {
+  return new ContainerBuilder()
+    .addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(
+        new MediaGalleryItemBuilder().setURL(`attachment://${MILHAO_BANNER_NAME}`),
+      ),
+    )
     .addTextDisplayComponents(new TextDisplayBuilder().setContent(text))
     .addSeparatorComponents(new SeparatorBuilder());
 }
@@ -258,7 +273,7 @@ function lobbyPayload(game) {
   const players = game.players
     .map((player, index) => `${index === 0 ? '👑' : '🎤'} ${index + 1}. **${playerName(player)}**`)
     .join('\n');
-  const container = gameContainer([
+  const container = lobbyContainer([
     '## 🎤 Jogo do Milhão',
     '**Sala de espera**',
     '',
@@ -298,6 +313,7 @@ function lobbyPayload(game) {
           .setStyle(ButtonStyle.Danger),
       ),
     ],
+    files: [new AttachmentBuilder(MILHAO_BANNER_PATH, { name: MILHAO_BANNER_NAME })],
     flags: MessageFlags.IsComponentsV2,
   };
 }
@@ -328,7 +344,7 @@ function gamePayload(game, notice = game.notice) {
     '**Placar**',
     scoreLine(game),
   ].join('\n');
-  const container = gameContainer(text, 0xf2c94c);
+  const container = gameContainer(text);
 
   const answerButtons = question.options.map((option, index) =>
     new ButtonBuilder()
@@ -377,7 +393,7 @@ function endPayload(game) {
     '',
     '**Resultado final**',
     ranking || 'A partida terminou sem participantes.',
-  ].filter(Boolean).join('\n'), game.result === 'champion' ? 0x57f287 : 0x5865f2);
+  ].filter(Boolean).join('\n'));
 
   return {
     components: [container],
