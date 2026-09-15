@@ -34,6 +34,21 @@ function contextMemberPermissions(context) {
   return context.memberPermissions ?? context.member?.permissions;
 }
 
+function isSlashContext(context) {
+  return typeof context.isChatInputCommand === 'function' && context.isChatInputCommand();
+}
+
+async function prepareResponse(context) {
+  if (isSlashContext(context) && !context.deferred && !context.replied) {
+    await context.deferReply({ flags: MessageFlags.IsComponentsV2 });
+  }
+}
+
+function respond(context, payload) {
+  if (context.deferred || context.replied) return context.editReply(payload);
+  return context.reply(payload);
+}
+
 function selectedRoles(interaction) {
   const unique = new Map();
   for (const optionName of ROLE_OPTIONS) {
@@ -104,15 +119,23 @@ async function editSendMessages(channel, id, value) {
 }
 
 async function lockChat(interaction) {
+  await prepareResponse(interaction);
   const checked = await ensureLockPermissions(interaction);
-  if (checked.error) return interaction.reply(v2Panel(`## 🔒 Lock do chat\n\n${checked.error}`));
+  if (checked.error) return respond(interaction, v2Panel(`## 🔒 Lock do chat\n\n${checked.error}`));
 
   const { channel, botMember } = checked;
   const roles = interaction.options ? selectedRoles(interaction) : [];
   const roleError = validateRoles(roles, interaction.guild);
-  if (roleError) return interaction.reply(v2Panel(`## 🔒 Lock do chat\n\n${roleError}`));
+  if (roleError) return respond(interaction, v2Panel(`## 🔒 Lock do chat\n\n${roleError}`));
 
-  const currentLock = await getLock(interaction);
+  let currentLock;
+  try {
+    currentLock = await getLock(interaction);
+  } catch (error) {
+    return respond(interaction, v2Panel(
+      `## 🔒 Lock do chat\n\nNão consegui consultar o estado deste canal.\n\n> ${error.message}`,
+    ));
+  }
   const previousRoleIds = lockRecordRoleIds(currentLock);
   const nextRoleIds = new Set(roles.map(role => role.id));
 
@@ -154,12 +177,12 @@ async function lockChat(interaction) {
       },
     });
   } catch (error) {
-    return interaction.reply(v2Panel(
+    return respond(interaction, v2Panel(
       `## 🔒 Lock do chat\n\nNão consegui trancar este canal.\n\n> ${error.message}`,
     ));
   }
 
-  return interaction.reply({
+  return respond(interaction, {
     ...v2Panel(
       `## 🔒 Chat trancado\n\n` +
       `**Cargos que podem falar:** ${roleList(roles)}\n` +
@@ -169,13 +192,21 @@ async function lockChat(interaction) {
 }
 
 async function unlockChat(interaction) {
+  await prepareResponse(interaction);
   const checked = await ensureLockPermissions(interaction);
-  if (checked.error) return interaction.reply(v2Panel(`## 🔓 Unlock do chat\n\n${checked.error}`));
+  if (checked.error) return respond(interaction, v2Panel(`## 🔓 Unlock do chat\n\n${checked.error}`));
 
   const { channel, botMember } = checked;
-  const currentLock = await getLock(interaction);
+  let currentLock;
+  try {
+    currentLock = await getLock(interaction);
+  } catch (error) {
+    return respond(interaction, v2Panel(
+      `## 🔓 Unlock do chat\n\nNão consegui consultar o estado deste canal.\n\n> ${error.message}`,
+    ));
+  }
   if (!currentLock) {
-    return interaction.reply(v2Panel('## 🔓 Chat destrancado\n\nEste canal não possui um lock ativo.'));
+    return respond(interaction, v2Panel('## 🔓 Chat destrancado\n\nEste canal não possui um lock ativo.'));
   }
 
   try {
@@ -191,12 +222,12 @@ async function unlockChat(interaction) {
     });
     await prisma.chatLock.delete({ where: { id: currentLock.id } });
   } catch (error) {
-    return interaction.reply(v2Panel(
+    return respond(interaction, v2Panel(
       `## 🔓 Unlock do chat\n\nNão consegui destrancar este canal.\n\n> ${error.message}`,
     ));
   }
 
-  return interaction.reply({
+  return respond(interaction, {
     ...v2Panel(
       `## 🔓 Chat destrancado\n\n` +
       `**Destrancado por:** <@${contextUserId(interaction)}>`,
@@ -231,7 +262,7 @@ export default {
     ),
   // Os comandos de texto têm nomes próprios; o slash continua agrupado em /chat.
   name: 'lock',
-  aliases: ['unlock'],
+  aliases: ['unlock', 'chat'],
 
   async execute(interaction) {
     const subcommand = interaction.options.getSubcommand();
@@ -243,9 +274,12 @@ export default {
   async executePrefix(message, _args, _client, commandName) {
     const invokedCommand = commandName
       ?? message.content.trim().split(/\s+/)[1]?.toLowerCase();
+    const action = invokedCommand === 'chat'
+      ? _args[0]?.toLowerCase()
+      : invokedCommand;
 
-    if (invokedCommand === 'lock') return lockChat(message);
-    if (invokedCommand === 'unlock') return unlockChat(message);
+    if (action === 'lock') return lockChat(message);
+    if (action === 'unlock') return unlockChat(message);
     return message.reply('Use `savage lock` ou `savage unlock`.');
   },
 };
