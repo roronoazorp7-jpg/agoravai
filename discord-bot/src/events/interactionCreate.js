@@ -44,6 +44,7 @@ import {
 import { handleShopInteraction } from '../utils/shopHandlers.js';
 import { buildProfilePayload } from '../commands/general/perfil.js';
 import { buildWalletCard, walletRefreshRow } from '../commands/economia/pf.js';
+import { handleImageSearchInteraction } from '../commands/general/imagens.js';
 import { handlePetButton } from '../commands/general/pet.js';
 import { handleModerationButton } from '../commands/admin/moderacao.js';
 import { handleBotLeaveInteraction } from '../commands/admin/bot.js';
@@ -1262,6 +1263,10 @@ export default {
 
         if (customId.startsWith('bot_leave_')) {
           return handleBotLeaveInteraction(interaction, client);
+        }
+
+        if (customId.startsWith('imgsearch:')) {
+          return handleImageSearchInteraction(interaction);
         }
 
         if (customId.startsWith('survival_')) {
