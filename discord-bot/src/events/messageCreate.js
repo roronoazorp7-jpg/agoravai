@@ -18,10 +18,12 @@ import { getEmoji } from '../utils/emojiManager.js';
 import { buildPartnershipPost } from '../utils/partnershipPanels.js';
 import {
   askAdminCommand,
+  askAI,
   askTicketAI,
   isAIConfigured,
   isGroqConfigured,
 } from '../utils/aiManager.js';
+import { answerWithVoice } from '../utils/voiceAiManager.js';
 import { clearAfkOnMessage, handleAfkMessage } from '../commands/general/afk.js';
 import { enforceAntiLink } from '../utils/antiLink.js';
 import { DISBOARD_BOT_ID, handleDisboardBump } from '../utils/bumpReminder.js';
@@ -168,6 +170,56 @@ export function invalidateGuildCfgCache(guildId) {
 const ticketAiInFlight = new Set();
 const ticketAiMissingKeyNotified = new Set();
 const triggerCooldowns = new Map();
+const voiceAiInFlight = new Set();
+const voiceAiCooldowns = new Map();
+
+async function handleVoiceAIMention(message, client) {
+  if (!message.guildId || !message.mentions.has(client.user)) return false;
+
+  const prompt = getMentionPrompt(message, client) || 'Cumprimente o membro e pergunte como pode ajudar.';
+  const key = `${message.guildId}:${message.author.id}`;
+  const lastReplyAt = voiceAiCooldowns.get(key) ?? 0;
+  if (Date.now() - lastReplyAt < 8_000) return true;
+  if (voiceAiInFlight.has(key)) return true;
+
+  if (!isGroqConfigured()) {
+    await message.reply('⚠️ A IA de voz ainda não está configurada neste ambiente.').catch(() => {});
+    return true;
+  }
+
+  voiceAiInFlight.add(key);
+  const cooldownStartedAt = Date.now();
+  voiceAiCooldowns.set(key, cooldownStartedAt);
+  try {
+    await message.channel.sendTyping().catch(() => {});
+    const { audio } = await answerWithVoice({ message, prompt });
+    await message.reply({
+      content: '🔊 Resposta em áudio',
+      files: [{ attachment: audio, name: 'resposta-ia.mp3' }],
+    });
+    return true;
+  } catch (error) {
+    console.error('[IA VOZ]', error?.message ?? error);
+    try {
+      const answer = error?.aiAnswer ?? await askAI({
+        guildId: message.guildId,
+        userId: message.author.id,
+        prompt,
+        serverName: message.guild?.name,
+      });
+      await message.reply(`🔊 Não consegui gerar o áudio agora, mas aqui está a resposta:\n${answer}`);
+    } catch (fallbackError) {
+      console.error('[IA VOZ FALLBACK]', fallbackError?.message ?? fallbackError);
+      await message.reply('❌ Não consegui responder agora. Tente novamente em alguns segundos.').catch(() => {});
+    }
+    return true;
+  } finally {
+    voiceAiInFlight.delete(key);
+    setTimeout(() => {
+      if (voiceAiCooldowns.get(key) === cooldownStartedAt) voiceAiCooldowns.delete(key);
+    }, 20_000);
+  }
+}
 
 async function handleMessageTrigger(message) {
   if (!message.guildId || !message.content?.trim()) return false;
@@ -356,6 +408,10 @@ export default {
       // ── CONTROLE ADMINISTRATIVO POR MENÇÃO ─────────────────────────────────
       // Administradores ainda podem acionar comandos naturais mencionando o bot.
       if (botMentioned && await handleAdminAIMention(message, client)) return;
+
+      // ── IA DE VOZ NO CHAT ───────────────────────────────────────────────────
+      // A resposta é enviada como áudio no canal; o bot nunca entra em call.
+      if (botMentioned && await handleVoiceAIMention(message, client)) return;
 
       // ── ATENDIMENTO AUTOMÁTICO NOS TICKETS ────────────────────────────────
       // Menções ao bot não acionam a IA. O atendimento automático de tickets
