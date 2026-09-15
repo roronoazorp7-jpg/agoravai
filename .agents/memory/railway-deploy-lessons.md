@@ -122,3 +122,11 @@ O CDN do FUT.GG (`cdn.futgg.com`) é inacessível da rede do Replit (timeout/000
 - **Why:** o host interno falha por DNS fora do Railway; além disso, `pg_dump` precisa ser da mesma versão major ou mais nova que o servidor PostgreSQL.
 - **Como aplicar:** validar a versão do servidor antes do dump e, se o cliente compatível não estiver disponível, exportar os dados por tabela e restaurar a estrutura a partir do schema Prisma.
 - Em exportações CSV entre bancos Prisma, sempre importar com lista explícita de colunas; a ordem física pode mudar entre bancos mesmo com o mesmo schema.
+
+## Provedores externos de IA e voz
+
+A conexão de um provedor feita no Replit não injeta credenciais no processo que roda no Railway. Para recursos do bot que chamam APIs diretamente em produção, como a voz neural do ElevenLabs, o serviço Railway precisa ter a variável correspondente configurada separadamente.
+
+**Why:** O bot é protegido para rodar somente no Railway; portanto, uma conexão OAuth disponível no ambiente de desenvolvimento não existe dentro do processo externo.
+
+**Como aplicar:** Manter o código lendo a variável de ambiente (`ELEVENLABS_API_KEY`, sem gravar o valor no repositório), configurar o segredo no Railway e usar a conexão do Replit apenas para validar endpoints e vozes durante o desenvolvimento.
