@@ -23,3 +23,4 @@
 - [Parcerias em Components V2](partnership-components-v2.md) — publicação sem cor lateral e sem mensagem automática; campos vazios ocultam o bloco e variáveis são resolvidas antes do envio.
 - [Mídia dos gatilhos](trigger-media-storage.md) — links do Discord expiram e o cache local pode sumir em deploys; respostas precisam de armazenamento persistente.
 - [UNO Components V2](uno-components-v2.md) — reconheça interações antes de renderizar/editar a mesa; mantenha mão privada e vitória pública em respostas separadas.
+- [Google Image Search](google-image-scraping.md) — scraping do Google recebe reCAPTCHA por tráfego automatizado no ambiente; não tratar como fallback confiável.
