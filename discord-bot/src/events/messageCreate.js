@@ -214,7 +214,12 @@ async function handleVoiceAIMention(message, client) {
         prompt,
         serverName: message.guild?.name,
       });
-      await message.reply(`🔊 Não consegui gerar o áudio agora, mas aqui está a resposta:\n${answer}`);
+      const fallbackNotice = error?.status === 429
+        ? '⚠️ O serviço de voz está temporariamente no limite. Aqui está a resposta em texto:'
+        : error?.status === 401 || error?.status === 402
+          ? '⚠️ O serviço de voz recusou a solicitação ou atingiu o limite da conta. Aqui está a resposta em texto:'
+          : '🔊 Não consegui gerar o áudio agora, mas aqui está a resposta:';
+      await message.reply(`${fallbackNotice}\n${answer}`);
     } catch (fallbackError) {
       console.error('[IA VOZ FALLBACK]', fallbackError?.message ?? fallbackError);
       await message.reply('❌ Não consegui responder agora. Tente novamente em alguns segundos.').catch(() => {});
