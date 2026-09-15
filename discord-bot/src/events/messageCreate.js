@@ -23,7 +23,7 @@ import {
   isAIConfigured,
   isGroqConfigured,
 } from '../utils/aiManager.js';
-import { answerWithVoice } from '../utils/voiceAiManager.js';
+import { answerWithVoice, isVoiceConfigured } from '../utils/voiceAiManager.js';
 import { clearAfkOnMessage, handleAfkMessage } from '../commands/general/afk.js';
 import { enforceAntiLink } from '../utils/antiLink.js';
 import { DISBOARD_BOT_ID, handleDisboardBump } from '../utils/bumpReminder.js';
@@ -184,6 +184,13 @@ async function handleVoiceAIMention(message, client) {
 
   if (!isGroqConfigured()) {
     await message.reply('⚠️ A IA de voz ainda não está configurada neste ambiente.').catch(() => {});
+    return true;
+  }
+
+  if (!isVoiceConfigured()) {
+    await message.reply(
+      '⚠️ A resposta de voz ainda não está configurada. Configure `ELEVENLABS_API_KEY` no ambiente de produção.',
+    ).catch(() => {});
     return true;
   }
 

@@ -1,8 +1,14 @@
 import { askAI } from './aiManager.js';
 
-const GOOGLE_TTS_URL = 'https://translate.google.com/translate_tts';
-const MAX_TTS_CHUNK_LENGTH = 180;
+const ELEVENLABS_TTS_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
+const DEFAULT_VOICE_ID = 'cgSgspJ2msm6clMCkdW9';
+const DEFAULT_MODEL_ID = 'eleven_multilingual_v2';
+const MAX_TTS_CHUNK_LENGTH = 1_800;
 const MAX_SPEECH_LENGTH = 1_500;
+
+export function isVoiceConfigured() {
+  return Boolean(process.env.ELEVENLABS_API_KEY?.trim());
+}
 
 function splitSpeechText(text) {
   const normalized = String(text ?? '')
@@ -29,33 +35,46 @@ function splitSpeechText(text) {
 }
 
 async function synthesizeChunk(chunk) {
-  const url = new URL(GOOGLE_TTS_URL);
-  url.searchParams.set('ie', 'UTF-8');
-  url.searchParams.set('client', 'tw-ob');
-  url.searchParams.set('tl', 'pt-BR');
-  url.searchParams.set('q', chunk);
-
-  const response = await fetch(url, {
+  const voiceId = process.env.ELEVENLABS_VOICE_ID?.trim() || DEFAULT_VOICE_ID;
+  const response = await fetch(`${ELEVENLABS_TTS_URL}/${encodeURIComponent(voiceId)}`, {
+    method: 'POST',
     headers: {
       Accept: 'audio/mpeg',
-      'User-Agent': 'Mozilla/5.0',
+      'Content-Type': 'application/json',
+      'xi-api-key': process.env.ELEVENLABS_API_KEY,
     },
-    signal: AbortSignal.timeout(15_000),
+    body: JSON.stringify({
+      text: chunk,
+      model_id: process.env.ELEVENLABS_MODEL_ID?.trim() || DEFAULT_MODEL_ID,
+      output_format: 'mp3_44100_128',
+      voice_settings: {
+        stability: 0.42,
+        similarity_boost: 0.82,
+        style: 0.2,
+        use_speaker_boost: true,
+      },
+    }),
+    signal: AbortSignal.timeout(45_000),
   });
 
   if (!response.ok) {
-    throw new Error(`Google TTS retornou HTTP ${response.status}`);
+    const detail = await response.text().catch(() => '');
+    throw new Error(`ElevenLabs retornou HTTP ${response.status}: ${detail.slice(0, 220)}`);
   }
 
   const contentType = response.headers.get('content-type') ?? '';
   if (!contentType.includes('audio')) {
-    throw new Error('Google TTS não retornou áudio');
+    throw new Error('ElevenLabs não retornou áudio MP3');
   }
 
   return Buffer.from(await response.arrayBuffer());
 }
 
 export async function textToSpeech(text) {
+  if (!isVoiceConfigured()) {
+    throw new Error('ELEVENLABS_API_KEY não configurada');
+  }
+
   const chunks = splitSpeechText(text);
   if (!chunks.length) throw new Error('Não há texto falável');
 
