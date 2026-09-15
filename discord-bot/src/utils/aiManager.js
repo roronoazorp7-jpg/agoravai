@@ -1,5 +1,6 @@
 const IMAGE_API = 'https://image.pollinations.ai/prompt/';
 const GROQ_API = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODEL = process.env.GROQ_MODEL?.trim() || 'openai/gpt-oss-20b';
 
 const MAX_HISTORY = 12;
 const SESSION_TTL_MS = 30 * 60 * 1000; // 30 min
@@ -114,7 +115,7 @@ export async function askAI({ guildId, userId, prompt, serverName, serverContext
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: GROQ_MODEL,
         messages,
         temperature: 0.75,
         max_tokens: 500,
@@ -178,7 +179,7 @@ export async function askTicketAI({ guildId, ticketId, messages, serverName, ser
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: GROQ_MODEL,
         messages: [
           { role: 'system', content: TICKET_SUPPORT_SYSTEM_PROMPT },
           { role: 'user', content: prompt },
@@ -226,7 +227,7 @@ export async function askAdminCommand({ prompt, commands, serverName }) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: GROQ_MODEL,
         messages: [
           {
             role: 'system',
