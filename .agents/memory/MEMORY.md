@@ -24,3 +24,4 @@
 - [Mídia dos gatilhos](trigger-media-storage.md) — links do Discord expiram e o cache local pode sumir em deploys; respostas precisam de armazenamento persistente.
 - [UNO Components V2](uno-components-v2.md) — reconheça interações antes de renderizar/editar a mesa; mantenha mão privada e vitória pública em respostas separadas.
 - [Google Image Search](google-image-scraping.md) — scraping do Google recebe reCAPTCHA por tráfego automatizado no ambiente; não tratar como fallback confiável.
+- [Disponibilidade de modelos Groq](groq-model-availability.md) — um modelo pode aparecer na documentação e ainda retornar model_not_found para a chave usada pelo bot.
