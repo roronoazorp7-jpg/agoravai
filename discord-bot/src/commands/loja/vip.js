@@ -886,17 +886,6 @@ export async function handleVipRoleSelect(interaction) {
       ephemeral: true,
     });
   }
-  const recipientAccess = await getVipBoosterAccess(
-    interaction.guild,
-    interaction.guildId,
-    recipientId,
-  );
-  if (!recipientAccess.hasVip || !recipientAccess.isBooster) {
-    return interaction.followUp({
-      content: '❌ O destinatário também precisa ter VIP ativo e estar impulsionando o servidor.',
-      ephemeral: true,
-    });
-  }
   if (recipient.roles.cache.has(roleId)) {
     return interaction.followUp({
       content: `❌ ${recipient} já possui este cargo.`,
