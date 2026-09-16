@@ -1,16 +1,30 @@
+import { spawn } from 'node:child_process';
+import { mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { pipeline } from 'node:stream/promises';
+import { Readable } from 'node:stream';
+import { randomUUID } from 'node:crypto';
 import { askAI } from './aiManager.js';
 
-const ELEVENLABS_TTS_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
-const DEFAULT_VOICE_ID = 'cgSgspJ2msm6clMCkdW9';
-const DEFAULT_MODEL_ID = 'eleven_multilingual_v2';
+const PIPER_MODEL_NAME = process.env.PIPER_MODEL_NAME?.trim() || 'pt_BR-faber-medium';
+const PIPER_MODEL_DIR = resolve(
+  process.env.PIPER_MODEL_DIR?.trim() || join(process.cwd(), 'data', 'tts'),
+);
+const PIPER_PYTHON = resolve(
+  process.env.PIPER_PYTHON?.trim() || join(process.cwd(), '.venv', 'bin', 'python'),
+);
+const PIPER_MODEL_BASE_URL = 'https://huggingface.co/rhasspy/piper-voices/resolve/main/pt/pt_BR/faber/medium';
 const MAX_TTS_CHUNK_LENGTH = 1_800;
 const MAX_SPEECH_LENGTH = 1_500;
-const MAX_TTS_ATTEMPTS = 3;
-const RETRYABLE_TTS_STATUS_CODES = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
-const DEFAULT_RETRY_DELAYS_MS = [1_000, 2_500];
+const PIPER_DOWNLOAD_TIMEOUT_MS = 120_000;
+const PIPER_SYNTHESIS_TIMEOUT_MS = 45_000;
+
+let piperModelPromise = null;
 
 export function isVoiceConfigured() {
-  return Boolean(process.env.ELEVENLABS_API_KEY?.trim());
+  return process.env.PIPER_TTS_DISABLED?.trim().toLowerCase() !== 'true';
 }
 
 function splitSpeechText(text) {
@@ -37,82 +51,170 @@ function splitSpeechText(text) {
   return chunks;
 }
 
-async function synthesizeChunk(chunk) {
-  const voiceId = process.env.ELEVENLABS_VOICE_ID?.trim() || DEFAULT_VOICE_ID;
+function modelPaths() {
+  return {
+    model: join(PIPER_MODEL_DIR, `${PIPER_MODEL_NAME}.onnx`),
+    config: join(PIPER_MODEL_DIR, `${PIPER_MODEL_NAME}.onnx.json`),
+  };
+}
 
-  for (let attempt = 0; attempt < MAX_TTS_ATTEMPTS; attempt += 1) {
-    try {
-      const response = await fetch(`${ELEVENLABS_TTS_URL}/${encodeURIComponent(voiceId)}`, {
-        method: 'POST',
-        headers: {
-          Accept: 'audio/mpeg',
-          'Content-Type': 'application/json',
-          'xi-api-key': process.env.ELEVENLABS_API_KEY,
-        },
-        body: JSON.stringify({
-          text: chunk,
-          model_id: process.env.ELEVENLABS_MODEL_ID?.trim() || DEFAULT_MODEL_ID,
-          output_format: 'mp3_44100_128',
-          voice_settings: {
-            stability: 0.42,
-            similarity_boost: 0.82,
-            style: 0.2,
-            use_speaker_boost: true,
-          },
-        }),
-        signal: AbortSignal.timeout(45_000),
-      });
+async function fileExists(path) {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
-      if (!response.ok) {
-        const detail = await response.text().catch(() => '');
-        const error = new Error(
-          `ElevenLabs retornou HTTP ${response.status}: ${detail.slice(0, 220)}`,
-        );
-        error.status = response.status;
-        error.retryable = RETRYABLE_TTS_STATUS_CODES.has(response.status);
-
-        const retryAfter = Number(response.headers.get('retry-after'));
-        error.retryAfterMs = Number.isFinite(retryAfter) && retryAfter > 0
-          ? Math.min(retryAfter * 1_000, 10_000)
-          : null;
-        throw error;
-      }
-
-      const contentType = response.headers.get('content-type') ?? '';
-      if (!contentType.includes('audio')) {
-        const error = new Error('ElevenLabs não retornou áudio MP3');
-        error.retryable = true;
-        throw error;
-      }
-
-      return Buffer.from(await response.arrayBuffer());
-    } catch (error) {
-      const retryableNetworkError = error?.name === 'AbortError' || error?.name === 'TimeoutError';
-      const canRetry = (error?.retryable === true || retryableNetworkError)
-        && attempt < MAX_TTS_ATTEMPTS - 1;
-      if (!canRetry) throw error;
-
-      const delay = error.retryAfterMs ?? DEFAULT_RETRY_DELAYS_MS[attempt] ?? 2_500;
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
+async function downloadModelFile(fileName, destination) {
+  const response = await fetch(`${PIPER_MODEL_BASE_URL}/${fileName}`, {
+    signal: AbortSignal.timeout(PIPER_DOWNLOAD_TIMEOUT_MS),
+  });
+  if (!response.ok || !response.body) {
+    throw new Error(`Piper não conseguiu baixar ${fileName}: HTTP ${response.status}`);
   }
 
-  throw new Error('ElevenLabs não conseguiu gerar o áudio após novas tentativas');
+  const temporaryPath = `${destination}.${randomUUID()}.part`;
+  try {
+    await pipeline(Readable.fromWeb(response.body), createWriteStream(temporaryPath));
+    await rename(temporaryPath, destination);
+  } finally {
+    await rm(temporaryPath, { force: true }).catch(() => {});
+  }
+}
+
+async function ensurePiperModel() {
+  const paths = modelPaths();
+  if (await fileExists(paths.model) && await fileExists(paths.config)) return paths;
+
+  if (!piperModelPromise) {
+    piperModelPromise = (async () => {
+      await mkdir(PIPER_MODEL_DIR, { recursive: true });
+      if (!await fileExists(paths.config)) {
+        await downloadModelFile(`${PIPER_MODEL_NAME}.onnx.json`, paths.config);
+      }
+      if (!await fileExists(paths.model)) {
+        await downloadModelFile(`${PIPER_MODEL_NAME}.onnx`, paths.model);
+      }
+      return paths;
+    })().catch(error => {
+      piperModelPromise = null;
+      error.code = error.code || 'PIPER_MODEL_ERROR';
+      throw error;
+    });
+  }
+
+  return piperModelPromise;
+}
+
+function runProcess(command, args, input, timeoutMs) {
+  return new Promise((resolveProcess, rejectProcess) => {
+    const child = spawn(command, args, {
+      stdio: ['pipe', 'ignore', 'pipe'],
+    });
+    const stderr = [];
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      const error = new Error(`${command} excedeu o tempo limite`);
+      error.code = 'PIPER_TIMEOUT';
+      rejectProcess(error);
+    }, timeoutMs);
+
+    child.stderr.on('data', chunk => stderr.push(chunk));
+    child.on('error', error => {
+      clearTimeout(timer);
+      rejectProcess(error);
+    });
+    child.on('close', code => {
+      clearTimeout(timer);
+      if (code !== 0) {
+        const error = new Error(`${command} encerrou com código ${code}: ${Buffer.concat(stderr).toString().slice(0, 500)}`);
+        error.code = 'PIPER_PROCESS_ERROR';
+        rejectProcess(error);
+        return;
+      }
+      resolveProcess();
+    });
+
+    child.stdin.end(input);
+  });
+}
+
+async function synthesizeChunk(chunk) {
+  const paths = await ensurePiperModel();
+  const workDir = await mkdtemp(join(tmpdir(), 'savage-piper-'));
+  const wavPath = join(workDir, 'speech.wav');
+
+  try {
+    await runProcess(
+      PIPER_PYTHON,
+      [
+        '-m',
+        'piper',
+        '-m',
+        PIPER_MODEL_NAME,
+        '--data-dir',
+        dirname(paths.model),
+        '-f',
+        wavPath,
+      ],
+      `${chunk}\n`,
+      PIPER_SYNTHESIS_TIMEOUT_MS,
+    );
+
+    const audio = await readFile(wavPath);
+    if (!audio.length) throw new Error('Piper gerou um arquivo WAV vazio');
+    return audio;
+  } finally {
+    await rm(workDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+async function convertWavToMp3(wav, outputPath) {
+  const workDir = await mkdtemp(join(tmpdir(), 'savage-mp3-'));
+  const wavPath = join(workDir, 'speech.wav');
+  try {
+    await writeFile(wavPath, wav);
+    await runProcess(
+      'ffmpeg',
+      [
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-y',
+        '-i',
+        wavPath,
+        '-codec:a',
+        'libmp3lame',
+        '-b:a',
+        '128k',
+        outputPath,
+      ],
+      '',
+      PIPER_SYNTHESIS_TIMEOUT_MS,
+    );
+    return readFile(outputPath);
+  } finally {
+    await rm(workDir, { recursive: true, force: true }).catch(() => {});
+  }
 }
 
 export async function textToSpeech(text) {
   if (!isVoiceConfigured()) {
-    throw new Error('ELEVENLABS_API_KEY não configurada');
+    throw new Error('PIPER_TTS_DISABLED está ativado');
   }
 
   const chunks = splitSpeechText(text);
   if (!chunks.length) throw new Error('Não há texto falável');
 
-  const audioParts = [];
-  for (const chunk of chunks) {
-    audioParts.push(await synthesizeChunk(chunk));
+  const wav = await synthesizeChunk(chunks[0]);
+  const outputPath = join(tmpdir(), `savage-${randomUUID()}.mp3`);
+  try {
+    return await convertWavToMp3(wav, outputPath);
+  } finally {
+    await rm(outputPath, { force: true }).catch(() => {});
   }
-  return Buffer.concat(audioParts);
 }
 
 export async function answerWithVoice({ message, prompt }) {
