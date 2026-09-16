@@ -19,6 +19,7 @@ const PIPER_PYTHON = resolve(
 );
 const PIPER_MODEL_BASE_URL = process.env.PIPER_MODEL_BASE_URL?.trim()
   || 'https://huggingface.co/OpenVoiceOS/pipertts_pt-BR_dii/resolve/main';
+const EDGE_TTS_VOICE = process.env.EDGE_TTS_VOICE?.trim() || 'pt-BR-FranciscaNeural';
 const MAX_TTS_CHUNK_LENGTH = 1_800;
 const MAX_SPEECH_LENGTH = 1_500;
 const PIPER_DOWNLOAD_TIMEOUT_MS = 120_000;
@@ -174,6 +175,39 @@ async function synthesizeChunk(chunk) {
   }
 }
 
+async function synthesizeNeuralChunk(chunk) {
+  const workDir = await mkdtemp(join(tmpdir(), 'savage-edge-tts-'));
+  const outputPath = join(workDir, 'speech.mp3');
+
+  try {
+    await runProcess(
+      PIPER_PYTHON,
+      [
+        '-m',
+        'edge_tts',
+        '--voice',
+        EDGE_TTS_VOICE,
+        '--rate',
+        '+0%',
+        '--pitch',
+        '+0Hz',
+        '--text',
+        chunk,
+        '--write-media',
+        outputPath,
+      ],
+      '',
+      PIPER_SYNTHESIS_TIMEOUT_MS,
+    );
+
+    const audio = await readFile(outputPath);
+    if (!audio.length) throw new Error('Edge TTS gerou um arquivo MP3 vazio');
+    return audio;
+  } finally {
+    await rm(workDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
 async function convertWavToMp3(wav, outputPath) {
   const workDir = await mkdtemp(join(tmpdir(), 'savage-mp3-'));
   const wavPath = join(workDir, 'speech.wav');
@@ -211,7 +245,15 @@ export async function textToSpeech(text) {
   const chunks = splitSpeechText(text);
   if (!chunks.length) throw new Error('Não há texto falável');
 
-  const wav = await synthesizeChunk(chunks[0]);
+  const chunk = chunks[0];
+  try {
+    return await synthesizeNeuralChunk(chunk);
+  } catch {
+    // O Piper local mantém a resposta disponível quando o serviço neural
+    // estiver temporariamente indisponível ou sem acesso à internet.
+  }
+
+  const wav = await synthesizeChunk(chunk);
   const outputPath = join(tmpdir(), `savage-${randomUUID()}.mp3`);
   try {
     return await convertWavToMp3(wav, outputPath);

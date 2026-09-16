@@ -3,8 +3,8 @@ name: Piper TTS local
 description: Decisão de síntese local em português do Brasil para evitar cotas de APIs de voz no bot.
 ---
 
-O bot usa Piper local com o modelo feminino `dii_pt-BR`, baixado durante o primeiro uso e convertido de WAV para MP3 pelo FFmpeg.
+O bot prioriza a voz neural feminina `pt-BR-FranciscaNeural` via Edge TTS e mantém o Piper feminino `dii_pt-BR` como fallback local.
 
-**Why:** A voz Dii é a alternativa feminina em português brasileiro compatível com Piper. Ela tem licença CC BY-NC-ND, portanto o uso deve permanecer não comercial e com atribuição à TigreGotico Lda. As vozes pt_BR oficiais do Piper são masculinas.
+**Why:** A voz neural soa mais natural e conversacional que o modelo Piper local. O fallback mantém a resposta disponível quando o serviço neural estiver indisponível. A voz Dii do fallback tem licença CC BY-NC-ND, portanto o uso deve permanecer não comercial e com atribuição à TigreGotico Lda.
 
-**Como aplicar:** Manter o runtime Python/Piper e o modelo fora do repositório (`.venv/` e `data/`); mudanças de modelo exigem verificar a licença e atualizar também a origem dos arquivos ONNX e JSON. Se o bot passar a ter uso comercial, trocar a voz ou obter autorização do detentor.
+**Como aplicar:** Manter o runtime Python com `edge-tts` e Piper fora do repositório (`.venv/` e `data/`); mudanças de voz exigem verificar o nome usado pelo Edge TTS ou a licença/origem dos arquivos Piper. Se o bot passar a ter uso comercial, trocar o fallback Dii ou obter autorização do detentor.
