@@ -15,7 +15,7 @@
       "commands": [
         "...",
         "python3 -m venv .venv",
-        ".venv/bin/python -m pip install --no-cache-dir piper-tts==1.8.0 edge-tts==7.2.8",
+        ".venv/bin/python -m pip install --no-cache-dir -r requirements.txt",
         "npx prisma generate",
         "mkdir -p /var/fonts",
         "find /usr/share/fonts -name '*.ttf' -exec cp {} /var/fonts/ \\; 2>/dev/null || true",

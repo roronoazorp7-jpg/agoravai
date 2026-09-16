@@ -14,8 +14,7 @@ const XTTS_SPEAKER_WAV = resolve(
 );
 const XTTS_PYTHON = process.env.XTTS_PYTHON?.trim()
   || process.env.PYTHON_BIN?.trim()
-  || process.env.PIPER_PYTHON?.trim()
-  || 'python3';
+  || resolve(process.cwd(), '.venv', 'bin', 'python');
 const XTTS_USE_GPU = process.env.XTTS_USE_GPU?.trim() || 'false';
 const XTTS_CACHE_DIR = resolve(
   process.env.XTTS_CACHE_DIR?.trim() || join(process.cwd(), 'data', 'tts', 'xtts-cache'),
