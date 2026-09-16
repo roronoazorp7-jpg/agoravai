@@ -1,8 +1,40 @@
 {
-  "start": {
-    "cmd": "npx prisma db push --accept-data-loss && node src/index.js"
+  "$schema": "https://schema.railpack.com",
+  "provider": "node",
+  "buildAptPackages": [
+    "ffmpeg",
+    "fonts-dejavu-core",
+    "fonts-noto",
+    "fonts-liberation",
+    "fontconfig",
+    "python3",
+    "python3-venv"
+  ],
+  "steps": {
+    "build": {
+      "commands": [
+        "...",
+        "python3 -m venv .venv",
+        ".venv/bin/python -m pip install --no-cache-dir piper-tts==1.8.0",
+        "npx prisma generate",
+        "mkdir -p /var/fonts",
+        "find /usr/share/fonts -name '*.ttf' -exec cp {} /var/fonts/ \\; 2>/dev/null || true",
+        "find /usr/local/share/fonts -name '*.ttf' -exec cp {} /var/fonts/ \\; 2>/dev/null || true",
+        "fc-cache -f -v 2>&1 | tail -3 || true",
+        "fc-list | head -10 || true"
+      ]
+    }
   },
-  "build": {
-    "cmds": ["npm i", "npx prisma generate"]
+  "deploy": {
+    "inputs": ["..."],
+    "aptPackages": [
+      "ffmpeg",
+      "fonts-dejavu-core",
+      "fonts-noto",
+      "fonts-liberation",
+      "fontconfig",
+      "python3"
+    ],
+    "startCommand": "npx prisma generate && npx prisma db push --accept-data-loss && node scripts/restore-guild-economy.js && node src/index.js"
   }
 }
