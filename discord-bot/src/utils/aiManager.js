@@ -50,6 +50,15 @@ const SYSTEM_PROMPT =
   '(negrito, listas, blocos de código). Se o usuário pedir para desenhar, gerar ou criar uma imagem, você não gera a imagem ' +
   'diretamente pelo chat — apenas responda normalmente ao pedido, pois a geração de imagem é tratada separadamente pelo sistema.';
 
+const VOICE_SYSTEM_PROMPT =
+  'Você é a assistente de voz do Savage Bot no Discord. ' +
+  'Responda sempre em português do Brasil, de forma natural, coerente e diretamente relacionada à última mensagem do usuário. ' +
+  'Dê respostas curtas, com no máximo 3 frases, para serem faladas em voz alta. ' +
+  'Não use Markdown, listas, emojis, URLs, código, símbolos decorativos ou explicações sobre ser uma IA. ' +
+  'Não invente informações sobre o servidor, pessoas, cargos, canais ou comandos. ' +
+  'Quando a pergunta estiver confusa ou sem contexto suficiente, peça uma clarificação curta em vez de tentar adivinhar. ' +
+  'Mantenha um tom simpático e descontraído, mas priorize sentido e objetividade.';
+
 const TICKET_SUPPORT_SYSTEM_PROMPT = [
   'Você atua como o suporte oficial deste servidor do Discord dentro de um ticket.',
   'Sua função é conhecer e explicar como o servidor funciona: onde ficam os canais, como usar os comandos,',
@@ -78,13 +87,12 @@ function trimForDiscord(text, max = 1900) {
 
 // ─── Chat geral via Groq ────────────────────────────────────────────────────
 
-export async function askAI({ guildId, userId, prompt, serverName, serverContext }) {
+export async function askAI({ guildId, userId, prompt, serverName, serverContext, voice = false }) {
   if (!isGroqConfigured()) {
     throw new Error('GROQ_API_KEY não configurada');
   }
 
   const session = getSession(guildId, userId);
-  pushHistory(session, 'user', prompt);
 
   const contextMessage = serverContext
     ? {
@@ -99,9 +107,10 @@ export async function askAI({ guildId, userId, prompt, serverName, serverContext
     : null;
 
   const messages = [
-    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: voice ? VOICE_SYSTEM_PROMPT : SYSTEM_PROMPT },
     ...(contextMessage ? [contextMessage] : []),
     ...session.history.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content })),
+    { role: 'user', content: prompt },
   ];
 
   const controller = new AbortController();
@@ -117,8 +126,8 @@ export async function askAI({ guildId, userId, prompt, serverName, serverContext
       body: JSON.stringify({
         model: GROQ_MODEL,
         messages,
-        temperature: 0.75,
-        max_tokens: 500,
+        temperature: voice ? 0.35 : 0.75,
+        max_tokens: voice ? 220 : 500,
         stream: false,
       }),
       signal: controller.signal,
@@ -133,6 +142,7 @@ export async function askAI({ guildId, userId, prompt, serverName, serverContext
     const answer = data?.choices?.[0]?.message?.content?.trim();
     if (!answer) throw new Error('Resposta vazia do Groq');
     const trimmedAnswer = trimForDiscord(answer);
+    pushHistory(session, 'user', prompt);
     pushHistory(session, 'assistant', trimmedAnswer);
     return trimmedAnswer;
   } finally {

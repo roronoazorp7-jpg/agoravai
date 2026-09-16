@@ -223,6 +223,7 @@ export async function answerWithVoice({ message, prompt }) {
     userId: message.author.id,
     prompt,
     serverName: message.guild?.name,
+    voice: true,
   });
 
   try {
