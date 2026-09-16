@@ -19,7 +19,9 @@ const PIPER_PYTHON = resolve(
 );
 const PIPER_MODEL_BASE_URL = process.env.PIPER_MODEL_BASE_URL?.trim()
   || 'https://huggingface.co/OpenVoiceOS/pipertts_pt-BR_dii/resolve/main';
-const EDGE_TTS_VOICE = process.env.EDGE_TTS_VOICE?.trim() || 'pt-BR-FranciscaNeural';
+const EDGE_TTS_VOICE = process.env.EDGE_TTS_VOICE?.trim() || 'pt-BR-ThalitaNeural';
+const EDGE_TTS_RATE = process.env.EDGE_TTS_RATE?.trim() || '-4%';
+const EDGE_TTS_PITCH = process.env.EDGE_TTS_PITCH?.trim() || '+1Hz';
 const MAX_TTS_CHUNK_LENGTH = 1_800;
 const MAX_SPEECH_LENGTH = 1_500;
 const PIPER_DOWNLOAD_TIMEOUT_MS = 120_000;
@@ -185,12 +187,9 @@ async function synthesizeNeuralChunk(chunk) {
       [
         '-m',
         'edge_tts',
-        '--voice',
-        EDGE_TTS_VOICE,
-        '--rate',
-        '+0%',
-        '--pitch',
-        '+0Hz',
+        `--voice=${EDGE_TTS_VOICE}`,
+        `--rate=${EDGE_TTS_RATE}`,
+        `--pitch=${EDGE_TTS_PITCH}`,
         '--text',
         chunk,
         '--write-media',
