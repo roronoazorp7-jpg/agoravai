@@ -13,10 +13,10 @@ const XTTS_SCRIPT = resolve(
   process.env.XTTS_SCRIPT?.trim() || join(process.cwd(), 'scripts', 'xtts_worker.py'),
 );
 const XTTS_SPEAKER_WAV = resolve(
-  process.env.XTTS_SPEAKER_WAV?.trim() || join(process.cwd(), 'data', 'tts', 'xtts-speaker.wav'),
+  process.env.XTTS_SPEAKER_WAV?.trim() || join(process.cwd(), 'assets', 'tts', 'xtts-speaker.wav'),
 );
 const XTTS_PYTHON = resolve(
-  process.env.XTTS_PYTHON?.trim() || process.env.PIPER_PYTHON?.trim() || join(process.cwd(), '.venv', 'bin', 'python'),
+  process.env.XTTS_PYTHON?.trim() || process.env.PYTHON_BIN?.trim() || 'python3',
 );
 const XTTS_USE_GPU = process.env.XTTS_USE_GPU?.trim() || 'false';
 const XTTS_CACHE_DIR = resolve(

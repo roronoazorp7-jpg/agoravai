@@ -280,3 +280,31 @@ mtime_ms = 1788993381841
 storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:ca88db20-ebf1-4a85-864c-1dc306011866/c55a47bf-99ed-4602-9fb9-4180ea4c4873/4e9e4778-d619-4bde-b288-3112d893df14"
 storage_version_token = "1788993411695018"
 content_type = "image/png"
+
+[[outputs]]
+id = "EiV3-LF3rVU6vgpwQE1Xe"
+uri = "file://discord-bot/assets/tts/xtts-speaker.wav"
+type = "audio"
+title = "Referência de voz XTTS"
+description = "Áudio de referência convertido para WAV mono 24 kHz, com 11,47 segundos, pronto para o XTTS-v2."
+logical_id = "e2efd472-fc9e-48be-bd81-2853f9b1c8e9"
+content_hash = "sha256:e3981ee7baad54ac4ddd9b3f37d06f99fd3e4cee3d556db53f047f4c081df730"
+size = 550670
+mtime_ms = 1789529374917
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:d9ade988-176e-4e20-b1df-f726d490015c/e2efd472-fc9e-48be-bd81-2853f9b1c8e9/932e6359-4339-4533-aec1-b597147f97a1"
+storage_version_token = "1789529390654623"
+content_type = "audio/wav"
+
+[[outputs]]
+id = "jjUptZKpd31-rKgcaNgGN"
+uri = "file://discord-bot/assets/tts/xtts-speaker.mp3"
+type = "audio"
+title = "Áudio original do Discord"
+description = "Arquivo MP3 original baixado da mensagem do Discord."
+logical_id = "7481b549-e694-487c-a8cb-e70aa8d6e7c4"
+content_hash = "sha256:377c494ff130d5a64e10d97a1ca0a31d9f3112ccf5830f2e53d6609d2e017871"
+size = 184782
+mtime_ms = 1789529374069
+storage_uri = "gcs://replit-rams-assets-reed/rams/assets/repl:d9ade988-176e-4e20-b1df-f726d490015c/7481b549-e694-487c-a8cb-e70aa8d6e7c4/0a4982b7-3f2f-49b4-8d3b-4136b0c3a7dc"
+storage_version_token = "1789529391314681"
+content_type = "audio/mpeg"
