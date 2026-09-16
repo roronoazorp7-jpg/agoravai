@@ -10,6 +10,7 @@ import prisma from '../../database/client.js';
 
 const ROLE_OPTIONS = ['cargo1', 'cargo2', 'cargo3', 'cargo4', 'cargo5'];
 const PUBLIC_LOCK_ROLE_NAMES = ['admin', 'coordenador', 'suporte', 'helper', 'owner'];
+const LOCKED_MEMBER_ROLE_NAME = 'drugs';
 const LOCKABLE_CHANNEL_TYPES = new Set([
   ChannelType.GuildText,
   ChannelType.GuildAnnouncement,
@@ -74,14 +75,17 @@ function normalizeRoleName(name) {
     .trim();
 }
 
+function findRoleByName(guild, roleName) {
+  const normalizedName = normalizeRoleName(roleName);
+  return guild.roles.cache.find(role => normalizeRoleName(role.name) === normalizedName) ?? null;
+}
+
 function configuredRoles(guild) {
   const roles = [];
   const missing = [];
 
   for (const roleName of PUBLIC_LOCK_ROLE_NAMES) {
-    const role = guild.roles.cache.find(candidate => (
-      normalizeRoleName(candidate.name) === normalizeRoleName(roleName)
-    ));
+    const role = findRoleByName(guild, roleName);
     if (role) roles.push(role);
     else missing.push(roleName);
   }
@@ -135,11 +139,14 @@ function validateRoles(roles, guild) {
   const invalid = roles.find(role => (
     role.id === guild.id
     || role.managed
+    || normalizeRoleName(role.name) === LOCKED_MEMBER_ROLE_NAME
   ));
   if (invalid) {
     return invalid.id === guild.id
       ? 'O cargo @everyone não pode ser configurado como exceção.'
-      : `O cargo ${invalid} é gerenciado por uma integração e não pode ser usado.`;
+      : normalizeRoleName(invalid.name) === LOCKED_MEMBER_ROLE_NAME
+        ? `O cargo ${invalid} é o cargo padrão dos membros e permanece bloqueado durante o Lock.`
+        : `O cargo ${invalid} é gerenciado por uma integração e não pode ser usado.`;
   }
   return null;
 }
@@ -182,6 +189,10 @@ async function repairSendMessageOverwrites(channel, guild, botMember, roles) {
   }
 
   await editSendMessages(channel, guild.id, false);
+  const memberRole = findRoleByName(guild, LOCKED_MEMBER_ROLE_NAME);
+  if (memberRole && !keepRoleIds.has(memberRole.id)) {
+    await editSendMessages(channel, memberRole.id, false);
+  }
   for (const role of roles) {
     await editSendMessages(channel, role.id, true);
   }
@@ -196,6 +207,10 @@ async function lockChannel(context, channel, botMember, roles, { repair = false 
     await repairSendMessageOverwrites(channel, context.guild, botMember, roles);
   } else {
     await editSendMessages(channel, context.guild.roles.everyone.id, false);
+    const memberRole = findRoleByName(context.guild, LOCKED_MEMBER_ROLE_NAME);
+    if (memberRole && !nextRoleIds.has(memberRole.id)) {
+      await editSendMessages(channel, memberRole.id, false);
+    }
 
     for (const roleId of previousRoleIds) {
       if (!nextRoleIds.has(roleId)) await editSendMessages(channel, roleId, null);
@@ -244,6 +259,7 @@ async function lockChat(interaction) {
   return respond(interaction, {
     ...v2Panel(
       `## 🔒 Chat trancado\n\n` +
+      `**Cargos bloqueados:** @everyone${findRoleByName(interaction.guild, LOCKED_MEMBER_ROLE_NAME) ? ` e ${findRoleByName(interaction.guild, LOCKED_MEMBER_ROLE_NAME)}` : ''}\n` +
       `**Cargos que podem falar:** ${roleList(roles)}\n` +
       `**Trancado por:** <@${contextUserId(interaction)}>`,
     ),
@@ -270,6 +286,8 @@ async function unlockChat(interaction) {
 
   try {
     await editSendMessages(channel, interaction.guild.roles.everyone.id, null);
+    const memberRole = findRoleByName(interaction.guild, LOCKED_MEMBER_ROLE_NAME);
+    if (memberRole) await editSendMessages(channel, memberRole.id, null);
     for (const roleId of lockRecordRoleIds(currentLock)) {
       await editSendMessages(channel, roleId, null);
     }
@@ -374,6 +392,7 @@ async function lockAllChat(context) {
   }
 
   let result = `## 🔒 Canais públicos trancados\n\n` +
+    `**Cargos bloqueados:** @everyone${findRoleByName(context.guild, LOCKED_MEMBER_ROLE_NAME) ? ` e ${findRoleByName(context.guild, LOCKED_MEMBER_ROLE_NAME)}` : ''}\n` +
     `**Cargos que podem falar:** ${roleList(roles)}\n` +
     `**Canais ajustados:** ${lockedCount}`;
   if (checked.skipped.length) {
@@ -401,6 +420,8 @@ async function unlockAllChat(context) {
       if (!currentLock) continue;
 
       await editSendMessages(channel, context.guild.roles.everyone.id, null);
+      const memberRole = findRoleByName(context.guild, LOCKED_MEMBER_ROLE_NAME);
+      if (memberRole) await editSendMessages(channel, memberRole.id, null);
       for (const roleId of lockRecordRoleIds(currentLock)) {
         await editSendMessages(channel, roleId, null);
       }

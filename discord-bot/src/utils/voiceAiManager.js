@@ -8,14 +8,17 @@ import { Readable } from 'node:stream';
 import { randomUUID } from 'node:crypto';
 import { askAI } from './aiManager.js';
 
-const PIPER_MODEL_NAME = process.env.PIPER_MODEL_NAME?.trim() || 'pt_BR-faber-medium';
+// Voz feminina pt-BR Dii, distribuída pela TigreGotico sob CC BY-NC-ND 4.0.
+// O uso deve continuar não comercial e a atribuição da licença deve ser mantida.
+const PIPER_MODEL_NAME = process.env.PIPER_MODEL_NAME?.trim() || 'dii_pt-BR';
 const PIPER_MODEL_DIR = resolve(
   process.env.PIPER_MODEL_DIR?.trim() || join(process.cwd(), 'data', 'tts'),
 );
 const PIPER_PYTHON = resolve(
   process.env.PIPER_PYTHON?.trim() || join(process.cwd(), '.venv', 'bin', 'python'),
 );
-const PIPER_MODEL_BASE_URL = 'https://huggingface.co/rhasspy/piper-voices/resolve/main/pt/pt_BR/faber/medium';
+const PIPER_MODEL_BASE_URL = process.env.PIPER_MODEL_BASE_URL?.trim()
+  || 'https://huggingface.co/OpenVoiceOS/pipertts_pt-BR_dii/resolve/main';
 const MAX_TTS_CHUNK_LENGTH = 1_800;
 const MAX_SPEECH_LENGTH = 1_500;
 const PIPER_DOWNLOAD_TIMEOUT_MS = 120_000;
