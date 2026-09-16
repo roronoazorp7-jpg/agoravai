@@ -1,10 +1,10 @@
 ---
-name: Piper TTS local
-description: Decisão de síntese local em português do Brasil para evitar cotas de APIs de voz no bot.
+name: TTS local do bot
+description: Estratégia de síntese local em português do Brasil sem cota de API.
 ---
 
-O bot prioriza a voz neural feminina `pt-BR-ThalitaNeural` via Edge TTS e mantém o Piper feminino `dii_pt-BR` como fallback local.
+O bot usa XTTS-v2 local como voz principal, com uma amostra de voz autorizada configurada em `XTTS_SPEAKER_WAV`; o Piper permanece como fallback local.
 
-**Why:** A voz neural soa mais natural e conversacional que o modelo Piper local. O fallback mantém a resposta disponível quando o serviço neural estiver indisponível. A voz Dii do fallback tem licença CC BY-NC-ND, portanto o uso deve permanecer não comercial e com atribuição à TigreGotico Lda.
+**Why:** XTTS-v2 entrega uma fala mais fluida, humanizada e descontraída que Piper sem depender de cota externa. A amostra de referência precisa ter autorização de uso; o fallback mantém respostas disponíveis quando o modelo pesado falhar.
 
-**Como aplicar:** Manter o runtime Python com `edge-tts` e Piper fora do repositório (`.venv/` e `data/`); mudanças de voz, ritmo ou tom devem ser configuráveis por `EDGE_TTS_VOICE`, `EDGE_TTS_RATE` e `EDGE_TTS_PITCH`. Se o bot passar a ter uso comercial, trocar o fallback Dii ou obter autorização do detentor.
+**Como aplicar:** O worker Python carrega o XTTS-v2 uma vez e atende uma fila local. Configure `XTTS_SPEAKER_WAV`, `XTTS_LANGUAGE` e `XTTS_USE_GPU`; mantenha modelos e áudios fora do Git (`data/`).

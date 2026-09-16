@@ -1,0 +1,2 @@
+# XTTS-v2 local, sem API externa ou limite por caracteres.
+coqui-tts>=0.27.0,<0.28.0

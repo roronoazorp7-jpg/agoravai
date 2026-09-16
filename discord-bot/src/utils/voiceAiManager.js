@@ -8,8 +8,20 @@ import { Readable } from 'node:stream';
 import { randomUUID } from 'node:crypto';
 import { askAI } from './aiManager.js';
 
-// Voz feminina pt-BR Dii, distribuída pela TigreGotico sob CC BY-NC-ND 4.0.
-// O uso deve continuar não comercial e a atribuição da licença deve ser mantida.
+// XTTS-v2 usa uma amostra de voz local para manter a fala natural sem cota de API.
+const XTTS_SCRIPT = resolve(
+  process.env.XTTS_SCRIPT?.trim() || join(process.cwd(), 'scripts', 'xtts_worker.py'),
+);
+const XTTS_SPEAKER_WAV = resolve(
+  process.env.XTTS_SPEAKER_WAV?.trim() || join(process.cwd(), 'data', 'tts', 'xtts-speaker.wav'),
+);
+const XTTS_PYTHON = resolve(
+  process.env.XTTS_PYTHON?.trim() || process.env.PIPER_PYTHON?.trim() || join(process.cwd(), '.venv', 'bin', 'python'),
+);
+const XTTS_USE_GPU = process.env.XTTS_USE_GPU?.trim() || 'false';
+const XTTS_CACHE_DIR = resolve(
+  process.env.XTTS_CACHE_DIR?.trim() || join(process.cwd(), 'data', 'tts', 'xtts-cache'),
+);
 const PIPER_MODEL_NAME = process.env.PIPER_MODEL_NAME?.trim() || 'dii_pt-BR';
 const PIPER_MODEL_DIR = resolve(
   process.env.PIPER_MODEL_DIR?.trim() || join(process.cwd(), 'data', 'tts'),
@@ -19,18 +31,17 @@ const PIPER_PYTHON = resolve(
 );
 const PIPER_MODEL_BASE_URL = process.env.PIPER_MODEL_BASE_URL?.trim()
   || 'https://huggingface.co/OpenVoiceOS/pipertts_pt-BR_dii/resolve/main';
-const EDGE_TTS_VOICE = process.env.EDGE_TTS_VOICE?.trim() || 'pt-BR-ThalitaNeural';
-const EDGE_TTS_RATE = process.env.EDGE_TTS_RATE?.trim() || '-4%';
-const EDGE_TTS_PITCH = process.env.EDGE_TTS_PITCH?.trim() || '+1Hz';
 const MAX_TTS_CHUNK_LENGTH = 1_800;
 const MAX_SPEECH_LENGTH = 1_500;
 const PIPER_DOWNLOAD_TIMEOUT_MS = 120_000;
+const XTTS_SYNTHESIS_TIMEOUT_MS = 180_000;
 const PIPER_SYNTHESIS_TIMEOUT_MS = 45_000;
 
 let piperModelPromise = null;
+let xttsWorkerState = null;
 
 export function isVoiceConfigured() {
-  return process.env.PIPER_TTS_DISABLED?.trim().toLowerCase() !== 'true';
+  return process.env.VOICE_TTS_DISABLED?.trim().toLowerCase() !== 'true';
 }
 
 function splitSpeechText(text) {
@@ -147,6 +158,118 @@ function runProcess(command, args, input, timeoutMs) {
   });
 }
 
+function rejectXttsWorker(state, error) {
+  if (xttsWorkerState === state) xttsWorkerState = null;
+  while (state.pending.length) {
+    state.pending.shift().reject(error);
+  }
+}
+
+function getXttsWorker() {
+  if (xttsWorkerState) return xttsWorkerState;
+
+  const child = spawn(XTTS_PYTHON, [XTTS_SCRIPT], {
+    env: {
+      ...process.env,
+      XTTS_SPEAKER_WAV,
+      XTTS_USE_GPU,
+      XDG_CACHE_HOME: XTTS_CACHE_DIR,
+    },
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  const state = {
+    child,
+    buffer: '',
+    pending: [],
+    settled: false,
+  };
+  xttsWorkerState = state;
+
+  child.stdout.on('data', chunk => {
+    state.buffer += chunk.toString();
+    let newlineIndex = state.buffer.indexOf('\n');
+    while (newlineIndex >= 0) {
+      const line = state.buffer.slice(0, newlineIndex).trim();
+      state.buffer = state.buffer.slice(newlineIndex + 1);
+      newlineIndex = state.buffer.indexOf('\n');
+      if (!line) continue;
+
+      let response;
+      try {
+        response = JSON.parse(line);
+      } catch {
+        continue;
+      }
+
+      const pending = state.pending.findIndex(item => item.id === response.id);
+      if (pending < 0) continue;
+      const request = state.pending.splice(pending, 1)[0];
+      if (response.ok) request.resolve(response);
+      else request.reject(new Error(response.error || 'XTTS falhou ao gerar o áudio'));
+    }
+  });
+
+  child.stderr.on('data', chunk => {
+    const message = chunk.toString().trim();
+    if (message) console.error(`[XTTS] ${message}`);
+  });
+
+  child.once('error', error => {
+    if (!state.settled) {
+      state.settled = true;
+      rejectXttsWorker(state, error);
+    }
+  });
+  child.once('close', code => {
+    if (!state.settled) {
+      state.settled = true;
+      rejectXttsWorker(state, new Error(`XTTS encerrou com código ${code}`));
+    }
+  });
+
+  return state;
+}
+
+async function synthesizeXttsChunk(chunk) {
+  if (!await fileExists(XTTS_SPEAKER_WAV)) {
+    const error = new Error(
+      `Amostra do XTTS não encontrada em ${XTTS_SPEAKER_WAV}. ` +
+      'Configure XTTS_SPEAKER_WAV com um WAV limpo de 6 a 15 segundos.',
+    );
+    error.code = 'XTTS_SPEAKER_MISSING';
+    throw error;
+  }
+
+  const state = getXttsWorker();
+  const workDir = await mkdtemp(join(tmpdir(), 'savage-xtts-'));
+  const wavPath = join(workDir, 'speech.wav');
+  const id = randomUUID();
+
+  try {
+    await new Promise((resolveRequest, rejectRequest) => {
+      state.pending.push({ id, resolve: resolveRequest, reject: rejectRequest });
+      state.child.stdin.write(`${JSON.stringify({ id, text: chunk, outputPath: wavPath })}\n`, error => {
+        if (error) rejectRequest(error);
+      });
+      setTimeout(() => {
+        const index = state.pending.findIndex(item => item.id === id);
+        if (index >= 0) {
+          state.pending.splice(index, 1);
+          const error = new Error('XTTS excedeu o tempo limite de síntese');
+          error.code = 'XTTS_TIMEOUT';
+          rejectRequest(error);
+        }
+      }, XTTS_SYNTHESIS_TIMEOUT_MS).unref();
+    });
+
+    const audio = await readFile(wavPath);
+    if (!audio.length) throw new Error('XTTS gerou um WAV vazio');
+    return audio;
+  } finally {
+    await rm(workDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
 async function synthesizeChunk(chunk) {
   const paths = await ensurePiperModel();
   const workDir = await mkdtemp(join(tmpdir(), 'savage-piper-'));
@@ -171,36 +294,6 @@ async function synthesizeChunk(chunk) {
 
     const audio = await readFile(wavPath);
     if (!audio.length) throw new Error('Piper gerou um arquivo WAV vazio');
-    return audio;
-  } finally {
-    await rm(workDir, { recursive: true, force: true }).catch(() => {});
-  }
-}
-
-async function synthesizeNeuralChunk(chunk) {
-  const workDir = await mkdtemp(join(tmpdir(), 'savage-edge-tts-'));
-  const outputPath = join(workDir, 'speech.mp3');
-
-  try {
-    await runProcess(
-      PIPER_PYTHON,
-      [
-        '-m',
-        'edge_tts',
-        `--voice=${EDGE_TTS_VOICE}`,
-        `--rate=${EDGE_TTS_RATE}`,
-        `--pitch=${EDGE_TTS_PITCH}`,
-        '--text',
-        chunk,
-        '--write-media',
-        outputPath,
-      ],
-      '',
-      PIPER_SYNTHESIS_TIMEOUT_MS,
-    );
-
-    const audio = await readFile(outputPath);
-    if (!audio.length) throw new Error('Edge TTS gerou um arquivo MP3 vazio');
     return audio;
   } finally {
     await rm(workDir, { recursive: true, force: true }).catch(() => {});
@@ -238,7 +331,7 @@ async function convertWavToMp3(wav, outputPath) {
 
 export async function textToSpeech(text) {
   if (!isVoiceConfigured()) {
-    throw new Error('PIPER_TTS_DISABLED está ativado');
+    throw new Error('VOICE_TTS_DISABLED está ativado');
   }
 
   const chunks = splitSpeechText(text);
@@ -246,10 +339,15 @@ export async function textToSpeech(text) {
 
   const chunk = chunks[0];
   try {
-    return await synthesizeNeuralChunk(chunk);
-  } catch {
-    // O Piper local mantém a resposta disponível quando o serviço neural
-    // estiver temporariamente indisponível ou sem acesso à internet.
+    const wav = await synthesizeXttsChunk(chunk);
+    const outputPath = join(tmpdir(), `savage-xtts-${randomUUID()}.mp3`);
+    try {
+      return await convertWavToMp3(wav, outputPath);
+    } finally {
+      await rm(outputPath, { force: true }).catch(() => {});
+    }
+  } catch (error) {
+    console.error('[XTTS FALLBACK]', error?.message ?? error);
   }
 
   const wav = await synthesizeChunk(chunk);

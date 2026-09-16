@@ -189,7 +189,7 @@ async function handleVoiceAIMention(message, client) {
 
   if (!isVoiceConfigured()) {
     await message.reply(
-      '⚠️ A resposta de voz está desativada neste ambiente. Configure o Piper local ou remova `PIPER_TTS_DISABLED`.',
+      '⚠️ A resposta de voz está desativada neste ambiente. Remova `VOICE_TTS_DISABLED` para ativá-la.',
     ).catch(() => {});
     return true;
   }
