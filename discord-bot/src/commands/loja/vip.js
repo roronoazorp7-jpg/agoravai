@@ -1649,6 +1649,7 @@ export async function handleVipButton(interaction) {
   const id = interaction.customId;
 
   if (id.startsWith('vip_call_')) return handleVipCallButton(interaction);
+  if (id.startsWith('vip_role_request_')) return handleVipRoleRequestButton(interaction);
   if (id.startsWith('vip_role_') || id.startsWith('vip_refresh')) {
     return handleVipRoleButton(interaction);
   }
