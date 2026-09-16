@@ -189,7 +189,7 @@ async function handleVoiceAIMention(message, client) {
 
   if (!isVoiceConfigured()) {
     await message.reply(
-      '⚠️ A resposta de voz está desativada neste ambiente. Remova `VOICE_TTS_DISABLED` para ativá-la.',
+      '⚠️ A resposta de voz está desativada neste ambiente. Remova `VOICE_TTS_DISABLED` para ativar o XTTS-v2.',
     ).catch(() => {});
     return true;
   }

@@ -1,14 +1,11 @@
 import { spawn } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
-import { createWriteStream } from 'node:fs';
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { pipeline } from 'node:stream/promises';
-import { Readable } from 'node:stream';
+import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { askAI } from './aiManager.js';
 
-// XTTS-v2 usa uma amostra de voz local para manter a fala natural sem cota de API.
+// A resposta de voz usa exclusivamente XTTS-v2 e uma amostra local autorizada.
 const XTTS_SCRIPT = resolve(
   process.env.XTTS_SCRIPT?.trim() || join(process.cwd(), 'scripts', 'xtts_worker.py'),
 );
@@ -22,22 +19,11 @@ const XTTS_USE_GPU = process.env.XTTS_USE_GPU?.trim() || 'false';
 const XTTS_CACHE_DIR = resolve(
   process.env.XTTS_CACHE_DIR?.trim() || join(process.cwd(), 'data', 'tts', 'xtts-cache'),
 );
-const PIPER_MODEL_NAME = process.env.PIPER_MODEL_NAME?.trim() || 'dii_pt-BR';
-const PIPER_MODEL_DIR = resolve(
-  process.env.PIPER_MODEL_DIR?.trim() || join(process.cwd(), 'data', 'tts'),
-);
-const PIPER_PYTHON = resolve(
-  process.env.PIPER_PYTHON?.trim() || join(process.cwd(), '.venv', 'bin', 'python'),
-);
-const PIPER_MODEL_BASE_URL = process.env.PIPER_MODEL_BASE_URL?.trim()
-  || 'https://huggingface.co/OpenVoiceOS/pipertts_pt-BR_dii/resolve/main';
 const MAX_TTS_CHUNK_LENGTH = 1_800;
 const MAX_SPEECH_LENGTH = 1_500;
-const PIPER_DOWNLOAD_TIMEOUT_MS = 120_000;
 const XTTS_SYNTHESIS_TIMEOUT_MS = 180_000;
-const PIPER_SYNTHESIS_TIMEOUT_MS = 45_000;
+const FFMPEG_TIMEOUT_MS = 45_000;
 
-let piperModelPromise = null;
 let xttsWorkerState = null;
 
 export function isVoiceConfigured() {
@@ -68,13 +54,6 @@ function splitSpeechText(text) {
   return chunks;
 }
 
-function modelPaths() {
-  return {
-    model: join(PIPER_MODEL_DIR, `${PIPER_MODEL_NAME}.onnx`),
-    config: join(PIPER_MODEL_DIR, `${PIPER_MODEL_NAME}.onnx.json`),
-  };
-}
-
 async function fileExists(path) {
   try {
     await stat(path);
@@ -82,47 +61,6 @@ async function fileExists(path) {
   } catch {
     return false;
   }
-}
-
-async function downloadModelFile(fileName, destination) {
-  const response = await fetch(`${PIPER_MODEL_BASE_URL}/${fileName}`, {
-    signal: AbortSignal.timeout(PIPER_DOWNLOAD_TIMEOUT_MS),
-  });
-  if (!response.ok || !response.body) {
-    throw new Error(`Piper não conseguiu baixar ${fileName}: HTTP ${response.status}`);
-  }
-
-  const temporaryPath = `${destination}.${randomUUID()}.part`;
-  try {
-    await pipeline(Readable.fromWeb(response.body), createWriteStream(temporaryPath));
-    await rename(temporaryPath, destination);
-  } finally {
-    await rm(temporaryPath, { force: true }).catch(() => {});
-  }
-}
-
-async function ensurePiperModel() {
-  const paths = modelPaths();
-  if (await fileExists(paths.model) && await fileExists(paths.config)) return paths;
-
-  if (!piperModelPromise) {
-    piperModelPromise = (async () => {
-      await mkdir(PIPER_MODEL_DIR, { recursive: true });
-      if (!await fileExists(paths.config)) {
-        await downloadModelFile(`${PIPER_MODEL_NAME}.onnx.json`, paths.config);
-      }
-      if (!await fileExists(paths.model)) {
-        await downloadModelFile(`${PIPER_MODEL_NAME}.onnx`, paths.model);
-      }
-      return paths;
-    })().catch(error => {
-      piperModelPromise = null;
-      error.code = error.code || 'PIPER_MODEL_ERROR';
-      throw error;
-    });
-  }
-
-  return piperModelPromise;
 }
 
 function runProcess(command, args, input, timeoutMs) {
@@ -134,7 +72,7 @@ function runProcess(command, args, input, timeoutMs) {
     const timer = setTimeout(() => {
       child.kill('SIGKILL');
       const error = new Error(`${command} excedeu o tempo limite`);
-      error.code = 'PIPER_TIMEOUT';
+      error.code = 'PROCESS_TIMEOUT';
       rejectProcess(error);
     }, timeoutMs);
 
@@ -147,7 +85,7 @@ function runProcess(command, args, input, timeoutMs) {
       clearTimeout(timer);
       if (code !== 0) {
         const error = new Error(`${command} encerrou com código ${code}: ${Buffer.concat(stderr).toString().slice(0, 500)}`);
-        error.code = 'PIPER_PROCESS_ERROR';
+        error.code = 'PROCESS_ERROR';
         rejectProcess(error);
         return;
       }
@@ -270,36 +208,6 @@ async function synthesizeXttsChunk(chunk) {
   }
 }
 
-async function synthesizeChunk(chunk) {
-  const paths = await ensurePiperModel();
-  const workDir = await mkdtemp(join(tmpdir(), 'savage-piper-'));
-  const wavPath = join(workDir, 'speech.wav');
-
-  try {
-    await runProcess(
-      PIPER_PYTHON,
-      [
-        '-m',
-        'piper',
-        '-m',
-        PIPER_MODEL_NAME,
-        '--data-dir',
-        dirname(paths.model),
-        '-f',
-        wavPath,
-      ],
-      `${chunk}\n`,
-      PIPER_SYNTHESIS_TIMEOUT_MS,
-    );
-
-    const audio = await readFile(wavPath);
-    if (!audio.length) throw new Error('Piper gerou um arquivo WAV vazio');
-    return audio;
-  } finally {
-    await rm(workDir, { recursive: true, force: true }).catch(() => {});
-  }
-}
-
 async function convertWavToMp3(wav, outputPath) {
   const workDir = await mkdtemp(join(tmpdir(), 'savage-mp3-'));
   const wavPath = join(workDir, 'speech.wav');
@@ -321,7 +229,7 @@ async function convertWavToMp3(wav, outputPath) {
         outputPath,
       ],
       '',
-      PIPER_SYNTHESIS_TIMEOUT_MS,
+      FFMPEG_TIMEOUT_MS,
     );
     return readFile(outputPath);
   } finally {
@@ -338,20 +246,8 @@ export async function textToSpeech(text) {
   if (!chunks.length) throw new Error('Não há texto falável');
 
   const chunk = chunks[0];
-  try {
-    const wav = await synthesizeXttsChunk(chunk);
-    const outputPath = join(tmpdir(), `savage-xtts-${randomUUID()}.mp3`);
-    try {
-      return await convertWavToMp3(wav, outputPath);
-    } finally {
-      await rm(outputPath, { force: true }).catch(() => {});
-    }
-  } catch (error) {
-    console.error('[XTTS FALLBACK]', error?.message ?? error);
-  }
-
-  const wav = await synthesizeChunk(chunk);
-  const outputPath = join(tmpdir(), `savage-${randomUUID()}.mp3`);
+  const wav = await synthesizeXttsChunk(chunk);
+  const outputPath = join(tmpdir(), `savage-xtts-${randomUUID()}.mp3`);
   try {
     return await convertWavToMp3(wav, outputPath);
   } finally {
