@@ -79,11 +79,11 @@ No ambiente Nix/Replit, `GlobalFonts.register()`, `registerFromPath()` e `loadFo
 
 **Como aplicar**: Nunca depender de registro manual de fonte. Usar `GlobalFonts.loadSystemFonts()` + detecção dinâmica da família disponível. No Railway, garantir que fontconfig + apt-fonts estejam instalados (via railpack.toml com aptPkgs).
 
-## Regra: usar railpack.toml (apt) em vez de nixpacks.toml (nix) para fontes no Railway
+## Regra: configurar o Railpack no railpack.json
 
-Nixpacks não configura fontconfig corretamente para o skia do @napi-rs/canvas. Com aptPkgs: ["fonts-dejavu-core","fonts-noto","fonts-liberation","fontconfig"] + fc-cache no build, o `loadSystemFonts()` funciona.
+O Railway/Railpack atual procura `railpack.json` no diretório raiz do serviço. A configuração deve manter `provider: "node"` e declarar os pacotes Apt de build/runtime no formato oficial; um `railpack.toml` não é aplicado nessa versão.
 
-**Como aplicar**: Manter nixpacks.toml vazio/comentado. Não forçar builder no railway.json — deixar Railway auto-detectar o railpack.toml.
+**Como aplicar**: Para fontes, manter `fonts-dejavu-core`, `fonts-noto`, `fonts-liberation` e `fontconfig`, executar `fc-cache` no build e deixar o `railway.json` apenas para o start/restart do serviço.
 
 ## Regra: fazer push via GitHub API quando git não está disponível no agente
 
